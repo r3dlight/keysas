@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# (C) Copyright 2019-2022 Stephane Neveu
+
+[Unit]
+Description=keysas-udev daemon
+PartOf=keysas.service
+After=keysas.service
+Before=nginx.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/keysas-udev
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=keysas.service
+
+

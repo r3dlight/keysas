@@ -1,0 +1,28 @@
+[package]
+name = "keysas-core"
+version = "2.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "*"
+bincode ="*"
+sha2 ="*"
+serde_derive = "*"
+serde = "*"
+nix = "*"
+keysas_lib = { path = "../keysas_lib" }
+clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
+
+[[bin]]
+name = "keysas-in"
+path = "src/keysas-in/main.rs"
+
+[[bin]]
+name = "keysas-transit"
+path = "src/keysas-transit/main.rs"
+
+[[bin]]
+name = "keysas-out"
+path = "src/keysas-out/main.rs"

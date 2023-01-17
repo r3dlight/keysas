@@ -1,0 +1,9 @@
+bin/
+fuzz/
+target/
+Cargo.lock
+keysas-core/documentation/user_documentation/_build/
+keysas-core/bin/
+keysas-io/bin/
+keysas-sign/bin/
+keysas-backend/bin/

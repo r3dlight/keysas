@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+    "keysas-core/",
+    "keysas-io/",
+    "keysas-backend/",
+    "keysas-sign/",
+    "keysas-fido/",
+    "keysas_lib/",
+]

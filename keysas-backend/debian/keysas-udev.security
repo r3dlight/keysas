@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# (C) Copyright 2019-2022 Stephane Neveu
+
+[Service]
+SystemCallFilter=@basic-io @file-system @io-event @process @network-io @ipc @system-service @mount landlock_create_ruleset landlock_add_rule landlock_restrict_self
+SystemCallFilter=~@privileged
+SystemCallFilter=~@resources
+CapabilityBoundingSet=CAP_SYS_ADMIN
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectSystem=true
+ProtectHostname=true
+ProtectHome=tmpfs
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=~AF_INET6
+PrivateTmp=true
+LockPersonality=yes
+SystemCallArchitectures=native
+NoNewPrivileges=yes
+RemoveIPC=true
+MemoryDenyWriteExecute=yes
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1/8
