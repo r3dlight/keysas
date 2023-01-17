@@ -1,0 +1,23 @@
+#include <tunables/global>
+
+# vim:syntax=apparmor
+# AppArmor policy for keysas-in
+# ###AUTHOR###
+# Stephane N
+# ###COPYRIGHT###
+# Keysas
+
+
+/usr/bin/keysas-in {
+  #include <abstractions/apache2-common>
+  #include <abstractions/base>
+
+  /sys/devices/system/cpu/online r,
+  owner /run/diode-in/ r,
+  owner /run/diode-in/** w,
+  /var/local/in/ r,
+  /var/local/in/** rw,
+  owner /var/log/keysas-in/ r,
+  owner /var/log/keysas-in/** rw,
+
+}

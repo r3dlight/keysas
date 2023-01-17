@@ -1,0 +1,13 @@
+[Unit]
+Description=keysas
+After=network.target clamav-daemon.socket
+Requires=clamav-daemon.socket
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

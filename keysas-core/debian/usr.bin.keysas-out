@@ -1,0 +1,20 @@
+#include <tunables/global>
+
+# vim:syntax=apparmor
+# AppArmor policy for keysas-out
+# ###AUTHOR###
+# Stephane N
+# ###COPYRIGHT###
+# Keysas
+
+
+/usr/bin/keysas-out {
+  #include <abstractions/base>
+
+  /run/diode-out/ r,
+  /run/diode-out/** r,
+  owner /var/local/out/ r,
+  owner /var/local/out/** rw,
+  owner /var/log/keysas-out/ r,
+  owner /var/log/keysas-out/** rw,
+}

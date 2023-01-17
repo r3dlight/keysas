@@ -1,0 +1,23 @@
+# Keysas-out configuration file
+# This file is part of keysas
+#
+# Diode directory
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+DIODEOUT=/run/diode-out/
+
+# Path where incoming files will be deposited
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+KEYSASOUT=/var/local/out/
+
+# Path to log directory
+# You should not touch this parameter.
+#Pay attention to add a slash at the end
+LOG=/var/log/keysas-out/
+
+# Maximum size in bytes before rotating current log
+ROTATE_OVER_SIZE=3000000
+
+# How many log file to keep under $LOG
+NB_OF_LOG_FILES=3

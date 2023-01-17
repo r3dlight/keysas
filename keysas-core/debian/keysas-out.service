@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# (C) Copyright 2019-2022 Stephane Neveu
+
+[Unit]
+Description=keysas-out daemon
+PartOf=keysas.service
+After=keysas-transit.service
+
+[Service]
+Type=simple
+User=keysas-out
+Group=keysas-out
+EnvironmentFile=/etc/keysas/keysas-out.conf
+ExecStart=/usr/bin/keysas-out -g ${KEYSASOUT} -d ${DIODEOUT} -l ${LOG} -s ${ROTATE_OVER_SIZE} -n ${NB_OF_LOG_FILES}
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=keysas.service
+

@@ -1,0 +1,4 @@
+# Add-on for keysas-in
+/var/local/in/ r,
+/var/local/in/* kr,
+/var/local/in/** kr,

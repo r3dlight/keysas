@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# (C) Copyright 2019-2022 Stephane Neveu
+
+[Unit]
+Description=keysas-transit daemon
+PartOf=keysas.service
+After=keysas-in.service
+
+[Service]
+Type=simple
+User=keysas-transit
+Group=keysas-transit
+RuntimeDirectory=diode-out
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+EnvironmentFile=/etc/keysas/keysas-transit.conf
+ExecStart=/usr/bin/keysas-transit -g ${TRANSIT} -i ${DIODEIN} -o ${DIODEOUT} -l ${LOG} -r ${RULES} -m ${YARA_MAXFILESIZE} -t ${YARA_TIMEOUT} -c ${YARA_CLEAN} -s ${ROTATE_OVER_SIZE} -n ${NB_OF_LOG_FILES} -a ${ALLOWED_TYPES}
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=keysas.service
+

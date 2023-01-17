@@ -1,0 +1,10 @@
+[Unit]
+Description=Clamav-daemon Socket
+After=clamav-daemon.socket
+Requires=clamav-daemon.socket
+
+[Socket]
+ListenStream=127.0.0.1:3310
+
+[Install]
+WantedBy=sockets.target

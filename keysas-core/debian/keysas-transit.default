@@ -1,0 +1,48 @@
+# Keysas-transit configuration file
+# This file is part of keysas.
+#
+# Diode-in directory
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+DIODEIN=/run/diode-in/
+
+# Diode-out directory
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+DIODEOUT=/run/diode-out/
+
+# Path where for files in transit
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+TRANSIT=/var/local/transit/
+
+# Path to log directory
+# You should not touch this parameter.
+# Pay attention to add a slash at the end
+LOG=/var/log/keysas-transit/
+
+# Path to Yara rules (don't forget to add index.yar)
+RULES=/usr/share/keysas/rules/index.yar
+
+# Yara max file size to scan
+# The bigger it is, the longer it takes to scan a file !
+# Default is 50Mo (50000000 bytes)
+YARA_MAXFILESIZE=50000000
+
+# Yara timeout when scannning files
+YARA_TIMEOUT=1000
+
+# Tells if keysas should remove the file if Yara matched at least one rule
+YARA_CLEAN=true
+
+# Maximum size in bytes before rotating current log
+ROTATE_OVER_SIZE=3000000
+
+# How many log file to keep under $LOG path
+NB_OF_LOG_FILES=3
+
+# Set here a whitelist (comma separated) of allowed file types
+# For example:
+# ALLOWED_TYPES="deb,rpm"
+# See https://keysas.fr/administration.html#keysas-transit for more information.
+ALLOWED_TYPES="jpg,png,bmp,mp4,m4v,avi,wmv,mpg,flv,mp3,wav,ogg,epub,mobi,doc,docx,xls,xlsx,ppt,pptx"

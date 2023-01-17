@@ -1,0 +1,22 @@
+#include <tunables/global>
+
+# vim:syntax=apparmor
+# AppArmor policy for keysas-transit
+# ###AUTHOR###
+# Stephane N
+# ###COPYRIGHT###
+# Keysas
+
+
+/usr/bin/keysas-transit {
+  #include <abstractions/base>
+
+  /run/diode-in/ r,
+  /run/diode-in/** r,
+  /usr/share/keysas/rules/** r,
+  owner /run/diode-out/** w,
+  owner /var/local/transit/ r,
+  owner /var/local/transit/** rw,
+  owner /var/log/keysas-transit/ r,
+  owner /var/log/keysas-transit/** rw,
+}
