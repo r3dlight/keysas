@@ -11,7 +11,7 @@ bincode ="*"
 sha2 ="*"
 serde_derive = "*"
 serde = "*"
-nix = "*"
+nix = "0.26"
 keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
 
