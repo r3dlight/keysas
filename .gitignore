@@ -7,3 +7,11 @@ keysas-core/bin/
 keysas-io/bin/
 keysas-sign/bin/
 keysas-backend/bin/
+keysas-frontend/node_modules
+keysas-frontend/dist
+keysas-frontend/.vscode
+keysas-admin/node_modules
+keysas-admin/src-tauri/target
+keysas-admin/dist
+keysas-admin/.vscode
+keysas-admin/.keysas.dat
