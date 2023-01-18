@@ -27,7 +27,7 @@
 #![feature(unix_socket_ancillary_data)]
 use anyhow::{Context, Result};
 use bincode::serialize;
-use clap::{arg, crate_version, Command};
+use clap::{crate_version, Arg, ArgAction, Command};
 use std::fs;
 use std::fs::File;
 use std::io::IoSlice;
@@ -47,53 +47,109 @@ struct Message {
     digest: String,
 }
 
-fn main() -> Result<()> {
+struct Config {
+    sas_in: String,
+    socket: String,
+    log_path: String,
+    file_max_size: u64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            sas_in: "/var/local/in/".to_string(),
+            socket: "/run/keysas/sock".to_string(),
+            log_path: "/var/log/keysas-in/".to_string(),
+            file_max_size: 500000,
+        }
+    }
+}
+fn command_args(config: &mut Config) {
     let matches = Command::new("keysas-in")
         .version(crate_version!())
         .author("Stephane N.")
-        .about("keysas-in, input window.")
+        .about("keysas-in, input SAS.")
         .arg(
-            arg!( -g --sasin <PATH> "Sets Keysas's path for incoming files")
-                .default_value("/var/local/in/"),
+            Arg::new("sas_in")
+                .short('g')
+                .long("sas_in")
+                .value_name("Sets path for incoming directory")
+                .default_value("/var/local/in/")
+                .action(ArgAction::Set)
+                .help("Path for incoming SAS"),
         )
         .arg(
-            arg!( -k --socket <PATH> "Sets a custom socket path").default_value("/run/keysas/sock"),
+            Arg::new("socket")
+                .short('s')
+                .long("socket")
+                .value_name("Sets path for write-only socket")
+                .default_value("/run/keysas/sock")
+                .action(ArgAction::Set)
+                .help("Path for write only abstract socket"),
+        )
+        .arg(
+            Arg::new("log_path")
+                .short('p')
+                .long("log_path")
+                .value_name("Sets path for the log file")
+                .default_value("/var/log/keysas-in/")
+                .action(ArgAction::Set)
+                .help("Path to the log directory"),
+        )
+        .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
         )
         .get_matches();
 
     //Won't panic according to clap authors
-    let keysasin = matches.get_one::<String>("sasin").unwrap();
-    let socket_path = matches.get_one::<String>("socket").unwrap();
+    if let Some(p) = matches.get_one::<String>("sas_in") {
+        config.sas_in = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("socket") {
+        config.socket = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("log_path") {
+        config.log_path = p.to_string();
+    }
+}
 
-    if Path::new(socket_path).exists() {
-        fs::remove_file(socket_path).expect("Cannot remove socket");
+fn main() -> Result<()> {
+    let mut config = Config::default();
+    command_args(&mut config);
+
+    if Path::new(&config.socket).exists() {
+        fs::remove_file(&config.socket).expect("Cannot remove socket");
     }
 
-    let sock = UnixListener::bind(socket_path).context("Could not create the unix socket")?;
+    let sock = UnixListener::bind(config.socket).context("Could not create the unix socket")?;
     //let sock = UnixStream::connect(socket_path)?;
     // put the server logic in a loop to accept several connections
     loop {
         let (unix_stream, _socket_address) = sock
             .accept()
             .context("Failed at accepting a connection on the unix listener")?;
-        let files = list_files(keysasin)?;
+        let files = list_files(&config.sas_in)?;
         for filename in files {
             //spawn a thread here to handle streams
 
             println!("Passing Fd of file is : {}", filename);
-            handle_stream(unix_stream.try_clone()?, keysasin, filename)?;
+            handle_stream(unix_stream.try_clone()?, &config.sas_in, filename)?;
         }
         main_thread::sleep(Duration::from_millis(500));
     }
     //Ok(())
 }
 
-fn handle_stream(stream: UnixStream, keysasin: &String, filename: String) -> Result<()> {
+fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Result<()> {
     // to be filled
     let mut ancillary_buffer = [0; 128];
     let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
     let mut path_file = PathBuf::new();
-    path_file.push(keysasin);
+    path_file.push(sas_in);
     path_file.push(&filename);
     let digest = sha256_digest(path_file.to_str().unwrap())?;
     let fd = File::open(&path_file)?;

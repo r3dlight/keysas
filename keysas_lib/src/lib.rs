@@ -1,10 +1,10 @@
-use sha2::{Digest, Sha256};
-use std::{io::BufReader, fs};
-use std::fs::File;
-use anyhow::{Result};
-use std::io::Read;
-use walkdir::{DirEntry};
+use anyhow::Result;
 use regex::Regex;
+use sha2::{Digest, Sha256};
+use std::fs::File;
+use std::io::Read;
+use std::{fs, io::BufReader};
+use walkdir::DirEntry;
 
 pub fn sha256_digest(file: &str) -> Result<String> {
     let input = File::open(file)?;
