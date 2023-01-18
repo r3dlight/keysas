@@ -30,7 +30,7 @@ use clap::{arg, crate_version, Command};
 use nix::sys::stat;
 use serde_derive::Deserialize;
 use std::fs::File;
-use std::io::IoSliceMut;
+use std::io::{IoSliceMut, Read};
 use std::os::unix::io::FromRawFd;
 use std::os::unix::net::{AncillaryData, SocketAncillary, UnixStream};
 use std::path::PathBuf;
@@ -55,7 +55,8 @@ fn main() -> Result<()> {
                 .default_value("/var/local/out/"),
         )
         .arg(
-            arg!( -k --socket <PATH> "Sets a custom socket path").default_value("/run/keysas/sock_in"),
+            arg!( -k --socket <PATH> "Sets a custom socket path")
+                .default_value("/run/keysas/sock_in"),
         )
         .get_matches();
 
@@ -83,7 +84,7 @@ fn main() -> Result<()> {
                 for fd in scm_rights {
                     //println!("receive file name: {:?}", scm_rights.);
                     println!("Receive file descriptor number: {fd}");
-                    let f = unsafe { File::from_raw_fd(fd) };
+                    let mut f = unsafe { File::from_raw_fd(fd) };
                     // Open the destination file for writing
                     let mut fileout = PathBuf::new();
                     fileout.push(keysasout);
@@ -100,7 +101,7 @@ fn main() -> Result<()> {
                     // Copy the contents of the source file to the dedicated named pipe
                     let mut buf = [0; 4096];
                     loop {
-                        let n = nix::unistd::read(fd, &mut buf)?;
+                        let n = f.read(&mut buf)?;
                         if n == 0 {
                             break;
                         }

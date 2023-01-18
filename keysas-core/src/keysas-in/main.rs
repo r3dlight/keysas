@@ -118,7 +118,6 @@ fn command_args(config: &mut Config) {
 }
 
 fn main() -> Result<()> {
-    
     let mut config = Config::default();
     command_args(&mut config);
     keysas_lib::init_logger();
@@ -158,7 +157,7 @@ fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Resul
 
     let data = serialize(&Message {
         filename: filename.clone(),
-        digest
+        digest,
     })?;
     let bufs = &mut [IoSlice::new(&data[..])][..];
     //let mut bufs = &mut [IoSlice::new(&buf[..])][..];
