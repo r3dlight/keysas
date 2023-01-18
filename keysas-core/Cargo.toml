@@ -14,6 +14,7 @@ serde = "*"
 nix = "0.26"
 keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
+log = "0.4"
 
 [[bin]]
 name = "keysas-in"
@@ -26,3 +27,8 @@ path = "src/keysas-transit/main.rs"
 [[bin]]
 name = "keysas-out"
 path = "src/keysas-out/main.rs"
+
+[profile.release]
+lto = true
+opt-level = 3
+debug = false

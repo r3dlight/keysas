@@ -28,6 +28,7 @@
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
+use log::{debug, error, info};
 use std::fs;
 use std::fs::File;
 use std::io::IoSlice;
@@ -58,7 +59,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             sas_in: "/var/local/in/".to_string(),
-            socket: "/run/keysas/sock".to_string(),
+            socket: "/run/keysas/sock_in".to_string(),
             log_path: "/var/log/keysas-in/".to_string(),
             file_max_size: 500000,
         }
@@ -120,9 +121,11 @@ fn command_args(config: &mut Config) {
 fn main() -> Result<()> {
     let mut config = Config::default();
     command_args(&mut config);
+    keysas_lib::init_logger();
 
     if Path::new(&config.socket).exists() {
         fs::remove_file(&config.socket).expect("Cannot remove socket");
+        debug!("Cleaning previous socket_in");
     }
 
     let sock = UnixListener::bind(config.socket).context("Could not create the unix socket")?;
@@ -136,12 +139,11 @@ fn main() -> Result<()> {
         for filename in files {
             //spawn a thread here to handle streams
 
-            println!("Passing Fd of file is : {}", filename);
+            info!("Passing file descriptor of file: {}", filename);
             handle_stream(unix_stream.try_clone()?, &config.sas_in, filename)?;
         }
         main_thread::sleep(Duration::from_millis(500));
     }
-    //Ok(())
 }
 
 fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Result<()> {
@@ -162,7 +164,10 @@ fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Resul
     let bufs = &mut [IoSlice::new(&data[..])][..];
     //let mut bufs = &mut [IoSlice::new(&buf[..])][..];
     stream.send_vectored_with_ancillary(bufs, &mut ancillary)?;
-    println!("Fd closed, removing: {}", path_file.display());
+    info!(
+        "File descriptor now closed, removing: {}",
+        path_file.display()
+    );
     fs::remove_file(path_file)?;
     Ok(())
 }

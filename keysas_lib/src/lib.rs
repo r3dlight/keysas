@@ -1,10 +1,19 @@
 use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::{fs, io::BufReader};
 use walkdir::DirEntry;
+
+pub fn init_logger() {
+    if env::var("RUST_LOG").is_ok() {
+        simple_logger::init_with_env().unwrap();
+    } else {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+    }
+}
 
 pub fn sha256_digest(file: &str) -> Result<String> {
     let input = File::open(file)?;
