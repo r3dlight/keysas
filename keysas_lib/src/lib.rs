@@ -31,7 +31,7 @@ pub fn sha256_digest(file: &str) -> Result<String> {
         }
         hasher.finalize()
     };
-    Ok(format!("{:x}", digest))
+    Ok(format!("{digest:x}"))
 }
 
 /// This function returns a bool weither
