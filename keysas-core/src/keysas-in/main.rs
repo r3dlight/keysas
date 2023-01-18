@@ -37,6 +37,7 @@ use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::thread as main_thread;
 use std::time::Duration;
+//use std::process;
 
 #[macro_use]
 extern crate serde_derive;
@@ -52,7 +53,6 @@ struct Config {
     sas_in: String,
     socket: String,
     log_path: String,
-    file_max_size: u64,
 }
 
 impl Default for Config {
@@ -61,7 +61,6 @@ impl Default for Config {
             sas_in: "/var/local/in/".to_string(),
             socket: "/run/keysas/sock_in".to_string(),
             log_path: "/var/log/keysas-in/".to_string(),
-            file_max_size: 500000,
         }
     }
 }
@@ -119,6 +118,7 @@ fn command_args(config: &mut Config) {
 }
 
 fn main() -> Result<()> {
+    
     let mut config = Config::default();
     command_args(&mut config);
     keysas_lib::init_logger();
@@ -138,7 +138,6 @@ fn main() -> Result<()> {
         let files = list_files(&config.sas_in)?;
         for filename in files {
             //spawn a thread here to handle streams
-
             info!("Passing file descriptor of file: {}", filename);
             handle_stream(unix_stream.try_clone()?, &config.sas_in, filename)?;
         }
@@ -159,7 +158,7 @@ fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Resul
 
     let data = serialize(&Message {
         filename: filename.clone(),
-        digest: digest,
+        digest
     })?;
     let bufs = &mut [IoSlice::new(&data[..])][..];
     //let mut bufs = &mut [IoSlice::new(&buf[..])][..];
@@ -169,5 +168,6 @@ fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Resul
         path_file.display()
     );
     fs::remove_file(path_file)?;
+    ancillary.clear();
     Ok(())
 }
