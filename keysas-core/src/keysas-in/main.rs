@@ -83,7 +83,7 @@ fn command_args(config: &mut Config) {
                 .short('s')
                 .long("socket")
                 .value_name("Sets path for write-only socket")
-                .default_value("/run/keysas/sock")
+                .default_value("/run/keysas/sock_in")
                 .action(ArgAction::Set)
                 .help("Path for write only abstract socket"),
         )
@@ -168,6 +168,6 @@ fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Resul
         path_file.display()
     );
     fs::remove_file(path_file)?;
-    ancillary.clear();
+    //ancillary.clear();
     Ok(())
 }

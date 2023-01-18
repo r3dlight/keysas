@@ -55,7 +55,7 @@ fn main() -> Result<()> {
                 .default_value("/var/local/out/"),
         )
         .arg(
-            arg!( -k --socket <PATH> "Sets a custom socket path").default_value("/run/keysas/sock"),
+            arg!( -k --socket <PATH> "Sets a custom socket path").default_value("/run/keysas/sock_in"),
         )
         .get_matches();
 
