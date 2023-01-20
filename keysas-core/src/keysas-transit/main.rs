@@ -34,12 +34,14 @@ use std::io::{IoSliceMut, IoSlice, BufReader, Read};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
 use std::os::unix::net::{AncillaryData, SocketAncillary, UnixStream, Messages, UnixListener};
+use std::path::Path;
 use std::str;
 use std::process;
 use infer::get_from_path;
 use clam_client::{
         client::ClamClient,
         response::ClamScanResult};
+use yara::*;
 
 #[macro_use]
 extern crate serde_derive;
@@ -75,7 +77,10 @@ struct Configuration {
     magic_list: Vec<String>,         // List of allowed file type
     clamav_ip: String,               // ClamAV IP address
     clamav_port: u16,                // ClamAV port number
-    clam_client: Option<ClamClient>, //Client for clamd
+    clam_client: Option<ClamClient>, // Client for clamd
+    rule_path: String,               // Path to yara rules
+    yara_timeout: i32,               // Timeout for yara
+    yara_rules: Option<Rules>,       // Yara rules
 }
 
 /// This function parse the command arguments into a structure
@@ -97,6 +102,10 @@ fn parse_args() ->Configuration {
         )
         .arg(arg!( -c --clamavip <IP> "Clamav IP addr").default_value("127.0.0.1"))
         .arg(arg!( -p --clamavport <IP> "Clamav port number").default_value("3310"))
+        .arg(arg!( -r --rules_path <PATH> "Sets a custom path for Yara rules").default_value("/usr/share/keysas/rules/index.yar")
+        )
+        .arg(arg!( -t --yara_timeout <SECONDS> "Sets a custom timeout for libyara scans").default_value("900").value_parser(clap::value_parser!(u16))
+        )
         .get_matches();
 
     // Unwrap should not panic with default values
@@ -108,6 +117,9 @@ fn parse_args() ->Configuration {
         clamav_ip: matches.get_one::<String>("clamavip").unwrap().to_string(),
         clamav_port: *matches.get_one::<u16>("clamavport").unwrap(),
         clam_client: None,
+        rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
+        yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
+        yara_rules: None,
     }
 }
 
@@ -257,7 +269,32 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
         
-        // TODO Check yara rules
+        // Check yara rules
+        match &conf.yara_rules {
+            Some(rules) => {
+                match rules.scan_file(Path::new(&f.md.filename), conf.yara_timeout) {
+                    Ok(results) => {
+                        match results.is_empty() {
+                            true => {
+                                f.md.yara_pass = true;
+                            },
+                            false => {
+                                // TODO send matching rules to keysas-out for report
+                                f.md.yara_pass = false;
+                                log::warn!("Yara rules matched");
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Yara cannot scan file {} error {e}", f.md.filename);
+                    }
+                }
+            },
+            None => {
+                log::error!("Yara rules not present");
+                f.md.yara_pass = false;
+            }
+        }
     }
 }
 
@@ -318,7 +355,7 @@ fn main() -> Result<()> {
     // Configure logger
     init_logger();
 
-    // Check clamd
+    // Initilize clamd client
     // Test if ClamAV IP is valid
     match config.clamav_ip.parse::<IpAddr>() {
         Ok(_) => (),
@@ -333,6 +370,34 @@ fn main() -> Result<()> {
         log::error!("Failed to get clamd client");
         process::exit(1);
     }
+
+    // Initialize yara rules
+    match Compiler::new() {
+        Ok(c) => {
+            match c.add_rules_file_with_namespace(&config.rule_path, "keysas") {
+                Ok(c) => {
+                    match c.compile_rules() {
+                        Ok(r) => {
+                            config.yara_rules = Some(r);
+                        },
+                        Err(e) => {
+                            log::error!("Failed to compile yara rules {e}");
+                            process::exit(1);
+                        }
+                    }
+                },
+                Err(e) => {
+                    log::error!("Failed to add yara rules to compiler {e}");
+                    process::exit(1);
+                }
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to initialize yara compiler {e}");
+            process::exit(1);
+        }
+    };
+
 
     // Open socket with keysas-in
     let sock_in = match UnixStream::connect(&config.path_in) {
