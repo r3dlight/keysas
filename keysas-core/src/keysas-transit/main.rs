@@ -31,10 +31,15 @@ use keysas_lib::init_logger;
 use sha2::{Digest, Sha256};
 use std::fs::{File, metadata};
 use std::io::{IoSliceMut, IoSlice, BufReader, Read};
+use std::net::IpAddr;
 use std::os::fd::FromRawFd;
 use std::os::unix::net::{AncillaryData, SocketAncillary, UnixStream, Messages, UnixListener};
 use std::str;
 use std::process;
+use infer::get_from_path;
+use clam_client::{
+        client::ClamClient,
+        response::ClamScanResult};
 
 #[macro_use]
 extern crate serde_derive;
@@ -51,7 +56,7 @@ struct FileMetadata {
     digest: String,
     is_digest_ok: bool,
     is_toobig: bool,
-    is_forbidden: bool,
+    is_type_allowed: bool,
     av_pass: bool,
     yara_pass: bool,    
 }
@@ -64,13 +69,17 @@ struct FileData {
 
 /// Daemon configuration arguments
 struct Configuration {
-    path_in: String, // path for the socket with keysas-in
-    path_out: String, // path for the socket with keysas-out
-    max_size: u64 // Maximum size for files
+    path_in: String,                 // path for the socket with keysas-in
+    path_out: String,                // path for the socket with keysas-out
+    max_size: u64,                   // Maximum size for files
+    magic_list: Vec<String>,         // List of allowed file type
+    clamav_ip: String,               // ClamAV IP address
+    clamav_port: u16,                // ClamAV port number
+    clam_client: Option<ClamClient>, //Client for clamd
 }
 
 /// This function parse the command arguments into a structure
-fn parse_args() -> Configuration {
+fn parse_args() ->Configuration {
     let matches = Command::new("keysas-out")
         .version(crate_version!())
         .author("Stephane N.")
@@ -84,13 +93,21 @@ fn parse_args() -> Configuration {
         .arg(
             arg!( -s --max_size <PATH> "Maximum size for files").default_value("500000000"),
         )
+        .arg(arg!( -a --allowed_formats <LIST> "Whitelist (comma separated) of allowed file formats").default_value("jpg,png,gif,bmp,mp4,m4v,avi,wmv,mpg,flv,mp3,wav,ogg,epub,mobi,doc,docx,xls,xlsx,ppt,pptx")
+        )
+        .arg(arg!( -c --clamavip <IP> "Clamav IP addr").default_value("127.0.0.1"))
+        .arg(arg!( -p --clamavport <IP> "Clamav port number").default_value("3310"))
         .get_matches();
 
     // Unwrap should not panic with default values
     Configuration {
         path_in: matches.get_one::<String>("socket_in").unwrap().to_string(), 
         path_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
-        max_size: *matches.get_one::<u64>("max_size").unwrap()
+        max_size: *matches.get_one::<u64>("max_size").unwrap(),
+        magic_list: matches.get_one::<String>("allowed_formats").unwrap().split(',').map(|s| String::from(s)).collect(),
+        clamav_ip: matches.get_one::<String>("clamavip").unwrap().to_string(),
+        clamav_port: *matches.get_one::<u16>("clamavport").unwrap(),
+        clam_client: None,
     }
 }
 
@@ -126,7 +143,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                                 digest: meta.digest,
                                 is_digest_ok: false,
                                 is_toobig: true,
-                                is_forbidden: true,
+                                is_type_allowed: false,
                                 av_pass: false,
                                 yara_pass: false,
                             },
@@ -140,6 +157,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             }).collect()
 }
 
+/// This function computes the SHA-256 digest of a file
 fn sha256_digest(file: &File) -> Result<String> {
     let mut reader = BufReader::new(file);
 
@@ -158,6 +176,32 @@ fn sha256_digest(file: &File) -> Result<String> {
     Ok(format!("{:x}", digest))
 }
 
+/// This function returns true if the file type is in the list provided 
+fn check_is_extension_allowed(filename: &String, conf: &Configuration) -> bool {
+    match get_from_path(filename) {
+        Ok(Some(info)) => {
+            conf.magic_list.contains(&info.extension().to_string()) 
+        },
+        Ok(None) => {
+            false
+        },
+        Err(e) => {
+            log::warn!("Failed to get Mime type for file {} error {e}", filename);
+            false
+        }
+    }
+}
+
+/// This function check each file given in the input vector.
+/// Checks are made against the provided configuration.
+/// Checks performed are:
+///     - File digest is corret
+///     - File size is less than maximum size provided in configuration
+///     - File type is in the list provided in configuration
+///     - Anti-virus check
+///     - Yara rules check
+/// Checks results are marked in file metadata.
+/// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
     for f in files {
         let file = unsafe {File::from_raw_fd(f.fd)};
@@ -182,14 +226,42 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
 
-        // TODO Check extension
+        // Check extension
+        f.md.is_type_allowed = check_is_extension_allowed(&f.md.filename, conf);
 
-        // TODO Check anti-virus
+        // Check anti-virus
+        match &conf.clam_client {
+            Some(client) => {
+                match client.scan_stream(file) {
+                    Ok(ClamScanResult::Ok) => {
 
+                    },
+                    Ok(ClamScanResult::Found(l, v)) => {
+                        // TODO send scan report to keysas-out
+                        log::warn!("Clam found virus {v} at {l}");
+                        f.md.av_pass = false;
+                    },
+                    Ok(ClamScanResult::Error(e)) => {
+                        log::error!("Clam error while scanning file {e}");
+                        f.md.av_pass = false;
+                    },
+                    Err(e) => {
+                        log::error!("Failed to run clam on file {e}");
+                        f.md.av_pass = false;
+                    }
+                }
+            },
+            None => {
+                log::error!("Clamd client failed");
+                f.md.av_pass = false;
+            }
+        }
+        
         // TODO Check yara rules
     }
 }
 
+/// This functions send the files filedescriptor and metadata to the socket
 fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
     for file in files {
         // Get metadata
@@ -215,14 +287,52 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
     }
 }
 
+/// This function returns a client to clamd
+fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
+    match ClamClient::new_with_timeout(clamav_ip, clamav_port, 5) {
+        Ok(client) => {
+            match client.version() {
+                Ok(version) => {
+                    log::info!("Clamd version {:?}", version);
+                    Some(client)
+                },
+                Err(e) => {
+                    log::error!("Clamd is not responding {e}");
+                    None
+                }
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to contact clamd {e}");
+            None
+        }
+    }
+}
+
 fn main() -> Result<()> {
     // TODO activate seccomp
 
     // Parse command arguments
-    let config = parse_args();
+    let mut config = parse_args();
 
     // Configure logger
     init_logger();
+
+    // Check clamd
+    // Test if ClamAV IP is valid
+    match config.clamav_ip.parse::<IpAddr>() {
+        Ok(_) => (),
+        Err(e) => {
+            log::error!("ClamAV invalid IP address {e}");
+            process::exit(1);
+        }
+    }
+    // Test if clamd is responding
+    config.clam_client = get_clamd_client(&config.clamav_ip, config.clamav_port);
+    if config.clam_client.is_none() {
+        log::error!("Failed to get clamd client");
+        process::exit(1);
+    }
 
     // Open socket with keysas-in
     let sock_in = match UnixStream::connect(&config.path_in) {
