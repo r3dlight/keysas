@@ -15,7 +15,7 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-//#![warn(unstable_features)]
+#![warn(unstable_features)]
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
@@ -26,95 +26,465 @@
 #![feature(unix_socket_ancillary_data)]
 
 use anyhow::Result;
-use clap::{arg, crate_version, Command};
-use nix::sys::stat;
-use serde_derive::Deserialize;
-use std::fs::File;
-use std::io::{IoSliceMut, Read};
-use std::os::unix::io::FromRawFd;
-use std::os::unix::net::{AncillaryData, SocketAncillary, UnixStream};
-use std::path::PathBuf;
+use clam_client::{client::ClamClient, response::ClamScanResult};
+use clap::{crate_version, Command};
+use infer::get_from_path;
+use keysas_lib::init_logger;
+use keysas_lib::sha256_digest;
+use log::{debug, error, info};
+use std::fs::{metadata, File};
+use std::io::{BufReader, IoSlice, IoSliceMut, Read};
+use std::net::IpAddr;
+use std::os::fd::FromRawFd;
+use std::os::unix::net::{AncillaryData, Messages, SocketAncillary, UnixListener, UnixStream};
+use std::path::Path;
+use std::process;
 use std::str;
-use std::thread as main_thread;
-use std::time::Duration;
-//use utils::sha256_digest;
+use yara::*;
+
+#[macro_use]
+extern crate serde_derive;
 
 #[derive(Deserialize, Debug)]
-struct Message {
+struct InputMetadata {
     filename: String,
     digest: String,
 }
 
-fn main() -> Result<()> {
+#[derive(Serialize, Debug)]
+struct FileMetadata {
+    filename: String,
+    digest: String,
+    is_digest_ok: bool,
+    is_toobig: bool,
+    is_type_allowed: bool,
+    av_pass: bool,
+    yara_pass: bool,
+}
+
+#[derive(Debug)]
+struct FileData {
+    fd: i32,
+    md: FileMetadata,
+}
+
+/// Daemon configuration arguments
+struct Configuration {
+    socket_in: String,               // path for the socket with keysas-in
+    socket_out: String,              // path for the socket with keysas-out
+    max_size: u64,                   // Maximum size for files
+    magic_list: Vec<String>,         // List of allowed file type
+    clamav_ip: String,               // ClamAV IP address
+    clamav_port: u16,                // ClamAV port number
+    clam_client: Option<ClamClient>, // Client for clamd
+    rule_path: String,               // Path to yara rules
+    yara_timeout: i32,               // Timeout for yara
+    yara_rules: Option<Rules>,       // Yara rules
+}
+
+/// This function parse the command arguments into a structure
+fn parse_args() -> Configuration {
     let matches = Command::new("keysas-out")
-        .version(crate_version!())
-        .author("Stephane N.")
-        .about("keysas-in, input window.")
-        .arg(
-            arg!( -g --sasout <PATH> "Sets Keysas's path for incoming files")
-                .default_value("/var/local/out/"),
+         .version(crate_version!())
+         .author("Stephane N.")
+         .about("keysas-transit, perform file sanitazation.")
+         .arg(
+            Arg::new("socket_in")
+                .short('i')
+                .long("socket_in")
+                .value_name("<PATH>")
+                .default_value("/run/keysas/sock_in")
+                .action(ArgAction::Set)
+                .help("Sets a custom socket path for input files"),
         )
         .arg(
-            arg!( -k --socket <PATH> "Sets a custom socket path")
-                .default_value("/run/keysas/sock_in"),
+            Arg::new("socket_out")
+                .short('o')
+                .long("socket_out")
+                .value_name("<PATH>")
+                .default_value("/run/keysas/sock_out")
+                .action(ArgAction::Set)
+                .help("Sets a custom socket path for output files"),
         )
-        .get_matches();
+        .arg(
+            Arg::new("max_size")
+                .short('s')
+                .long("max_size")
+                .value_name("<SIZE_IN_BYTES>")
+                .default_value("500000000")
+                .action(ArgAction::Set)
+                .help("Maximum size for files"),
+        )
+        .arg(
+            Arg::new("allowed_formats")
+                .short('a')
+                .long("allowed_formats")
+                .value_name("<LIST>")
+                .default_value("jpg,png,gif,bmp,mp4,m4v,avi,wmv,mpg,flv,mp3,wav,ogg,epub,mobi,doc,docx,xls,xlsx,ppt,pptx")
+                .action(ArgAction::Set)
+                .help("Whitelist (comma separated) of allowed file formats"),
+        )
+        .arg(
+            Arg::new("clamavip")
+                .short('c')
+                .long("clamavip")
+                .value_name("<IP>")
+                .default_value("127.0.0.1")
+                .action(ArgAction::Set)
+                .help("Clamav IP address"),
+        )
+        .arg(
+            Arg::new("clamavport")
+                .short('p')
+                .long("clamavport")
+                .value_name("<PORT>")
+                .default_value("3310")
+                .action(ArgAction::Set)
+                .help("Clamav port number"),
+        )
+        .arg(
+            Arg::new("rules_path")
+                .short('r')
+                .long("rules_path")
+                .value_name("<PATH>")
+                .default_value("/usr/share/keysas/rules/index.yar")
+                .action(ArgAction::Set)
+                .help("Sets a custom path for Yara rules"),
+        )
+        .arg(
+            Arg::new("yara_timeout")
+                .short('t')
+                .long("yara_timeout")
+                .value_name("<SECONDS>")
+                .default_value("100")
+                .action(ArgAction::Set)
+                .help("Sets a custom timeout for libyara scans"),
+        )
+         .get_matches();
 
-    //Won't panic according to clap authors
-    let keysasout = matches.get_one::<String>("sasout").unwrap();
-    let socket_path = matches.get_one::<String>("socket").unwrap();
-    //let sock = UnixStream::connect(socket_path)?;
+    // Unwrap should not panic with default values
+    Configuration {
+        socket_in: matches.get_one::<String>("socket_in").unwrap().to_string(),
+        socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
+        max_size: *matches.get_one::<u64>("max_size").unwrap(),
+        magic_list: matches
+            .get_one::<String>("allowed_formats")
+            .unwrap()
+            .split(',')
+            .map(|s| String::from(s))
+            .collect(),
+        clamav_ip: matches.get_one::<String>("clamavip").unwrap().to_string(),
+        clamav_port: *matches.get_one::<u16>("clamavport").unwrap(),
+        clam_client: None,
+        rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
+        yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
+        yara_rules: None,
+    }
+}
 
-    //let mut fds = [0; 8];
-    let mut ancillary_buffer = [0; 128];
-    let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
-
-    let mut buf = [0; 4096];
-    let bufs = &mut [IoSliceMut::new(&mut buf[..])][..];
-    //sock.recv_vectored_with_ancillary(bufs, &mut ancillary)?;
-    loop {
-        let sock = UnixStream::connect(socket_path)?;
-
-        sock.recv_vectored_with_ancillary(bufs, &mut ancillary)?;
-
-        for ancillary_result in ancillary.messages() {
-            let data: Message = bincode::deserialize_from(&*bufs[0])?;
-            println!("{:?}", data);
-            if let AncillaryData::ScmRights(scm_rights) = ancillary_result.unwrap() {
-                for fd in scm_rights {
-                    //println!("receive file name: {:?}", scm_rights.);
-                    println!("Receive file descriptor number: {fd}");
-                    let mut f = unsafe { File::from_raw_fd(fd) };
-                    // Open the destination file for writing
-                    let mut fileout = PathBuf::new();
-                    fileout.push(keysasout);
-                    fileout.push(&data.filename);
-                    //create the file into keysasout path
-                    let _file = File::create(&fileout)?;
-                    // Open the destination file for writing
-                    let dst_fd = nix::fcntl::open(
-                        &fileout,
-                        nix::fcntl::OFlag::O_WRONLY,
-                        stat::Mode::empty(),
-                    )?;
-
-                    // Copy the contents of the source file to the dedicated named pipe
-                    let mut buf = [0; 4096];
-                    loop {
-                        let n = f.read(&mut buf)?;
-                        if n == 0 {
-                            break;
-                        }
-                        nix::unistd::write(dst_fd, &buf[..n])?;
-                    }
-                    nix::unistd::close(dst_fd)?;
-                    drop(f);
-
-                    println!("Filename is : {}", data.filename);
-                    println!("SHA256 is : {}", data.digest);
+/// This function retrieves the file descriptors and metadata from the messages
+fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
+    messages
+        .filter_map(|m| {
+            //Desencapsulate Result
+            match m {
+                Ok(ad) => Some(ad),
+                Err(e) => {
+                    warn!("failed to get ancillary data: {:?}", e);
+                    None
                 }
             }
+        })
+        .filter_map(|ad| {
+            // Filter AncillaryData to keep only ScmRights
+            match ad {
+                AncillaryData::ScmRights(scm_rights) => Some(scm_rights),
+                AncillaryData::ScmCredentials(_) => None,
+            }
+        })
+        .flatten()
+        .filter_map(|fd| {
+            // Deserialize metadata
+            match bincode::deserialize_from::<&[u8], InputMetadata>(buffer) {
+                Ok(meta) => {
+                    // Initialize with failed value by default
+                    Some(FileData {
+                        fd,
+                        md: FileMetadata {
+                            filename: meta.filename,
+                            digest: meta.digest,
+                            is_digest_ok: false,
+                            is_toobig: true,
+                            is_type_allowed: false,
+                            av_pass: false,
+                            yara_pass: false,
+                        },
+                    })
+                }
+                Err(e) => {
+                    warn!("Failed to deserialize messge from in: {e}");
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
+/// This function returns true if the file type is in the list provided
+fn check_is_extension_allowed(filename: &String, conf: &Configuration) -> bool {
+    match get_from_path(filename) {
+        Ok(Some(info)) => conf.magic_list.contains(&info.extension().to_string()),
+        Ok(None) => false,
+        Err(e) => {
+            warn!("Failed to get Mime type for file {} error {e}", filename);
+            false
         }
-        main_thread::sleep(Duration::from_millis(500));
+    }
+}
+
+/// This function check each file given in the input vector.
+/// Checks are made against the provided configuration.
+/// Checks performed are:
+///     - File digest is correct
+///     - File size is less than maximum size provided in configuration
+///     - File type is in the list provided in configuration
+///     - Anti-virus check
+///     - Yara rules check
+/// Checks results are marked in file metadata.
+/// This function does not modify the files.
+fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
+    for f in files {
+        let file = unsafe { File::from_raw_fd(f.fd) };
+
+        // Check digest
+        match sha256_digest(&file.to_string_lossy()) {
+            Ok(d) => {
+                f.md.is_digest_ok = f.md.digest.eq(&d);
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to calculate digest for file {}, error {e}",
+                    f.md.filename
+                );
+            }
+        }
+
+        // Check size
+        match metadata(&f.md.filename) {
+            Ok(meta) => {
+                f.md.is_toobig = meta.len().gt(&conf.max_size);
+            }
+            Err(e) => {
+                warn!("Failed to get metadata of file {} error {e}", f.md.filename);
+            }
+        }
+
+        // Check extension
+        f.md.is_type_allowed = check_is_extension_allowed(&f.md.filename, conf);
+
+        // Check anti-virus
+        match &conf.clam_client {
+            Some(client) => {
+                match client.scan_stream(file) {
+                    Ok(ClamScanResult::Ok) => {}
+                    Ok(ClamScanResult::Found(l, v)) => {
+                        // TODO send scan report to keysas-out
+                        warn!("Clam found virus {v} at {l}");
+                        f.md.av_pass = false;
+                    }
+                    Ok(ClamScanResult::Error(e)) => {
+                        error!("Clam error while scanning file {e}");
+                        f.md.av_pass = false;
+                    }
+                    Err(e) => {
+                        error!("Failed to run clam on file {e}");
+                        f.md.av_pass = false;
+                    }
+                }
+            }
+            None => {
+                error!("Clamd client failed");
+                f.md.av_pass = false;
+            }
+        }
+
+        // Check yara rules
+        match &conf.yara_rules {
+            Some(rules) => {
+                match rules.scan_file(Path::new(&f.md.filename), conf.yara_timeout) {
+                    Ok(results) => {
+                        match results.is_empty() {
+                            true => {
+                                f.md.yara_pass = true;
+                            }
+                            false => {
+                                // TODO send matching rules to keysas-out for report
+                                f.md.yara_pass = false;
+                                warn!("Yara rules matched");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Yara cannot scan file {} error {e}", f.md.filename);
+                    }
+                }
+            }
+            None => {
+                error!("Yara rules not present");
+                f.md.yara_pass = false;
+            }
+        }
+    }
+}
+
+/// This functions send the files filedescriptor and metadata to the socket
+fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
+    for file in files {
+        // Get metadata
+        let data = match bincode::serialize(&file.md) {
+            Ok(d) => d,
+            Err(e) => {
+                println!("Failed to serialize: {e}");
+                process::exit(1);
+            }
+        };
+        let bufs = &[IoSlice::new(&data[..])];
+
+        // Send them on the socket
+        let mut ancillary_buffer = [0; 4096];
+        let mut ancillary = SocketAncillary::new(&mut ancillary_buffer);
+        ancillary.add_fds(&[file.fd][..]);
+        match stream.send_vectored_with_ancillary(&bufs[..], &mut ancillary) {
+            Ok(_) => println!("File sent"),
+            Err(e) => println!("Failed to send file {e}"),
+        }
+    }
+}
+
+/// This function returns a client to clamd
+fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
+    match ClamClient::new_with_timeout(clamav_ip, clamav_port, 5) {
+        Ok(client) => match client.version() {
+            Ok(version) => {
+                info!("Clamd version {:?}", version);
+                Some(client)
+            }
+            Err(e) => {
+                error!("Clamd is not responding {e}");
+                None
+            }
+        },
+        Err(e) => {
+            error!("Failed to contact clamd {e}");
+            None
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    // TODO activate seccomp & landlock
+
+    // Parse command arguments
+    let mut config = parse_args();
+
+    // Configure logger
+    init_logger();
+
+    // Initilize clamd client
+    // Test if ClamAV IP is valid
+    match config.clamav_ip.parse::<IpAddr>() {
+        Ok(_) => (),
+        Err(e) => {
+            error!("ClamAV invalid IP address {e}");
+            process::exit(1);
+        }
+    }
+    // Test if clamd is responding
+    config.clam_client = get_clamd_client(&config.clamav_ip, config.clamav_port);
+    if config.clam_client.is_none() {
+        error!("Failed to get clamd client");
+        process::exit(1);
+    }
+
+    // Initialize yara rules
+    match Compiler::new() {
+        Ok(c) => match c.add_rules_file_with_namespace(&config.rule_path, "keysas") {
+            Ok(c) => match c.compile_rules() {
+                Ok(r) => {
+                    config.yara_rules = Some(r);
+                }
+                Err(e) => {
+                    error!("Failed to compile yara rules {e}");
+                    process::exit(1);
+                }
+            },
+            Err(e) => {
+                error!("Failed to add yara rules to compiler {e}");
+                process::exit(1);
+            }
+        },
+        Err(e) => {
+            error!("Failed to initialize yara compiler {e}");
+            process::exit(1);
+        }
+    };
+
+    // Open socket with keysas-in
+    let sock_in = match UnixStream::connect(&config.socket_in) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to open socket with keysas-in {e}");
+            process::exit(1);
+        }
+    };
+
+    // Open socket with keysas-out
+    let sock_out = match UnixListener::bind(&config.socket_out) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to open socket with keysas-out {e}");
+            process::exit(1);
+        }
+    };
+
+    // Wait to be connected with keysas-out before starting to accept files in
+    let (out_stream, _sck_addr) = match sock_out.accept() {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Failed to accept connection: {e}");
+            process::exit(1);
+        }
+    };
+
+    // Allocate buffers for input messages
+    let mut ancillary_buffer_in = [0; 128];
+    let mut ancillary_in = SocketAncillary::new(&mut ancillary_buffer_in[..]);
+
+    // Main loop
+    // 1. receive file descriptors from in
+    // 2. run check on the file
+    // 3. send fd and report to out
+    loop {
+        // 4128 => filename max 4096 bytes and digest 32 bytes
+        let mut buf_in = [0; 4128];
+        let bufs_in = &mut [IoSliceMut::new(&mut buf_in[..])][..];
+
+        // Listen for message on socket
+        match sock_in.recv_vectored_with_ancillary(bufs_in, &mut ancillary_in) {
+            Ok(_) => (),
+            Err(e) => {
+                warn!("Failed to receive fds from in: {e}");
+                process::exit(1);
+            }
+        }
+
+        // Parse messages received
+        let mut files = parse_messages(ancillary_in.messages(), &buf_in);
+
+        // Run check on message received
+        check_files(&mut files, &config);
+
+        // Send fd and report to out
+        send_files(&files, &out_stream)
     }
 }
