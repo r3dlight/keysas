@@ -3,7 +3,10 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::File;
+use std::io::IoSlice;
 use std::io::Read;
+use std::mem;
+use std::os::unix::io::AsRawFd;
 use std::{fs, io::BufReader};
 use walkdir::DirEntry;
 
@@ -84,4 +87,19 @@ pub fn list_files(directory: &str) -> Result<Vec<String>> {
     let re = Regex::new(r"^\.([a-z])*")?;
     names.retain(|x| !re.is_match(x));
     Ok(names)
+}
+
+pub fn convert_ioslice<'a>(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
+    let mut ios: Vec<IoSlice> = Vec::new();
+    let mut fds: Vec<i32> = Vec::new();
+    for i in input {
+        ios.push(IoSlice::new(&i[..]));
+    }
+
+    for file in files {
+        fds.push(file.as_raw_fd());
+        //TODO: add destructors to close any fd left
+        mem::forget(file);
+    }
+    (ios, fds)
 }

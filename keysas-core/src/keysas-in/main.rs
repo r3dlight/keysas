@@ -16,7 +16,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-//#![warn(unstable_features)]
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
@@ -32,19 +31,15 @@ use log::{debug, error, info};
 use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::IoSlice;
-use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::PathBuf;
+use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
-//use std::process;
-use std::mem;
-use std::process;
 
 #[macro_use]
 extern crate serde_derive;
-use keysas_lib::{list_files, sha256_digest};
+use keysas_lib::{convert_ioslice, list_files, sha256_digest};
 
 #[derive(Serialize, Debug, Clone)]
 struct Message {
@@ -121,27 +116,12 @@ fn command_args(config: &mut Config) {
     }
 }
 
-fn convert_ioslice<'a>(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
-    let mut ios: Vec<IoSlice> = Vec::new();
-    let mut fds: Vec<i32> = Vec::new();
-    for i in input {
-        ios.push(IoSlice::new(&i[..]));
-    }
-
-    for file in files {
-        fds.push(file.as_raw_fd());
-        //TODO: add destructors to close any fd left
-        mem::forget(file);
-    }
-    (ios, fds)
-}
-
 fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Result<()> {
-    //Max X files per send in .chunks(X)
+    //Remove any file starting by .(dot)
     let re = Regex::new(r"^\.([a-z])*")?;
     let mut files = files.clone();
     files.retain(|x| !re.is_match(x));
-
+    //Max X files per send in .chunks(X)
     for batch in files.chunks(2) {
         let (bufs, fhs): (Vec<Vec<u8>>, Vec<File>) = batch
             .iter()
