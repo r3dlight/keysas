@@ -39,7 +39,7 @@ use std::time::Duration;
 
 #[macro_use]
 extern crate serde_derive;
-use keysas_lib::{convert_ioslice, list_files, sha256_digest};
+use keysas_lib::{convert_ioslice, init_logger, list_files, sha256_digest};
 
 #[derive(Serialize, Debug, Clone)]
 struct Message {
@@ -49,7 +49,7 @@ struct Message {
 
 struct Config {
     sas_in: String,
-    socket: String,
+    socket_in: String,
     log_path: String,
 }
 
@@ -57,7 +57,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             sas_in: "/var/local/in/".to_string(),
-            socket: "/run/keysas/sock_in".to_string(),
+            socket_in: "/run/keysas/sock_in".to_string(),
             log_path: "/var/log/keysas-in/".to_string(),
         }
     }
@@ -78,17 +78,17 @@ fn command_args(config: &mut Config) {
                 .help("Path for incoming SAS"),
         )
         .arg(
-            Arg::new("socket")
+            Arg::new("socket_in")
                 .short('s')
-                .long("socket")
+                .long("socket_in")
                 .value_name("Sets path for write-only socket")
                 .default_value("/run/keysas/sock_in")
                 .action(ArgAction::Set)
-                .help("Path for write only abstract socket"),
+                .help("Path for write only abstract socket_in"),
         )
         .arg(
             Arg::new("log_path")
-                .short('p')
+                .short('l')
                 .long("log_path")
                 .value_name("Sets path for the log file")
                 .default_value("/var/log/keysas-in/")
@@ -108,8 +108,8 @@ fn command_args(config: &mut Config) {
     if let Some(p) = matches.get_one::<String>("sas_in") {
         config.sas_in = p.to_string();
     }
-    if let Some(p) = matches.get_one::<String>("socket") {
-        config.socket = p.to_string();
+    if let Some(p) = matches.get_one::<String>("socket_in") {
+        config.socket_in = p.to_string();
     }
     if let Some(p) = matches.get_one::<String>("log_path") {
         config.log_path = p.to_string();
@@ -175,10 +175,13 @@ fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Resu
 }
 
 fn main() -> Result<()> {
+    // TODO activate seccomp & landlock
+
     let mut config = Config::default();
     command_args(&mut config);
+    init_logger();
     info!("Keysas-in started :)");
-    let sock = match UnixListener::bind(config.socket) {
+    let sock = match UnixListener::bind(config.socket_in) {
         Ok(s) => s,
         Err(e) => {
             error!("Failed to open socket {e}");
