@@ -27,7 +27,7 @@
 
 use anyhow::Result;
 use clam_client::{client::ClamClient, response::ClamScanResult};
-use clap::{Arg, crate_version, Command};
+use clap::{Arg, ArgAction, crate_version, Command};
 use infer::get_from_path;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
