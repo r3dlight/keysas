@@ -29,23 +29,26 @@ use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
 use log::{debug, error, info};
-use std::fs;
+use regex::Regex;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::IoSlice;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread as main_thread;
 use std::time::Duration;
 //use std::process;
+use std::mem;
+use std::process;
 
 #[macro_use]
 extern crate serde_derive;
 use keysas_lib::{list_files, sha256_digest};
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 struct Message {
-    filename: String,
+    filename: Box<OsStr>,
     digest: String,
 }
 
@@ -64,6 +67,7 @@ impl Default for Config {
         }
     }
 }
+
 fn command_args(config: &mut Config) {
     let matches = Command::new("keysas-in")
         .version(crate_version!())
@@ -117,56 +121,110 @@ fn command_args(config: &mut Config) {
     }
 }
 
+fn convert_ioslice<'a>(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
+    let mut ios: Vec<IoSlice> = Vec::new();
+    let mut fds: Vec<i32> = Vec::new();
+    for i in input {
+        ios.push(IoSlice::new(&i[..]));
+    }
+
+    for file in files {
+        fds.push(file.as_raw_fd());
+        //TODO: add destructors to close any fd left
+        mem::forget(file);
+    }
+    (ios, fds)
+}
+
+fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Result<()> {
+    //Max X files per send in .chunks(X)
+    let re = Regex::new(r"^\.([a-z])*")?;
+    let mut files = files.clone();
+    files.retain(|x| !re.is_match(x));
+
+    for batch in files.chunks(2) {
+        let (bufs, fhs): (Vec<Vec<u8>>, Vec<File>) = batch
+            .iter()
+            .map(|f| {
+                let mut base_path = PathBuf::from(&sas_in);
+                base_path.push(f);
+                base_path
+            })
+            .filter_map(|f| {
+                let digest = sha256_digest(&f.to_string_lossy()).unwrap();
+                let m = Message {
+                    filename: f.file_name()?.to_os_string().into(),
+                    digest,
+                };
+                let data: Vec<u8> = match serialize(&m) {
+                    Ok(d) => d,
+                    Err(_e) => {
+                        error!("Failed to serialize message");
+                        return None;
+                    }
+                };
+
+                let fh = match File::open(&f) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        error!("Failed to open file {}: {e}", f.display());
+                        process::exit(1);
+                    }
+                };
+                Some((data, fh))
+            })
+            .unzip();
+
+        let (ios, fds) = convert_ioslice(fhs, &bufs);
+
+        let mut ancillary_buffer = [0; 4096];
+        let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
+        ancillary.add_fds(&fds[..]);
+        match stream.send_vectored_with_ancillary(&ios[..], &mut ancillary) {
+            Ok(_) => {
+                debug!("Sent fds");
+            }
+            Err(e) => error!("Failed to send fds: {e}"),
+        }
+        //Not sure it is actually good
+        for fd in fds {
+            drop(fd);
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let mut config = Config::default();
     command_args(&mut config);
-    keysas_lib::init_logger();
-
-    if Path::new(&config.socket).exists() {
-        fs::remove_file(&config.socket).expect("Cannot remove socket");
-        debug!("Cleaning previous socket_in");
-    }
-
-    let sock = UnixListener::bind(config.socket).context("Could not create the unix socket")?;
-    //let sock = UnixStream::connect(socket_path)?;
-    // put the server logic in a loop to accept several connections
-    loop {
-        let (unix_stream, _socket_address) = sock
-            .accept()
-            .context("Failed at accepting a connection on the unix listener")?;
-        let files = list_files(&config.sas_in)?;
-        for filename in files {
-            //spawn a thread here to handle streams
-            info!("Passing file descriptor of file: {}", filename);
-            handle_stream(unix_stream.try_clone()?, &config.sas_in, filename)?;
+    info!("Keysas-in started :)");
+    let sock = match UnixListener::bind(config.socket) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to open socket {e}");
+            process::exit(1);
         }
+    };
+
+    loop {
+        let (unix_stream, _sck_addr) = match sock.accept() {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to accept connection: {e}");
+                process::exit(1);
+            }
+        };
+
+        let files = match list_files(&config.sas_in) {
+            Ok(fs) => fs,
+            Err(e) => {
+                error!("Failed to list files in directory {}: {e}", &config.sas_in);
+                process::exit(1);
+            }
+        };
+
+        send_files(&files, &unix_stream, &config.sas_in)
+            .context("Cannot send file descriptors :/")?;
         main_thread::sleep(Duration::from_millis(500));
     }
-}
-
-fn handle_stream(stream: UnixStream, sas_in: &String, filename: String) -> Result<()> {
-    // to be filled
-    let mut ancillary_buffer = [0; 128];
-    let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
-    let mut path_file = PathBuf::new();
-    path_file.push(sas_in);
-    path_file.push(&filename);
-    let digest = sha256_digest(path_file.to_str().unwrap())?;
-    let fd = File::open(&path_file)?;
-    ancillary.add_fds(&[fd.as_raw_fd()][..]);
-
-    let data = serialize(&Message {
-        filename: filename.clone(),
-        digest,
-    })?;
-    let bufs = &mut [IoSlice::new(&data[..])][..];
-    //let mut bufs = &mut [IoSlice::new(&buf[..])][..];
-    stream.send_vectored_with_ancillary(bufs, &mut ancillary)?;
-    info!(
-        "File descriptor now closed, removing: {}",
-        path_file.display()
-    );
-    fs::remove_file(path_file)?;
-    //ancillary.clear();
-    Ok(())
 }
