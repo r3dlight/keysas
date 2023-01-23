@@ -16,6 +16,9 @@ keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
 regex = "*"
+infer = "*"
+clam-client = { git = "https://gitlab.com/r3dlight/clam-client", branch = "master" }
+yara = "0.16.2"
 
 [[bin]]
 name = "keysas-in"
