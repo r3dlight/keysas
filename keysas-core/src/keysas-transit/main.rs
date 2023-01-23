@@ -31,7 +31,7 @@ use clap::{Arg, ArgAction, crate_version, Command};
 use infer::get_from_path;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::fs::{metadata, File};
 use std::io::{BufReader, IoSlice, IoSliceMut, Read};
 use std::net::IpAddr;
