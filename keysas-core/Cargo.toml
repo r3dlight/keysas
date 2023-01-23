@@ -15,6 +15,7 @@ nix = "0.26"
 keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
+regex = "*"
 
 [[bin]]
 name = "keysas-in"
