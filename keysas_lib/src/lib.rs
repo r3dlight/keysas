@@ -4,12 +4,12 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::File;
 use std::io::IoSlice;
-use std::io::Read;
 use std::mem;
 use std::os::unix::io::AsRawFd;
-use std::{fs, io::BufReader};
-use walkdir::DirEntry;
+use std::path::Path;
+use std::fs;
 
+// Init logger
 pub fn init_logger() {
     if env::var("RUST_LOG").is_ok() {
         simple_logger::init_with_env().unwrap();
@@ -18,23 +18,23 @@ pub fn init_logger() {
     }
 }
 
-pub fn sha256_digest(file: &str) -> Result<String> {
-    let input = File::open(file)?;
-    let mut reader = BufReader::new(input);
+/*
+struct FileAsPath(File);
+impl AsRef<Path> for FileAsPath {
+    fn as_ref(&self) -> &Path {
+        self.0
+    }
+}
+*/
 
-    let digest = {
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; 1048576];
-        loop {
-            let count = reader.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            hasher.update(&buffer[..count]);
-        }
-        hasher.finalize()
-    };
-    Ok(format!("{digest:x}"))
+/// This function computes the SHA-256 digest of a file
+pub fn sha256_digest(input: &Path) -> Result<String> {
+    //let path = input.as_ref();
+    // if Path::new(path).exists//
+    let mut file = File::open(input).unwrap();
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher).unwrap();
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 /// This function returns a bool weither
@@ -49,6 +49,7 @@ pub fn sha256_digest(file: &str) -> Result<String> {
 ///    let entry = entry.unwrap();
 ///    println!("{}", entry.path().display());
 /// ```
+/*
 fn is_not_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
@@ -56,6 +57,7 @@ fn is_not_hidden(entry: &DirEntry) -> bool {
         .map(|s| entry.depth() == 0 || !s.starts_with('.'))
         .unwrap_or(false)
 }
+*/
 
 /// This function lists all files in a directory except hidden ones.
 ///
@@ -89,7 +91,7 @@ pub fn list_files(directory: &str) -> Result<Vec<String>> {
     Ok(names)
 }
 
-pub fn convert_ioslice<'a>(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
+pub fn convert_ioslice(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
     let mut ios: Vec<IoSlice> = Vec::new();
     let mut fds: Vec<i32> = Vec::new();
     for i in input {
@@ -98,7 +100,6 @@ pub fn convert_ioslice<'a>(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSli
 
     for file in files {
         fds.push(file.as_raw_fd());
-        //TODO: add destructors to close any fd left
         mem::forget(file);
     }
     (ios, fds)

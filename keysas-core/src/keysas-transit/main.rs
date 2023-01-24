@@ -27,13 +27,13 @@
 
 use anyhow::Result;
 use clam_client::{client::ClamClient, response::ClamScanResult};
-use clap::{Arg, ArgAction, crate_version, Command};
+use clap::{crate_version, Arg, ArgAction, Command};
 use infer::get_from_path;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use std::fs::{metadata, File};
-use std::io::{BufReader, IoSlice, IoSliceMut, Read};
+use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
 use std::os::unix::net::{AncillaryData, Messages, SocketAncillary, UnixListener, UnixStream};
@@ -85,82 +85,82 @@ struct Configuration {
 /// This function parse the command arguments into a structure
 fn parse_args() -> Configuration {
     let matches = Command::new("keysas-out")
-         .version(crate_version!())
-         .author("Stephane N.")
-         .about("keysas-transit, perform file sanitazation.")
+          .version(crate_version!())
+          .author("Stephane N.")
+          .about("keysas-transit, perform file sanitazation.")
+          .arg(
+             Arg::new("socket_in")
+                 .short('i')
+                 .long("socket_in")
+                 .value_name("<PATH>")
+                 .default_value("/run/keysas/sock_in")
+                 .action(ArgAction::Set)
+                 .help("Sets a custom socket path for input files"),
+         )
          .arg(
-            Arg::new("socket_in")
-                .short('i')
-                .long("socket_in")
-                .value_name("<PATH>")
-                .default_value("/run/keysas/sock_in")
-                .action(ArgAction::Set)
-                .help("Sets a custom socket path for input files"),
-        )
-        .arg(
-            Arg::new("socket_out")
-                .short('o')
-                .long("socket_out")
-                .value_name("<PATH>")
-                .default_value("/run/keysas/sock_out")
-                .action(ArgAction::Set)
-                .help("Sets a custom socket path for output files"),
-        )
-        .arg(
-            Arg::new("max_size")
-                .short('s')
-                .long("max_size")
-                .value_name("<SIZE_IN_BYTES>")
-                .default_value("500000000")
-                .action(ArgAction::Set)
-                .help("Maximum size for files"),
-        )
-        .arg(
-            Arg::new("allowed_formats")
-                .short('a')
-                .long("allowed_formats")
-                .value_name("<LIST>")
-                .default_value("jpg,png,gif,bmp,mp4,m4v,avi,wmv,mpg,flv,mp3,wav,ogg,epub,mobi,doc,docx,xls,xlsx,ppt,pptx")
-                .action(ArgAction::Set)
-                .help("Whitelist (comma separated) of allowed file formats"),
-        )
-        .arg(
-            Arg::new("clamavip")
-                .short('c')
-                .long("clamavip")
-                .value_name("<IP>")
-                .default_value("127.0.0.1")
-                .action(ArgAction::Set)
-                .help("Clamav IP address"),
-        )
-        .arg(
-            Arg::new("clamavport")
-                .short('p')
-                .long("clamavport")
-                .value_name("<PORT>")
-                .default_value("3310")
-                .action(ArgAction::Set)
-                .help("Clamav port number"),
-        )
-        .arg(
-            Arg::new("rules_path")
-                .short('r')
-                .long("rules_path")
-                .value_name("<PATH>")
-                .default_value("/usr/share/keysas/rules/index.yar")
-                .action(ArgAction::Set)
-                .help("Sets a custom path for Yara rules"),
-        )
-        .arg(
-            Arg::new("yara_timeout")
-                .short('t')
-                .long("yara_timeout")
-                .value_name("<SECONDS>")
-                .default_value("100")
-                .action(ArgAction::Set)
-                .help("Sets a custom timeout for libyara scans"),
-        )
-         .get_matches();
+             Arg::new("socket_out")
+                 .short('o')
+                 .long("socket_out")
+                 .value_name("<PATH>")
+                 .default_value("/run/keysas/sock_out")
+                 .action(ArgAction::Set)
+                 .help("Sets a custom socket path for output files"),
+         )
+         .arg(
+             Arg::new("max_size")
+                 .short('s')
+                 .long("max_size")
+                 .value_name("<SIZE_IN_BYTES>")
+                 .default_value("500000000")
+                 .action(ArgAction::Set)
+                 .help("Maximum size for files"),
+         )
+         .arg(
+             Arg::new("allowed_formats")
+                 .short('a')
+                 .long("allowed_formats")
+                 .value_name("<LIST>")
+                 .default_value("jpg,png,gif,bmp,mp4,m4v,avi,wmv,mpg,flv,mp3,wav,ogg,epub,mobi,doc,docx,xls,xlsx,ppt,pptx")
+                 .action(ArgAction::Set)
+                 .help("Whitelist (comma separated) of allowed file formats"),
+         )
+         .arg(
+             Arg::new("clamavip")
+                 .short('c')
+                 .long("clamavip")
+                 .value_name("<IP>")
+                 .default_value("127.0.0.1")
+                 .action(ArgAction::Set)
+                 .help("Clamav IP address"),
+         )
+         .arg(
+             Arg::new("clamavport")
+                 .short('p')
+                 .long("clamavport")
+                 .value_name("<PORT>")
+                 .default_value("3310")
+                 .action(ArgAction::Set)
+                 .help("Clamav port number"),
+         )
+         .arg(
+             Arg::new("rules_path")
+                 .short('r')
+                 .long("rules_path")
+                 .value_name("<PATH>")
+                 .default_value("/usr/share/keysas/rules/index.yar")
+                 .action(ArgAction::Set)
+                 .help("Sets a custom path for Yara rules"),
+         )
+         .arg(
+             Arg::new("yara_timeout")
+                 .short('t')
+                 .long("yara_timeout")
+                 .value_name("<SECONDS>")
+                 .default_value("100")
+                 .action(ArgAction::Set)
+                 .help("Sets a custom timeout for libyara scans"),
+         )
+          .get_matches();
 
     // Unwrap should not panic with default values
     Configuration {
@@ -257,7 +257,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         let file = unsafe { File::from_raw_fd(f.fd) };
 
         // Check digest
-        match sha256_digest(&file.to_string_lossy()) {
+        match sha256_digest(Path::new(&f.md.filename)) {
             Ok(d) => {
                 f.md.is_digest_ok = f.md.digest.eq(&d);
             }

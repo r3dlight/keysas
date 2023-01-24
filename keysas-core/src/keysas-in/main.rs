@@ -28,6 +28,7 @@ use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
 use log::{debug, error, info};
+use nix::unistd::close;
 use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::File;
@@ -116,10 +117,10 @@ fn command_args(config: &mut Config) {
     }
 }
 
-fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Result<()> {
+fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<()> {
     //Remove any file starting by .(dot)
     let re = Regex::new(r"^\.([a-z])*")?;
-    let mut files = files.clone();
+    let mut files = files.to_owned();
     files.retain(|x| !re.is_match(x));
     //Max X files per send in .chunks(X)
     for batch in files.chunks(2) {
@@ -131,7 +132,13 @@ fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Resu
                 base_path
             })
             .filter_map(|f| {
-                let digest = sha256_digest(&f.to_string_lossy()).unwrap();
+                let digest = match sha256_digest(&f) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        log::error!("Failed to compute hash {e}");
+                        return None;
+                    }
+                };
                 let m = Message {
                     filename: f.file_name()?.to_os_string().into(),
                     digest,
@@ -168,7 +175,12 @@ fn send_files(files: &Vec<String>, stream: &UnixStream, sas_in: &String) -> Resu
         }
         //Not sure it is actually good
         for fd in fds {
-            drop(fd);
+            match close(fd) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("Failed to close file descriptor {e}");
+                }
+            }
         }
     }
     Ok(())
