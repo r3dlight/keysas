@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::File;
-use std::io::IoSlice;
+use std::io::{IoSlice, BufReader, Read};
 use std::mem;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -29,12 +29,24 @@ impl AsRef<Path> for FileAsPath {
 
 /// This function computes the SHA-256 digest of a file
 pub fn sha256_digest(input: &Path) -> Result<String> {
-    //let path = input.as_ref();
-    // if Path::new(path).exists//
-    let mut file = File::open(input).unwrap();
-    let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).unwrap();
-    Ok(format!("{:x}", hasher.finalize()))
+    let file = File::open(input)
+                            .context("Failed to open input file")?;
+    
+    let mut reader = BufReader::new(file);
+
+    let digest = {
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 1048576];
+        loop {
+            let count = reader.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..count]);
+        }
+        hasher.finalize()
+    };
+    Ok(format!("{:x}", digest))
 }
 
 /// This function returns a bool weither
