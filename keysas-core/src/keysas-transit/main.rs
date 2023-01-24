@@ -59,7 +59,9 @@ struct FileMetadata {
     is_toobig: bool,
     is_type_allowed: bool,
     av_pass: bool,
+    av_report: String,
     yara_pass: bool,
+    yara_report: String,
 }
 
 #[derive(Debug)]
@@ -217,7 +219,9 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             is_toobig: true,
                             is_type_allowed: false,
                             av_pass: false,
+                            av_report: String::new(),
                             yara_pass: false,
+                            yara_report: String::new(),
                         },
                     })
                 }
@@ -284,24 +288,23 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
 
         // Check anti-virus
         match &conf.clam_client {
-            Some(client) => {
-                match client.scan_stream(file) {
-                    Ok(ClamScanResult::Ok) => {}
-                    Ok(ClamScanResult::Found(l, v)) => {
-                        // TODO send scan report to keysas-out
-                        warn!("Clam found virus {v} at {l}");
-                        f.md.av_pass = false;
-                    }
-                    Ok(ClamScanResult::Error(e)) => {
-                        error!("Clam error while scanning file {e}");
-                        f.md.av_pass = false;
-                    }
-                    Err(e) => {
-                        error!("Failed to run clam on file {e}");
-                        f.md.av_pass = false;
-                    }
+            Some(client) => match client.scan_stream(file) {
+                Ok(ClamScanResult::Ok) => {}
+                Ok(ClamScanResult::Found(l, v)) => {
+                    warn!("Clam found virus {v} at {l}");
+                    f.md.av_report
+                        .push_str(format!("Clam report: {} - {}", l, v).as_str());
+                    f.md.av_pass = false;
                 }
-            }
+                Ok(ClamScanResult::Error(e)) => {
+                    error!("Clam error while scanning file {e}");
+                    f.md.av_pass = false;
+                }
+                Err(e) => {
+                    error!("Failed to run clam on file {e}");
+                    f.md.av_pass = false;
+                }
+            },
             None => {
                 error!("Clamd client failed");
                 f.md.av_pass = false;
@@ -310,25 +313,23 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
 
         // Check yara rules
         match &conf.yara_rules {
-            Some(rules) => {
-                match rules.scan_file(Path::new(&f.md.filename), conf.yara_timeout) {
-                    Ok(results) => {
-                        match results.is_empty() {
-                            true => {
-                                f.md.yara_pass = true;
-                            }
-                            false => {
-                                // TODO send matching rules to keysas-out for report
-                                f.md.yara_pass = false;
-                                warn!("Yara rules matched");
-                            }
+            Some(rules) => match rules.scan_file(Path::new(&f.md.filename), conf.yara_timeout) {
+                Ok(results) => match results.is_empty() {
+                    true => {
+                        f.md.yara_pass = true;
+                    }
+                    false => {
+                        for result in results {
+                            f.md.yara_report.push_str(result.identifier);
                         }
+                        f.md.yara_pass = false;
+                        warn!("Yara rules matched");
                     }
-                    Err(e) => {
-                        error!("Yara cannot scan file {} error {e}", f.md.filename);
-                    }
+                },
+                Err(e) => {
+                    error!("Yara cannot scan file {} error {e}", f.md.filename);
                 }
-            }
+            },
             None => {
                 error!("Yara rules not present");
                 f.md.yara_pass = false;
