@@ -44,7 +44,7 @@ pub fn sha256_digest(input: &File) -> Result<String> {
         }
         hasher.finalize()
     };
-    Ok(format!("{:x}", digest))
+    Ok(format!("{digest:x}"))
 }
 
 /// This function returns a bool weither
@@ -113,7 +113,7 @@ pub fn convert_ioslice<'a>(
 
     for file in files {
         fds.push(file.as_raw_fd());
-        mem::forget(file);
+        mem::forget(file.to_owned());
     }
     (ios, fds)
 }
