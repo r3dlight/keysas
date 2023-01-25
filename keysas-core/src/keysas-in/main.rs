@@ -217,7 +217,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         // Files are unlinked once fds are sent
         for it in fs.iter().zip(fds.iter()) {
             let (file_path, fd) = it;
-            match unlinkat(Some(fd), file_path, UnlinkatFlags::NoRemoveDir) {
+            match unlinkat(Some(*fd), file_path, UnlinkatFlags::NoRemoveDir) {
                 Ok(_) => info!("File {:?} is now removed."),
                 Err(e) => error!("Cannot unlink file {:?}: {:?}",file_path, e),
             };
