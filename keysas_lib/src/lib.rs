@@ -29,9 +29,9 @@ impl AsRef<Path> for FileAsPath {
 
 /// This function computes the SHA-256 digest of a file
 pub fn sha256_digest(input: &File) -> Result<String> {
-    let file = File::open(input).context("Failed to open input file")?;
+    //let file = File::open(input).context("Failed to open input file")?;
 
-    let mut reader = BufReader::new(file);
+    let mut reader = BufReader::new(input);
 
     let digest = {
         let mut hasher = Sha256::new();
