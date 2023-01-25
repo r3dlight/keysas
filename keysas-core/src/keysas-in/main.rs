@@ -27,7 +27,7 @@
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use nix::unistd::close;
 use regex::Regex;
 use std::ffi::OsStr;
@@ -37,10 +37,16 @@ use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
+use landlock::{
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
+    RulesetStatus, ABI,
+};
 
 #[macro_use]
 extern crate serde_derive;
 use keysas_lib::{convert_ioslice, init_logger, list_files, sha256_digest};
+
+const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[derive(Serialize, Debug, Clone)]
 struct Message {
@@ -63,6 +69,34 @@ impl Default for Config {
         }
     }
 }
+fn landlock_sandbox() -> Result<(), RulesetError> {
+    let abi = ABI::V2;
+    let status = Ruleset::new()
+        .handle_access(AccessFs::from_all(abi))?
+        .create()?
+        // Read-only access.
+        .add_rules(path_beneath_rules(
+            &[config_directory],
+            AccessFs::from_read(abi),
+        ))?
+        // Read-write access.
+        .add_rules(path_beneath_rules(
+            &[socket_in, sas_in, log_path],
+            AccessFs::from_all(abi),
+        ))?
+        .restrict_self()?;
+    match status.ruleset {
+        // The FullyEnforced case must be tested.
+        RulesetStatus::FullyEnforced => info!("Keysas-in is now fully sandboxed using Landlock !"),
+        RulesetStatus::PartiallyEnforced => warn!("Keysas-in is only partially sandboxed using Landlock !"),
+        // Users should be warned that they are not protected.
+        RulesetStatus::NotEnforced => {
+            warn!("Keysas-in: Not sandboxed with Landlock ! Please update your kernel.")
+        }
+    }
+    Ok(())
+}
+
 
 fn command_args(config: &mut Config) {
     let matches = Command::new("keysas-in")
@@ -71,7 +105,7 @@ fn command_args(config: &mut Config) {
         .about("keysas-in, input SAS.")
         .arg(
             Arg::new("sas_in")
-                .short('g')
+                .short('i')
                 .long("sas_in")
                 .value_name("Sets path for incoming directory")
                 .default_value("/var/local/in/")
@@ -132,7 +166,15 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 base_path
             })
             .filter_map(|f| {
-                let digest = match sha256_digest(&f) {
+                // FD is opened in read-only mode
+                let fh = match File::open(&f) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        error!("Failed to open file {}: {e}", f.display());
+                        process::exit(1);
+                    }
+                };
+                let digest = match sha256_digest(&fh) {
                     Ok(d) => d,
                     Err(e) => {
                         log::error!("Failed to compute hash {e}");
@@ -150,19 +192,11 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                         return None;
                     }
                 };
-
-                let fh = match File::open(&f) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        error!("Failed to open file {}: {e}", f.display());
-                        process::exit(1);
-                    }
-                };
                 Some((data, fh))
             })
             .unzip();
 
-        let (ios, fds) = convert_ioslice(fhs, &bufs);
+        let (ios, fds) = convert_ioslice(&fhs, &bufs);
 
         let mut ancillary_buffer = [0; 4096];
         let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);

@@ -261,7 +261,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         let file = unsafe { File::from_raw_fd(f.fd) };
 
         // Check digest
-        match sha256_digest(Path::new(&f.md.filename)) {
+        match sha256_digest(&file) {
             Ok(d) => {
                 f.md.is_digest_ok = f.md.digest.eq(&d);
             }
