@@ -27,23 +27,22 @@
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
+use itertools::MultiUnzip;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
 };
 use log::{debug, error, info, warn};
-use nix::unistd::close;
 use nix::unistd::unlinkat;
 use nix::unistd::UnlinkatFlags;
 use regex::Regex;
 use std::ffi::OsStr;
-use std::fs::{self, File};
+use std::fs::File;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
-use itertools::MultiUnzip;
 
 #[macro_use]
 extern crate serde_derive;
@@ -220,7 +219,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
             let (file_path, fd) = it;
             match unlinkat(Some(*fd), file_path, UnlinkatFlags::NoRemoveDir) {
                 Ok(_) => info!("File {:?} is now removed.", file_path),
-                Err(e) => error!("Cannot unlink file {:?}: {:?}",file_path, e),
+                Err(e) => error!("Cannot unlink file {:?}: {:?}", file_path, e),
             };
         }
     }
@@ -228,7 +227,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
 }
 
 fn main() -> Result<()> {
-    // TODO: 
+    // TODO:
     // - Add seccomp whitelist
     // - Check that fd is not dir
 
