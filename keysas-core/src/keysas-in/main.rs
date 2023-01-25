@@ -27,6 +27,10 @@
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
+use landlock::{
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
+    RulesetStatus, ABI,
+};
 use log::{debug, error, info, warn};
 use nix::unistd::close;
 use regex::Regex;
@@ -37,10 +41,6 @@ use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
-use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
-};
 
 #[macro_use]
 extern crate serde_derive;
@@ -69,14 +69,18 @@ impl Default for Config {
         }
     }
 }
-fn landlock_sandbox() -> Result<(), RulesetError> {
+fn landlock_sandbox(
+    socket_in: &String,
+    sas_in: &String,
+    log_path: &String,
+) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[config_directory],
+            &[CONFIG_DIRECTORY],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
@@ -88,7 +92,9 @@ fn landlock_sandbox() -> Result<(), RulesetError> {
     match status.ruleset {
         // The FullyEnforced case must be tested.
         RulesetStatus::FullyEnforced => info!("Keysas-in is now fully sandboxed using Landlock !"),
-        RulesetStatus::PartiallyEnforced => warn!("Keysas-in is only partially sandboxed using Landlock !"),
+        RulesetStatus::PartiallyEnforced => {
+            warn!("Keysas-in is only partially sandboxed using Landlock !")
+        }
         // Users should be warned that they are not protected.
         RulesetStatus::NotEnforced => {
             warn!("Keysas-in: Not sandboxed with Landlock ! Please update your kernel.")
@@ -96,7 +102,6 @@ fn landlock_sandbox() -> Result<(), RulesetError> {
     }
     Ok(())
 }
-
 
 fn command_args(config: &mut Config) {
     let matches = Command::new("keysas-in")
@@ -225,6 +230,7 @@ fn main() -> Result<()> {
 
     let mut config = Config::default();
     command_args(&mut config);
+    landlock_sandbox(&config.socket_in, &config.sas_in, &config.log_path)?;
     init_logger();
     info!("Keysas-in started :)");
     let sock = match UnixListener::bind(config.socket_in) {
