@@ -19,6 +19,7 @@ regex = "*"
 infer = "*"
 clam-client = { git = "https://gitlab.com/r3dlight/clam-client", branch = "master" }
 yara = "0.16.2"
+landlock = { git = "https://github.com/landlock-lsm/rust-landlock", branch = "main" }
 
 [[bin]]
 name = "keysas-in"
