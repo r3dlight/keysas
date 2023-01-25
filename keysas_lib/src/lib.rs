@@ -103,7 +103,7 @@ pub fn list_files(directory: &str) -> Result<Vec<String>> {
     Ok(names)
 }
 
-pub fn convert_ioslice(files: Vec<File>, input: &Vec<Vec<u8>>) -> (Vec<IoSlice>, Vec<i32>) {
+pub fn convert_ioslice<'a>(files: &'a Vec<File>, input: &'a Vec<Vec<u8>>) -> (Vec<IoSlice<'a>>, Vec<i32>) {
     let mut ios: Vec<IoSlice> = Vec::new();
     let mut fds: Vec<i32> = Vec::new();
     for i in input {
