@@ -26,9 +26,7 @@ jobs:
     - run: apt-get update -yq
     - run: apt -qy -t bullseye-backports install libyara-dev libyara9
     - run: apt-get install -y wget make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev
-    - run: 
-  - bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-
+    - run: bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
     - name: Build
       run: cargo build --verbose
     - name: Run tests
