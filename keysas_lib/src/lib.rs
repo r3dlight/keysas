@@ -5,7 +5,6 @@ use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, IoSlice, Read};
-use std::mem;
 use std::os::unix::io::AsRawFd;
 
 // Init logger
@@ -113,7 +112,6 @@ pub fn convert_ioslice<'a>(
 
     for file in files {
         fds.push(file.as_raw_fd());
-        mem::forget(file.to_owned());
     }
     (ios, fds)
 }
