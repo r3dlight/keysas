@@ -38,7 +38,9 @@ use nix::unistd::UnlinkatFlags;
 use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::File;
+use std::fs::File;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
@@ -72,7 +74,7 @@ impl Default for Config {
     }
 }
 fn landlock_sandbox(
-    socket_in: &String,
+    socket_in: &str,
     sas_in: &String,
     log_path: &String,
 ) -> Result<(), RulesetError> {
@@ -233,9 +235,31 @@ fn main() -> Result<()> {
 
     let mut config = Config::default();
     command_args(&mut config);
-    landlock_sandbox(&config.socket_in, &config.sas_in, &config.log_path)?;
+    let socket = Path::new(&config.socket_in);
     init_logger();
+    match socket.parent() {
+        Some(parent) => {
+            landlock_sandbox(parent.to_str().unwrap(), &config.sas_in, &config.log_path)?
+        }
+        None => {
+            error!("Failed to find parent directory for socket");
+            process::exit(1);
+        }
+    }
     info!("Keysas-in started :)");
+    info!("Running configuration is:");
+    info!("- socket_in: {}", &config.socket_in);
+    info!("- sas_in: {}", &config.sas_in);
+    info!("- log_path: {}", &config.log_path);
+    if Path::new(&config.socket_in).exists() {
+        match remove_file(&config.socket_in) {
+            Ok(_) => debug!("Removing previously created socket_in"),
+            Err(why) => {
+                error!("Cannot remove previously created socket_in !");
+                process::exit(1);
+            }
+        }
+    }
     let sock = match UnixListener::bind(config.socket_in) {
         Ok(s) => s,
         Err(e) => {
