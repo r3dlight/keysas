@@ -43,6 +43,7 @@ use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
+use itertools::MultiUnzip;
 
 #[macro_use]
 extern crate serde_derive;
@@ -201,7 +202,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 };
                 Some((data, fh, f))
             })
-            .unzip();
+            .multiunzip();
 
         let (ios, fds) = convert_ioslice(&fhs, &bufs);
 
@@ -218,7 +219,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         for it in fs.iter().zip(fds.iter()) {
             let (file_path, fd) = it;
             match unlinkat(Some(*fd), file_path, UnlinkatFlags::NoRemoveDir) {
-                Ok(_) => info!("File {:?} is now removed."),
+                Ok(_) => info!("File {:?} is now removed.", file_path),
                 Err(e) => error!("Cannot unlink file {:?}: {:?}",file_path, e),
             };
         }
