@@ -37,8 +37,8 @@ use nix::unistd::unlinkat;
 use nix::unistd::UnlinkatFlags;
 use regex::Regex;
 use std::ffi::OsStr;
-use std::fs::File;
 use std::fs::remove_file;
+use std::fs::File;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::Path;
 use std::path::PathBuf;
@@ -255,7 +255,7 @@ fn main() -> Result<()> {
         match remove_file(&config.socket_in) {
             Ok(_) => debug!("Removing previously created socket_in"),
             Err(why) => {
-                error!("Cannot remove previously created socket_in !");
+                error!("Cannot remove previously created socket_in: {:?}", why);
                 process::exit(1);
             }
         }
