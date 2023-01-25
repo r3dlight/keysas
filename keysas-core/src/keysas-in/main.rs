@@ -33,9 +33,11 @@ use landlock::{
 };
 use log::{debug, error, info, warn};
 use nix::unistd::close;
+use nix::unistd::unlinkat;
+use nix::unistd::UnlinkatFlags;
 use regex::Regex;
 use std::ffi::OsStr;
-use std::fs::File;
+use std::fs::{self, File};
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::process;
@@ -163,7 +165,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
     files.retain(|x| !re.is_match(x));
     //Max X files per send in .chunks(X)
     for batch in files.chunks(2) {
-        let (bufs, fhs): (Vec<Vec<u8>>, Vec<File>) = batch
+        let (bufs, fhs, fs): (Vec<Vec<u8>>, Vec<File>, Vec<PathBuf>) = batch
             .iter()
             .map(|f| {
                 let mut base_path = PathBuf::from(&sas_in);
@@ -197,7 +199,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                         return None;
                     }
                 };
-                Some((data, fh))
+                Some((data, fh, f))
             })
             .unzip();
 
@@ -212,14 +214,13 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
             }
             Err(e) => error!("Failed to send fds: {e}"),
         }
-        //Not sure it is actually good
-        for fd in fds {
-            match close(fd) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!("Failed to close file descriptor {e}");
-                }
-            }
+        // Files are unlinked once fds are sent
+        for it in fs.iter().zip(fds.iter()) {
+            let (file_path, fd) = it;
+            match unlinkat(fd, file_path, UnlinkatFlags::NoRemoveDir) {
+                Ok(_) => info!("File "),
+                Err(e) => error!("{:?}", e),
+            };
         }
     }
     Ok(())
