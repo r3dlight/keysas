@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::env;
@@ -7,7 +7,6 @@ use std::fs::File;
 use std::io::{BufReader, IoSlice, Read};
 use std::mem;
 use std::os::unix::io::AsRawFd;
-use std::path::Path;
 
 // Init logger
 pub fn init_logger() {
