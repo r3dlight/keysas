@@ -38,7 +38,7 @@ use nix::unistd::UnlinkatFlags;
 use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::fs::File;
+use std::fs::remove_file;
 use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
 use std::path::Path;
 use std::path::PathBuf;
