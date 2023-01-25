@@ -12,7 +12,7 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: debian-stable
     strategy:
       matrix:
         toolchain:
@@ -22,6 +22,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+    - run: echo "deb http://deb.debian.org/debian bullseye-backports main contrib non-free" > /etc/apt/sources.list.d/backports.list
+    - run: apt-get update -yq
+    - run: apt -qy -t bullseye-backports install libyara-dev libyara9
+    - run: apt-get install -y wget make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev
+    - run: 
+  - bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
     - name: Build
       run: cargo build --verbose
     - name: Run tests
