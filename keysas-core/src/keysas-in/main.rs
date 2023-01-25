@@ -210,16 +210,16 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         ancillary.add_fds(&fds[..]);
         match stream.send_vectored_with_ancillary(&ios[..], &mut ancillary) {
             Ok(_) => {
-                debug!("Sent fds");
+                debug!("Chunk of file descriptors is sent");
             }
             Err(e) => error!("Failed to send fds: {e}"),
         }
         // Files are unlinked once fds are sent
         for it in fs.iter().zip(fds.iter()) {
             let (file_path, fd) = it;
-            match unlinkat(fd, file_path, UnlinkatFlags::NoRemoveDir) {
-                Ok(_) => info!("File "),
-                Err(e) => error!("{:?}", e),
+            match unlinkat(Some(fd), file_path, UnlinkatFlags::NoRemoveDir) {
+                Ok(_) => info!("File {:?} is now removed."),
+                Err(e) => error!("Cannot unlink file {:?}: {:?}",file_path, e),
             };
         }
     }
@@ -227,7 +227,9 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
 }
 
 fn main() -> Result<()> {
-    // TODO activate seccomp & landlock
+    // TODO: 
+    // - Add seccomp whitelist
+    // - Check that fd is not dir
 
     let mut config = Config::default();
     command_args(&mut config);
