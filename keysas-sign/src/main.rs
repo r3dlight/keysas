@@ -264,8 +264,7 @@ fn try_format(device: &str) -> Result<()> {
     Cmd::new("/usr/sbin/mkfs.vfat").arg(device).spawn()?;
     println!("USB device formated to vfat !");
     println!(
-        "(If it failed, you can format manually the newly created partition. Run 'mkfs.vfat {}1')",
-        device
+        "(If it failed, you can format manually the newly created partition. Run 'mkfs.vfat {device}1')"
     );
     Ok(())
 }
