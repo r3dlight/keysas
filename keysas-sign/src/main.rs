@@ -152,7 +152,7 @@ fn signme(
     let sk = sk_box.into_secret_key(Some(password.to_string()))?;
 
     // Now, we can use the secret key to sign anything.
-    let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
+    let data = format!("{vendor}/{model}/{revision}/{serial}/{direction}");
     let data_reader = Cursor::new(&data);
     let signature_box = minisign::sign(
         None,
@@ -182,7 +182,7 @@ fn watch() -> Result<()> {
     loop {
         let result = unsafe {
             ppoll(
-                (&mut fds[..]).as_mut_ptr(),
+                fds[..].as_mut_ptr(),
                 fds.len() as nfds_t,
                 ptr::null_mut(),
                 ptr::null(),
@@ -599,8 +599,8 @@ fn main() -> Result<()> {
             Some("Keysas-USB-privkey"),
             Some(password.to_string()),
         )?;
-        println!("Private key path is: {}", privkey_path);
-        println!("Public key path is: {}", pubkey_path);
+        println!("Private key path is: {privkey_path}");
+        println!("Public key path is: {pubkey_path}");
         println!("All done.")
     }
     if verify {
@@ -608,24 +608,24 @@ fn main() -> Result<()> {
 
         match get_signature(device) {
             Ok(signature) => {
-                println!("Read signature from key: {:?}", signature);
+                println!("Read signature from key: {signature:?}");
                 let pk_box_str = fs::read_to_string(pubkey_path)?;
                 let signature_box = SignatureBox::from_string(&signature)?;
                 // Load the public key from the string.
                 let pk_box = PublicKeyBox::from_string(&pk_box_str)?;
                 let pk = pk_box.into_public_key()?;
                 // And verify the data.
-                let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
+                let data = format!("{vendor}/{model}/{revision}/{serial}/{direction}");
                 let data_reader = Cursor::new(&data);
                 let verified =
                     minisign::verify(&pk, &signature_box, data_reader, true, false, false);
                 match verified {
                     Ok(()) => println!("Successfully verified your device signature :)"),
-                    Err(e) => println!("Verification of the device failed :/ : {:?}", e),
+                    Err(e) => println!("Verification of the device failed :/ : {e:?}"),
                 }
             }
             Err(e) => {
-                println!("No signature found on this device: {}.", e)
+                println!("No signature found on this device: {e}.")
             }
         };
     }
