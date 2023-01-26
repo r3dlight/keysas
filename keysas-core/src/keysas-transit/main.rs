@@ -30,6 +30,10 @@ use clap::{crate_version, Arg, ArgAction, Command};
 use infer::get_from_path;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
+use landlock::{
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
+    RulesetStatus, ABI,
+};
 use log::{error, info, warn};
 use std::fs::{metadata, File};
 use std::io::{IoSlice, IoSliceMut};
@@ -40,6 +44,8 @@ use std::path::Path;
 use std::process;
 use std::str;
 use yara::*;
+
+const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[macro_use]
 extern crate serde_derive;
@@ -83,12 +89,41 @@ struct Configuration {
     yara_rules: Option<Rules>,       // Yara rules
 }
 
+fn landlock_sandbox(socket_in: &String, socket_out: &String) -> Result<(), RulesetError> {
+    let abi = ABI::V2;
+    let status = Ruleset::new()
+        .handle_access(AccessFs::from_all(abi))?
+        .create()?
+        // Read-only access.
+        .add_rules(path_beneath_rules(
+            &[CONFIG_DIRECTORY, socket_in],
+            AccessFs::from_read(abi),
+        ))?
+        // Read-write access.
+        .add_rules(path_beneath_rules(&[socket_out], AccessFs::from_all(abi)))?
+        .restrict_self()?;
+    match status.ruleset {
+        // The FullyEnforced case must be tested.
+        RulesetStatus::FullyEnforced => {
+            info!("Keysas-transit is now fully sandboxed using Landlock !")
+        }
+        RulesetStatus::PartiallyEnforced => {
+            warn!("Keysas-transit is only partially sandboxed using Landlock !")
+        }
+        // Users should be warned that they are not protected.
+        RulesetStatus::NotEnforced => {
+            warn!("Keysas-transit: Not sandboxed with Landlock ! Please update your kernel.")
+        }
+    }
+    Ok(())
+}
+
 /// This function parse the command arguments into a structure
 fn parse_args() -> Configuration {
-    let matches = Command::new("keysas-out")
+    let matches = Command::new("keysas-transit")
           .version(crate_version!())
           .author("Stephane N.")
-          .about("keysas-transit, perform file sanitazation.")
+          .about("keysas-transit, perform file sanitization.")
           .arg(
              Arg::new("socket_in")
                  .short('i')
@@ -386,6 +421,9 @@ fn main() -> Result<()> {
 
     // Parse command arguments
     let mut config = parse_args();
+
+    // landlock init
+    landlock_sandbox(&config.socket_in, &config.socket_out)?;
 
     // Configure logger
     init_logger();
