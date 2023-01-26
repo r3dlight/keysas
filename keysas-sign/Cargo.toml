@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mbrman = "0.5.1" 
-clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
-minisign = "0.7.2"
-anyhow = "*"
+mbrman = "0.5" 
+clap = { version = "4", default-features = false, features = ["std", "cargo"] }
+minisign = "0.7"
+anyhow = "1.0"
 nom = "7"
-libc = "*"
-udev = "0.7.0"
+libc = "0.2"
+udev = "0.7"

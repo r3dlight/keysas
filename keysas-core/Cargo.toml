@@ -6,21 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "*"
-bincode ="*"
-sha2 ="*"
-serde_derive = "*"
-serde = "*"
+anyhow = "1.0"
+bincode ="1.3"
+sha2 ="0.10"
+serde_derive = "1.0"
+serde = "1.0"
 nix = "0.26"
 keysas_lib = { path = "../keysas_lib" }
-clap = { version = "4.0.32", default-features = false, features = ["std", "cargo"] }
+clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
-regex = "*"
-infer = "*"
+regex = "1.7"
+infer = "0.12"
 clam-client = { git = "https://gitlab.com/r3dlight/clam-client", branch = "master" }
-yara = "0.16.2"
+yara = "0.16"
 landlock = { git = "https://github.com/landlock-lsm/rust-landlock", branch = "main" }
-itertools ="*"
+itertools ="0.10"
 
 [[bin]]
 name = "keysas-in"
