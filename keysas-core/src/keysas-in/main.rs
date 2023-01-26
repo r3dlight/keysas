@@ -61,7 +61,6 @@ struct Message {
 struct Config {
     sas_in: String,
     socket_in: String,
-    log_path: String,
 }
 
 impl Default for Config {
@@ -69,29 +68,21 @@ impl Default for Config {
         Self {
             sas_in: "/var/local/in/".to_string(),
             socket_in: "/run/keysas/sock_in".to_string(),
-            log_path: "/var/log/keysas-in/".to_string(),
         }
     }
 }
-fn landlock_sandbox(
-    socket_in: &str,
-    sas_in: &String,
-    log_path: &String,
-) -> Result<(), RulesetError> {
+fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY],
+            &[CONFIG_DIRECTORY, sas_in],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_in, sas_in, log_path],
-            AccessFs::from_all(abi),
-        ))?
+        .add_rules(path_beneath_rules(&[socket_in], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -131,15 +122,6 @@ fn command_args(config: &mut Config) {
                 .help("Path for write only abstract socket_in"),
         )
         .arg(
-            Arg::new("log_path")
-                .short('l')
-                .long("log_path")
-                .value_name("Sets path for the log file")
-                .default_value("/var/log/keysas-in/")
-                .action(ArgAction::Set)
-                .help("Path to the log directory"),
-        )
-        .arg(
             Arg::new("version")
                 .short('v')
                 .long("version")
@@ -154,9 +136,6 @@ fn command_args(config: &mut Config) {
     }
     if let Some(p) = matches.get_one::<String>("socket_in") {
         config.socket_in = p.to_string();
-    }
-    if let Some(p) = matches.get_one::<String>("log_path") {
-        config.log_path = p.to_string();
     }
 }
 
@@ -186,7 +165,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 let digest = match sha256_digest(&fh) {
                     Ok(d) => d,
                     Err(e) => {
-                        log::error!("Failed to compute hash {e}");
+                        error!("Failed to compute hash {e}");
                         return None;
                     }
                 };
@@ -238,9 +217,7 @@ fn main() -> Result<()> {
     let socket = Path::new(&config.socket_in);
     init_logger();
     match socket.parent() {
-        Some(parent) => {
-            landlock_sandbox(parent.to_str().unwrap(), &config.sas_in, &config.log_path)?
-        }
+        Some(parent) => landlock_sandbox(parent.to_str().unwrap(), &config.sas_in)?,
         None => {
             error!("Failed to find parent directory for socket");
             process::exit(1);
@@ -250,7 +227,6 @@ fn main() -> Result<()> {
     info!("Running configuration is:");
     info!("- socket_in: {}", &config.socket_in);
     info!("- sas_in: {}", &config.sas_in);
-    info!("- log_path: {}", &config.log_path);
     if Path::new(&config.socket_in).exists() {
         match remove_file(&config.socket_in) {
             Ok(_) => debug!("Removing previously created socket_in"),
