@@ -16,11 +16,6 @@ DIODEOUT=/run/keysas/sock_out
 # Pay attention to add a slash at the end
 MAX_SIZE=500000000
 
-# Path to log directory
-# You should not touch this parameter.
-# Pay attention to add a slash at the end
-LOG_PATH=/var/log/keysas-transit/
-
 # Path to Yara rules (don't forget to add index.yar)
 RULES=/usr/share/keysas/rules/index.yar
 
