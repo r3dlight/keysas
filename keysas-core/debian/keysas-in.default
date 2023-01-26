@@ -11,11 +11,6 @@ SOCKET_IN=/run/keysas/socket_in
 # Pay attention to add a slash at the end.
 SAS_IN=/var/local/in/
 
-# Path to log directory
-# You should not touch this parameter.
-# Pay attention to add a slash at the end.
-LOG=/var/log/keysas-in/
-
 # Maximum file size to transfert
 # Default is 500Mo
 MAXFILESIZE=500000000

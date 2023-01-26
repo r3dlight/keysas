@@ -11,7 +11,7 @@ Type=simple
 User=keysas-out
 Group=keysas-out
 EnvironmentFile=/etc/keysas/keysas-out.conf
-ExecStart=/usr/bin/keysas-out -o ${SOCKET_OUT} -l ${LOG_PATH} -g ${SAS_OUT}
+ExecStart=/usr/bin/keysas-out -o ${SOCKET_OUT} -g ${SAS_OUT}
 Restart=always
 RestartSec=2
 
