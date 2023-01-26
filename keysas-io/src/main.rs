@@ -386,8 +386,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                              match unmount(mount_point, UnmountFlags::DETACH) {
                                                  Ok(()) => {
                                                      println!(
-                                                         "Early removing mount point: {:?}",
-                                                         mount_point
+                                                         "Early removing mount point: {mount_point:?}"
                                                      )
                                                  }
                                                  Err(why) => {
