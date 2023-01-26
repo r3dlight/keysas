@@ -172,7 +172,7 @@ fn parse_args() -> Configuration {
             .get_one::<String>("allowed_formats")
             .unwrap()
             .split(',')
-            .map(|s| String::from(s))
+            .map(String::from)
             .collect(),
         clamav_ip: matches.get_one::<String>("clamavip").unwrap().to_string(),
         clamav_port: *matches.get_one::<u16>("clamavport").unwrap(),
@@ -292,7 +292,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 Ok(ClamScanResult::Found(l, v)) => {
                     warn!("Clam found virus {v} at {l}");
                     f.md.av_report
-                        .push_str(format!("Clam report: {} - {}", l, v).as_str());
+                        .push_str(format!("Clam report: {l} - {v}").as_str());
                     f.md.av_pass = false;
                 }
                 Ok(ClamScanResult::Error(e)) => {

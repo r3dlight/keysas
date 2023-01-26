@@ -26,6 +26,7 @@
 
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
+use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
 use log::{error, warn};
 use std::fs::File;
@@ -37,7 +38,6 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAncillary, UnixStream};
 use std::path::PathBuf;
 use std::process;
 use std::str;
-use keysas_lib::init_logger;
 
 #[macro_use]
 extern crate serde_derive;
@@ -64,7 +64,7 @@ struct FileData {
 /// Daemon configuration arguments
 struct Configuration {
     socket_in: String, // Path for the socket with keysas-transit
-    out_dir: String,   // Path to output directory
+    sas_out: String,   // Path to output directory
 }
 
 /// This function parse the command arguments into a structure
@@ -83,20 +83,20 @@ fn parse_args() -> Configuration {
                 .help("Sets a custom socket path for files coming from transit"),
         )
         .arg(
-            Arg::new("keysasout")
+            Arg::new("sas_out")
                 .short('g')
-                .long("keysasout")
+                .long("sas_out")
                 .value_name("<PATH>")
                 .default_value("/var/local/out")
                 .action(ArgAction::Set)
-                .help("Sets the keysasout path for transfering files"),
+                .help("Sets the out sas path for transfering files"),
         )
         .get_matches();
 
     // Unwrap should not panic with default values
     Configuration {
         socket_in: matches.get_one::<String>("socket_in").unwrap().to_string(),
-        out_dir: matches.get_one::<String>("out_dir").unwrap().to_string(),
+        sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
     }
 }
 
@@ -124,7 +124,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .filter_map(|fd| {
             // Deserialize metadata
             match bincode::deserialize_from::<&[u8], FileMetadata>(buffer) {
-                Ok(meta) => Some(FileData { fd: fd, md: meta }),
+                Ok(meta) => Some(FileData { fd, md: meta }),
                 Err(e) => {
                     warn!("Failed to deserialize messge from in: {e}");
                     None
@@ -144,7 +144,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         let digest = match sha256_digest(&file) {
             Ok(d) => d,
             Err(e) => {
-                log::warn!(
+                warn!(
                     "Failed to calculate digest for file {}, error {e}",
                     f.md.filename
                 );
@@ -153,7 +153,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         };
         // Test if digest is correct
         if digest.ne(&f.md.digest) {
-            log::warn!("Digest invalid for file {}", f.md.filename);
+            warn!("Digest invalid for file {}", f.md.filename);
             f.md.is_digest_ok = false;
         }
 
@@ -176,7 +176,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             {
                 Ok(f) => f,
                 Err(e) => {
-                    log::error!(
+                    error!(
                         "Failed to create report for file {}, error {e}",
                         f.md.filename
                     );
@@ -188,7 +188,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 match write!(report, "Invalid hash - original hash is {}", f.md.digest) {
                     Ok(_) => (),
                     Err(e) => {
-                        log::error!(
+                        error!(
                             "Failed to write report for file {}, error {e}",
                             f.md.filename
                         );
@@ -201,7 +201,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 match write!(report, "File is too big") {
                     Ok(_) => (),
                     Err(e) => {
-                        log::error!(
+                        error!(
                             "Failed to write report for file {}, error {e}",
                             f.md.filename
                         );
@@ -214,7 +214,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 match write!(report, "File extension is forbidden") {
                     Ok(_) => (),
                     Err(e) => {
-                        log::error!(
+                        error!(
                             "Failed to write report for file {}, error {e}",
                             f.md.filename
                         );
@@ -227,7 +227,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 match write!(report, "Clam : {}", f.md.av_report) {
                     Ok(_) => (),
                     Err(e) => {
-                        log::error!(
+                        error!(
                             "Failed to write report for file {}, error {e}",
                             f.md.filename
                         );
@@ -240,7 +240,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 match write!(report, "Yara : {}", f.md.yara_report) {
                     Ok(_) => (),
                     Err(e) => {
-                        log::error!(
+                        error!(
                             "Failed to write report for file {}, error {e}",
                             f.md.filename
                         );
@@ -253,12 +253,12 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut reader = BufReader::new(file);
 
             let mut path = PathBuf::new();
-            path.push(&conf.out_dir);
+            path.push(&conf.sas_out);
             path.push(&f.md.filename);
             let output = match File::options().write(true).create_new(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
-                    log::error!("Failed to create output file {}, error {e}", f.md.filename);
+                    error!("Failed to create output file {}, error {e}", f.md.filename);
                     continue;
                 }
             };
@@ -266,7 +266,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             match io::copy(&mut reader, &mut writer) {
                 Ok(_) => (),
                 Err(e) => {
-                    log::error!("Failed to output file {}, error {e}", f.md.filename);
+                    error!("Failed to output file {}, error {e}", f.md.filename);
                 }
             }
         }
