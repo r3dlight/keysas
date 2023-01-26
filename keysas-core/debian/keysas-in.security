@@ -2,7 +2,7 @@
 # (C) Copyright 2019-2022 Stephane Neveu
 
 [Service]
-SystemCallFilter=@basic-io @file-system @io-event @process @network-io @ipc @system-service seccomp landlock_create_ruleset landlock_add_rule landlock_restrict_self
+SystemCallFilter=@basic-io @file-system @io-event @process @ipc @system-service seccomp landlock_create_ruleset landlock_add_rule landlock_restrict_self
 SystemCallFilter=~@privileged
 SystemCallFilter=~@resources
 CapabilityBoundingSet=
@@ -33,5 +33,5 @@ TemporaryFileSystem=/var
 BindPaths=/var/local/in
 BindPaths=/var/log/keysas-in
 IPAddressDeny=any
-IPAddressAllow=127.0.0.1/8
+PrivateNetwork=true
 

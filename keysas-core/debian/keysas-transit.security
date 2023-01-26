@@ -2,7 +2,7 @@
 # (C) Copyright 2019-2022 Stephane Neveu
 
 [Service]
-SystemCallFilter=@basic-io @file-system @io-event @process @ipc @system-service seccomp landlock_create_ruleset landlock_add_rule landlock_restrict_self
+SystemCallFilter=@basic-io @file-system @io-event @process @network-io @ipc @system-service seccomp landlock_create_ruleset landlock_add_rule landlock_restrict_self
 SystemCallFilter=~@privileged
 SystemCallFilter=~@resources
 CapabilityBoundingSet=
@@ -18,7 +18,6 @@ RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictAddressFamilies=AF_UNIX
 PrivateTmp=true
-PrivateNetwork=true
 PrivateDevices=yes
 LockPersonality=yes
 SystemCallArchitectures=native
@@ -32,3 +31,5 @@ TemporaryFileSystem=/var
 BindPaths=/var/local/transit
 BindPaths=/var/log/keysas-transit
 IPAddressDeny=any
+RestrictAddressFamilies=AF_INET
+IPAddressAllow=127.0.0.1/8
