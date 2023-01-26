@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yubico_manager = "0.9.0"
-rand="*"
+yubico_manager = "0.9"
+rand="0.8"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
-sled = "0.34.7"
-anyhow = "*"
-hex = "*"
-kv = "*"
+sled = "0.34"
+anyhow = "1.0"
+hex = "0.4"
+kv = "0.24"
