@@ -46,28 +46,6 @@ pub fn sha256_digest(input: &File) -> Result<String> {
     Ok(format!("{digest:x}"))
 }
 
-/// This function returns a bool weither
-/// a file is hidden or not.
-/// This is a filter on regular files ans not hidden ones.
-/// We do not want to catch .bashrc like files.
-///
-/// Example:
-/// ```
-/// let walker = WalkDir::new("foo").into_iter();
-/// for entry in walker.filter_entry(|e| !is_not_hidden(e)) {
-///    let entry = entry.unwrap();
-///    println!("{}", entry.path().display());
-/// ```
-/*
-fn is_not_hidden(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| entry.depth() == 0 || !s.starts_with('.'))
-        .unwrap_or(false)
-}
-*/
-
 /// This function lists all files in a directory except hidden ones.
 ///
 /// Example:
