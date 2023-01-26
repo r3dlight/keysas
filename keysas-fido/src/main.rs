@@ -96,9 +96,9 @@ fn manage_db(name: &str, enroll: bool, revoke: bool) -> Result<()> {
         let hex_string = hex::encode(v);
         if enroll && !revoke {
             match store_key(name.to_string(), hex_string.clone()) {
-                Ok(true) => println!("Enrollment sucessfull for user {}: {}", name, hex_string),
-                Ok(false) => println!("Error: Yubikey already enrolled: {}", hex_string),
-                Err(why) => println!("Error: {:?}", why),
+                Ok(true) => println!("Enrollment sucessfull for user {name}: {hex_string}"),
+                Ok(false) => println!("Error: Yubikey already enrolled: {hex_string}"),
+                Err(why) => println!("Error: {why:?}"),
             }
         } else if !enroll && revoke {
             remove_key(hex_string)?;
@@ -140,7 +140,7 @@ fn init_yubikey() -> Result<()> {
         device_config.challenge_response_hmac(&hmac_key, false, require_press_button);
 
         if let Err(err) = yubi.write_config(config, &mut device_config) {
-            println!("Error write random secret: {:?}", err);
+            println!("Error write random secret: {err:?}");
         } else {
             println!("Your Yubikey is now configured using a random secret.");
         }
