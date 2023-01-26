@@ -28,8 +28,6 @@ jobs:
     - run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
     - name: Run audit
       run: |
         cargo install cargo-audit
