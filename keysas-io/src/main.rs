@@ -175,18 +175,18 @@ fn hmac_challenge() -> Option<String> {
                                 enrolled_yubikeys.get(&hex_string).unwrap().map(|name| name)
                             }
                             Err(why) => {
-                                println!("Error while accessing the Bucket: {:?}", why);
+                                println!("Error while accessing the Bucket: {why:?}");
                                 None
                             }
                         },
                         Err(why) => {
-                            println!("Error while accessing the store: {:?}", why);
+                            println!("Error while accessing the store: {why:?}");
                             None
                         }
                     }
                 }
                 Err(why) => {
-                    println!("Error while performing hmac challenge {:?}", why);
+                    println!("Error while performing hmac challenge {why:?}");
                     None
                 }
             }
@@ -234,7 +234,7 @@ fn is_signed(
     id_revision: &str,
     id_serial: &str,
 ) -> Result<bool> {
-    println!("Checking signature for device: {}", device);
+    println!("Checking signature for device: {device}");
     match get_signature(device.remove_last()) {
         Ok(signature) => {
             //println!("Read signature from key: {:?}", signature);
@@ -250,10 +250,10 @@ fn is_signed(
                 "{}/{}/{}/{}/{}",
                 id_vendor_id, id_model_id, id_revision, id_serial, "out"
             );
-            println!("{}", data);
+            //println!("{data}");
             let data_reader = Cursor::new(&data);
             let verified = minisign::verify(&pk, &signature_box, data_reader, true, false, false);
-            println!("USB device is signed: {:?}", verified);
+            println!("USB device is signed: {verified:?}");
             match verified {
                 Ok(()) => Ok(true),
                 Err(_) => Ok(false),
@@ -266,10 +266,7 @@ fn is_signed(
 fn copy_device_in(device: &Path) -> Result<()> {
     let dir = tempfile::tempdir()?;
     let mount_point = dir.path();
-    println!(
-        "Unsigned USB device {:?} will be mounted on path: {:?}",
-        device, mount_point
-    );
+    println!("Unsigned USB device {device:?} will be mounted on path: {mount_point:?}");
     let supported = SupportedFilesystems::new()?;
     let mount_result = Mount::builder()
         .fstype(FilesystemType::from(&supported))
@@ -278,21 +275,20 @@ fn copy_device_in(device: &Path) -> Result<()> {
     match mount_result {
         Ok(mount) => {
             // Copying file to the mounted device.
-            println!("Unsigned device is mounted on: {:?}", mount_point);
+            println!("Unsigned device is mounted on: {mount_point:?}");
             copy_files_in(&mount_point.to_path_buf())?;
             // Make the mount temporary, so that it will be unmounted on drop.
             let _mount = mount.into_unmount_drop(UnmountFlags::DETACH);
         }
         Err(why) => {
-            eprintln!("Failed to mount unsigned device: {}", why);
+            eprintln!("Failed to mount unsigned device: {why}");
             let reg = Regex::new(r"/tmp/\.tmp.*")?;
             for mount in MountIter::new()? {
                 let mnt = mount.as_ref().unwrap().dest.to_str().unwrap();
                 if reg.is_match(mnt) {
-                    println!("Will umount: {}", mnt);
+                    println!("Will umount: {mnt}");
                 }
             }
-            //exit(1);
         }
     }
     Ok(())
@@ -301,10 +297,7 @@ fn copy_device_in(device: &Path) -> Result<()> {
 fn move_device_out(device: &Path) -> Result<PathBuf> {
     let dir = tempfile::tempdir()?;
     let mount_point = dir.path();
-    println!(
-        "Signed USB device {:?} will be mounted on path: {:?}",
-        device, mount_point
-    );
+    println!("Signed USB device {device:?} will be mounted on path: {mount_point:?}");
     let supported = SupportedFilesystems::new()?;
     let mount_result = Mount::builder()
         .fstype(FilesystemType::from(&supported))
@@ -313,14 +306,13 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
     match mount_result {
         Ok(mount) => {
             // Moving files to the mounted device.
-            println!("Temporary out mount point: {:?}", mount_point);
+            println!("Temporary out mount point: {mount_point:?}");
             move_files_out(&mount_point.to_path_buf())?;
             // Make the mount temporary, so that it will be unmounted on drop.
             let _mount = mount.into_unmount_drop(UnmountFlags::DETACH);
         }
         Err(why) => {
-            eprintln!("Failed to mount device: {}", why);
-            //exit(1);
+            eprintln!("Failed to mount device: {why}");
         }
     }
     Ok(mount_point.to_path_buf())
@@ -355,7 +347,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                          if !tmp.exists() &&  !tmp.is_dir() {
                              match fs::create_dir(tmp) {
                                  Ok(_)=> println!("Creating tmp directory for writing incoming files !"),
-                                 Err(e) => println!("Cannot create tmp directory: {:?}", e),
+                                 Err(e) => println!("Cannot create tmp directory: {e:?}"),
                              }
                          }
                          match fs::metadata(path_to_read) {
@@ -363,16 +355,12 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                  if Path::new(&path_to_read).exists() && !mtdata.is_dir() {
                                      match fs::copy(path_to_read, &path_to_tmp) {
                                          Ok(_) => {
-                                             println!(
-                                             "File {} copied to {}.",
-                                             path_to_read, path_to_tmp
-                                         );
+                                             println!("File {path_to_read} copied to {path_to_tmp}.");
                                          if fs::rename(&path_to_tmp, path_to_write).is_ok() { println!("File {} moved to sas-in.", &path_to_tmp) }
                                      },
                                          Err(e) => {
                                              println!(
-                                                 "Error while copying file {}: {:?}",
-                                                 path_to_read, e
+                                                 "Error while copying file {path_to_read}: {e:?}"
                                              );
                                              let mut report =
                                                  format!("{}{}", path_to_write, ".failed");
@@ -380,21 +368,18 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                                  Ok(_) => println!("io-error report file created."),
                                                  Err(why) => {
                                                      eprintln!(
-                                                         "Failed to create io-error report {:?}: {}",
-                                                         report, why
+                                                         "Failed to create io-error report {report:?}: {why}"
                                                      );
                                                  }
                                              }
                                              match writeln!(
                                                  report,
-                                                 "Error while copying file: {:?}",
-                                                 e
+                                                 "Error while copying file: {e:?}"
                                              ) {
                                                  Ok(_) => println!("io-error report file created."),
                                                  Err(why) => {
                                                      eprintln!(
-                                                     "Failed to write into io-error report {:?}: {}",
-                                                     report, why
+                                                     "Failed to write into io-error report {report:?}: {why}"
                                                  );
                                                  }
                                              }
@@ -407,8 +392,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                                  }
                                                  Err(why) => {
                                                      eprintln!(
-                                                         "Failed to unmount {:?}: {}",
-                                                         mount_point, why
+                                                         "Failed to unmount {mount_point:?}: {why}"
                                                      );
                                                  }
                                              }
@@ -417,8 +401,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                  }
                              }
                              Err(why) => eprintln!(
-                                 "Thread error: Cannot get metadata for file {:?}: {:?}. Terminating thread...",
-                                 path_to_read, why
+                                 "Thread error: Cannot get metadata for file {path_to_read:?}: {why:?}. Terminating thread..."
                              ),
                          };
              });
@@ -452,22 +435,19 @@ fn move_files_out(mount_point: &PathBuf) -> Result<()> {
         );
         if !fs::metadata(&path_to_read)?.is_dir() {
             match fs::copy(&path_to_read, path_to_write) {
-                Ok(_) => println!("Copying file: {} to signed device.", path_to_read),
+                Ok(_) => println!("Copying file: {path_to_read} to signed device."),
                 Err(e) => {
-                    println!(
-                        "Error while copying file to signed device {}: {:?}",
-                        path_to_read, e
-                    );
+                    println!("Error while copying file to signed device {path_to_read}: {e:?}");
                     match unmount(mount_point, UnmountFlags::DETACH) {
-                        Ok(()) => println!("Early removing mount point: {:?}", mount_point),
+                        Ok(()) => println!("Early removing mount point: {mount_point:?}"),
                         Err(why) => {
-                            eprintln!("Failed to unmount {:?}: {}", mount_point, why);
+                            eprintln!("Failed to unmount {mount_point:?}: {why}");
                         }
                     }
                 }
             }
             fs::remove_file(&path_to_read)?;
-            println!("Removing file: {}.", path_to_read);
+            println!("Removing file: {path_to_read}.");
         }
     }
     println!("Moving files to out device done.");
@@ -585,17 +565,7 @@ fn main() -> Result<()> {
         let pubkey_path = Arc::clone(&pubkey_path);
         spawn(move || -> Result<()> {
             let callback = |_req: &Request, response: Response| {
-                println!("keysas-udev: Received a new websocket handshake.");
-                //println!("The request's path is: {}", req.uri().path());
-                //println!("The request's headers are:");
-                //for (ref header, _value) in req.headers() {
-                //    println!("* {}", header);
-                //}
-
-                // Let's add an additional header to our response to the client.
-                //let headers = response.headers_mut();
-                //headers.append("keysas-udev", "true".parse().unwrap());
-
+                println!("keysas-io: Received a new websocket handshake.");
                 Ok(response)
             };
             let mut websocket = accept_hdr(stream?, callback)?;
@@ -745,7 +715,6 @@ fn main() -> Result<()> {
                     match signed {
                         Ok(value) => {
                             //Invalid Signature
-                            println!("Value is {}", value);
                             if !value {
                                 println!("Device signature is not valid !");
                                 let keys_in_iter: Vec<String> =
@@ -769,8 +738,7 @@ fn main() -> Result<()> {
                                         match hmac_challenge() {
                                             Some(name) => {
                                                 println!(
-                                                    "HMAC challenge successfull for user: {} !",
-                                                    name
+                                                    "HMAC challenge successfull for user: {name} !"
                                                 );
                                                 copy_device_in(Path::new(&device))?;
                                                 println!("Unsigned USB device done.");
@@ -835,7 +803,7 @@ fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            println!("USB device never signed: {}", e);
+                            println!("USB device never signed: {e:?}");
                             let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
                             if !keys_in_iter.contains(&product) {
                                 // busy_in ?
@@ -857,8 +825,7 @@ fn main() -> Result<()> {
                                     match hmac_challenge() {
                                         Some(name) => {
                                             println!(
-                                                "HMAC challenge successfull for user: {} !",
-                                                name
+                                                "HMAC challenge successfull for user: {name} !"
                                             );
                                             copy_device_in(Path::new(&device))?;
                                             println!("Unsigned USB device done.");
