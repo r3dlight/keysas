@@ -1,38 +1,20 @@
 # Keysas-in configuration file
 # This file is part of keysas
 #
-# Clamd server IP 
-# Note that if you modify this address, you also
-# have to edit the following file 
-# /etc/systemd/system/keysas-in.service.d/keysas-in.conf
-# to allow sockets via systemd.
-# See https://keysas.fr/configuration.html#systemd
-# for more information.
-CLAMAV_IP=127.0.0.1
 
-# Clamd server port
-CLAMAV_PORT=3310
-
-# Diode-in directory
+# Socket_in path
 # You should not touch this parameter.
-# Pay attention to add a slash at the end.
-DIODEIN=/run/diode-in/
+SOCKET_IN=/run/keysas/socket_in
 
 # Path where incoming files will be deposited
 # You should not touch this parameter.
 # Pay attention to add a slash at the end.
-KEYSASIN=/var/local/in/
+SAS_IN=/var/local/in/
 
 # Path to log directory
 # You should not touch this parameter.
 # Pay attention to add a slash at the end.
 LOG=/var/log/keysas-in/
-
-# Maximum size in bytes before rotating current log
-ROTATE_OVER_SIZE=3000000
-
-# How many log file to keep under $LOG path
-NB_OF_LOG_FILES=3
 
 # Maximum file size to transfert
 # Default is 500Mo

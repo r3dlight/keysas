@@ -10,11 +10,11 @@ After=keysas-in.service
 Type=simple
 User=keysas-transit
 Group=keysas-transit
-RuntimeDirectory=diode-out
+RuntimeDirectory=keysas
 RuntimeDirectoryMode=0750
 RuntimeDirectoryPreserve=yes
 EnvironmentFile=/etc/keysas/keysas-transit.conf
-ExecStart=/usr/bin/keysas-transit -g ${TRANSIT} -i ${DIODEIN} -o ${DIODEOUT} -l ${LOG} -r ${RULES} -m ${YARA_MAXFILESIZE} -t ${YARA_TIMEOUT} -c ${YARA_CLEAN} -s ${ROTATE_OVER_SIZE} -n ${NB_OF_LOG_FILES} -a ${ALLOWED_TYPES}
+ExecStart=/usr/bin/keysas-transit -i ${SOCKET_IN} -o ${SOCKET_OUT} -s ${MAX_SIZE} -l ${LOG} -c ${CLAMAV_IP} -p ${CLAMAV_PORT} -r ${RULES} -t ${YARA_TIMEOUT} -a ${ALLOWED_TYPES}
 Restart=always
 RestartSec=2
 

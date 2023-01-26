@@ -10,14 +10,14 @@ After=keysas.service
 Type=simple
 User=keysas-in
 Group=keysas-in
-RuntimeDirectory=diode-in
+RuntimeDirectory=keysas
 RuntimeDirectoryMode=0750
 RuntimeDirectoryPreserve=yes
 EnvironmentFile=/etc/keysas/keysas-in.conf
-ExecStart=/usr/bin/keysas-in -g ${KEYSASIN} -d ${DIODEIN} -l ${LOG} -c ${CLAMAV_IP} -p ${CLAMAV_PORT} -s ${ROTATE_OVER_SIZE} -n ${NB_OF_LOG_FILES} -m ${MAXFILESIZE}
+ExecStart=/usr/bin/keysas-in -i ${SAS_IN} -s ${SOCKET_IN} -l ${LOG_PATH}
 Restart=on-failure
 RestartSec=5
-#FailureAction=poweroff
+FailureAction=poweroff
 
 [Install]
 WantedBy=keysas.service

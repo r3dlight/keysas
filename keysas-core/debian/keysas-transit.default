@@ -1,25 +1,25 @@
 # Keysas-transit configuration file
 # This file is part of keysas.
 #
-# Diode-in directory
+# Socket_in path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-DIODEIN=/run/diode-in/
+SOCKET_IN=/run/keysas/sock_in
 
-# Diode-out directory
+# Socket_out path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-DIODEOUT=/run/diode-out/
+DIODEOUT=/run/keysas/sock_out
 
-# Path where for files in transit
+# Max file size to be transfered
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-TRANSIT=/var/local/transit/
+MAX_SIZE=500000000
 
 # Path to log directory
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-LOG=/var/log/keysas-transit/
+LOG_PATH=/var/log/keysas-transit/
 
 # Path to Yara rules (don't forget to add index.yar)
 RULES=/usr/share/keysas/rules/index.yar
@@ -35,11 +35,17 @@ YARA_TIMEOUT=1000
 # Tells if keysas should remove the file if Yara matched at least one rule
 YARA_CLEAN=true
 
-# Maximum size in bytes before rotating current log
-ROTATE_OVER_SIZE=3000000
+# Clamd server IP 
+# Note that if you modify this address, you also
+# have to edit the following file 
+# /etc/systemd/system/keysas-in.service.d/keysas-in.conf
+# to allow sockets via systemd.
+# See https://keysas.fr/configuration.html#systemd
+# for more information.
+CLAMAV_IP=127.0.0.1
 
-# How many log file to keep under $LOG path
-NB_OF_LOG_FILES=3
+# Clamd server port
+CLAMAV_PORT=3310
 
 # Set here a whitelist (comma separated) of allowed file types
 # For example:
