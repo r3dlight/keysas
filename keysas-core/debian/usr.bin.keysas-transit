@@ -11,8 +11,9 @@
 /usr/bin/keysas-transit {
   #include <abstractions/base>
 
-  /run/diode-in/ r,
-  /run/diode-in/** r,
+  /run/keysas/ r,
+  /run/keysas/sock_in r,
+  /run/keysas/sock_out rw,
   /usr/share/keysas/rules/** r,
   owner /run/diode-out/** w,
   owner /var/local/transit/ r,
