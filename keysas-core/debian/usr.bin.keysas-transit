@@ -12,8 +12,8 @@
   #include <abstractions/base>
 
   /run/keysas/ r,
-  /run/keysas/sock_in r,
-  /run/keysas/sock_out rw,
+  /run/keysas/socket_in r,
+  /run/keysas/socket_out rw,
   /usr/share/keysas/rules/** r,
   owner /run/diode-out/** w,
   owner /var/local/transit/ r,

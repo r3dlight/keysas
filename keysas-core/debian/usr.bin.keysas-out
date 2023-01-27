@@ -12,7 +12,7 @@
   #include <abstractions/base>
 
   /run/keysas/ r,
-  /run/keysas/sock_out r,
+  /run/keysas/socket_out r,
   owner /var/local/out/ r,
   owner /var/local/out/** rw,
   owner /var/log/keysas-out/ r,
