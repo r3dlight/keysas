@@ -29,6 +29,6 @@ MemoryDenyWriteExecute=yes
 TemporaryFileSystem=/etc
 BindReadOnlyPaths=/etc/keysas
 TemporaryFileSystem=/var
+BindReadOnlyPaths=/run/keysas
 BindPaths=/var/local/out 
-BindPaths=/var/log/keysas-out
 IPAddressDeny=any
