@@ -149,6 +149,7 @@ fn parse_args() -> Configuration {
                  .value_name("<SIZE_IN_BYTES>")
                  .default_value("500000000")
                  .action(ArgAction::Set)
+                 .value_parser(clap::value_parser!(u64))
                  .help("Maximum size for files"),
          )
          .arg(
@@ -176,6 +177,7 @@ fn parse_args() -> Configuration {
                  .value_name("<PORT>")
                  .default_value("3310")
                  .action(ArgAction::Set)
+                 .value_parser(clap::value_parser!(u16))
                  .help("Clamav port number"),
          )
          .arg(
@@ -194,6 +196,7 @@ fn parse_args() -> Configuration {
                  .value_name("<SECONDS>")
                  .default_value("100")
                  .action(ArgAction::Set)
+                 .value_parser(clap::value_parser!(u16))
                  .help("Sets a custom timeout for libyara scans"),
          )
           .get_matches();
