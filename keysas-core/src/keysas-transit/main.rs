@@ -456,6 +456,7 @@ fn main() -> Result<()> {
         Ok(c) => match c.add_rules_file_with_namespace(&config.rule_path, "keysas") {
             Ok(c) => match c.compile_rules() {
                 Ok(r) => {
+                    info!("Yara compiler initialized.");
                     config.yara_rules = Some(r);
                 }
                 Err(e) => {
@@ -476,7 +477,10 @@ fn main() -> Result<()> {
 
     // Open socket with keysas-in
     let sock_in = match UnixStream::connect(&config.socket_in) {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("Connected to Keysas-in socket.");
+            s
+        }
         Err(e) => {
             error!("Failed to open socket with keysas-in {e}");
             process::exit(1);
@@ -485,7 +489,10 @@ fn main() -> Result<()> {
 
     // Open socket with keysas-out
     let sock_out = match UnixListener::bind(&config.socket_out) {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("Socket for Keysas-out created.");
+            s
+        }
         Err(e) => {
             error!("Failed to open socket with keysas-out {e}");
             process::exit(1);
@@ -496,7 +503,7 @@ fn main() -> Result<()> {
     let (out_stream, _sck_addr) = match sock_out.accept() {
         Ok(r) => r,
         Err(e) => {
-            println!("Failed to accept connection: {e}");
+            error!("Failed to accept connection: {e}");
             process::exit(1);
         }
     };
