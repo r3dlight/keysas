@@ -95,7 +95,7 @@ fn parse_args() -> Configuration {
 
     // Unwrap should not panic with default values
     Configuration {
-        socket_in: matches.get_one::<String>("socket_in").unwrap().to_string(),
+        socket_in: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
     }
 }
