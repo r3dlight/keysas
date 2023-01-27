@@ -67,7 +67,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             sas_in: "/var/local/in/".to_string(),
-            socket_in: "/run/keysas/sock_in".to_string(),
+            socket_in: "/run/keysas/socket_in".to_string(),
         }
     }
 }
@@ -117,7 +117,7 @@ fn command_args(config: &mut Config) {
                 .short('s')
                 .long("socket_in")
                 .value_name("Sets path for write-only socket")
-                .default_value("/run/keysas/sock_in")
+                .default_value("/run/keysas/socket_in")
                 .action(ArgAction::Set)
                 .help("Path for write only abstract socket_in"),
         )

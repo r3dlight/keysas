@@ -78,7 +78,7 @@ fn parse_args() -> Configuration {
                 .short('o')
                 .long("socket_out")
                 .value_name("<PATH>")
-                .default_value("/run/keysas/sock_out")
+                .default_value("/run/keysas/socket_out")
                 .action(ArgAction::Set)
                 .help("Sets a custom socket path for files coming from transit"),
         )
