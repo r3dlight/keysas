@@ -17,7 +17,7 @@ EnvironmentFile=/etc/keysas/keysas-in.conf
 ExecStart=/usr/bin/keysas-in -i ${SAS_IN} -s ${SOCKET_IN}
 Restart=on-failure
 RestartSec=5
-FailureAction=poweroff
+#FailureAction=poweroff
 
 [Install]
 WantedBy=keysas.service
