@@ -9,12 +9,10 @@
 
 
 /usr/bin/keysas-in {
-  #include <abstractions/apache2-common>
+  
   #include <abstractions/base>
-
-  /sys/devices/system/cpu/online r,
-  owner /run/keysas/ r,
-  owner /run/keysas/socket_in rw,
+  run/keysas/ rw,
+  /run/keysas/socket_in rw,
   /var/local/in/ r,
   /var/local/in/** rw,
 }
