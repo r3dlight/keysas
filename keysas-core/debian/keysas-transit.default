@@ -9,7 +9,7 @@ SOCKET_IN=/run/keysas/socket_in
 # Socket_out path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-DIODEOUT=/run/keysas/socket_out
+SOCKET_OUT=/run/keysas/socket_out
 
 # Max file size to be transfered
 # You should not touch this parameter.
