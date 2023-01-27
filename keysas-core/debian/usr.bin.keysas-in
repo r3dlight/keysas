@@ -11,7 +11,7 @@
 /usr/bin/keysas-in {
   
   #include <abstractions/base>
-  run/keysas/ rw,
+  /run/keysas/ rw,
   /run/keysas/socket_in rw,
   /var/local/in/ r,
   /var/local/in/** rw,
