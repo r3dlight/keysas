@@ -39,19 +39,6 @@ add_users() {
 	fi
 }
 
-# Install /var/log/ directories.
-create_varlog() {
-	if [ ! -d "/var/log/keysas-in" ]; then
-		install -d -m 0750 -o $U_KEYSAS_IN -g $U_KEYSAS_IN /var/log/keysas-in
-	fi
-	if [ ! -d "/var/log/keysas-out" ]; then
-		install -d -m 0750 -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT /var/log/keysas-out
-	fi
-	if [ ! -d "/var/log/keysas-transit" ]; then
-		install -d -m 0750 -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT /var/log/keysas-transit
-	fi
-}
-
 # Install ELF binaries in /usr/bin/.
 install_bin() {
 	if [ -d "/usr/bin" ]; then
@@ -188,7 +175,6 @@ enable_systemd() {
 main() {
 	# Call the above functions to perform the installation.
 	add_users
-	create_varlog
 	install_bin
 	install_systemd_units
 	install_config

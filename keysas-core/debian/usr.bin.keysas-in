@@ -17,6 +17,4 @@
   owner /run/keysas/socket_in rw,
   /var/local/in/ r,
   /var/local/in/** rw,
-  owner /var/log/keysas-in/ r,
-  owner /var/log/keysas-in/** rw,
 }
