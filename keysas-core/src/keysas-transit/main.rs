@@ -133,7 +133,7 @@ fn parse_args() -> Configuration {
                  .short('i')
                  .long("socket_in")
                  .value_name("<PATH>")
-                 .default_value("/run/keysas/sock_in")
+                 .default_value("/run/keysas/socket_in")
                  .action(ArgAction::Set)
                  .help("Sets a custom socket path for input files"),
          )
@@ -142,7 +142,7 @@ fn parse_args() -> Configuration {
                  .short('o')
                  .long("socket_out")
                  .value_name("<PATH>")
-                 .default_value("/run/keysas/sock_out")
+                 .default_value("/run/keysas/socket_out")
                  .action(ArgAction::Set)
                  .help("Sets a custom socket path for output files"),
          )
