@@ -199,7 +199,7 @@ fn main() -> Result<()> {
     } else if enroll | revoke {
         manage_db(name, enroll, revoke)?
     } else {
-        println!("Error: Try keysas-manage-yubikey --help");
+        println!("Error: Try keysas-fido --help");
     }
 
     Ok(())

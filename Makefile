@@ -52,7 +52,7 @@ install: ## Install keysas on your GNU/Linux OS (You need to be sudo).
 	@if [ -x ./${PROJECT_NAME}-io/Makefile ]; then cd ./${PROJECT_NAME}-io && make install; fi
 	@if [ -x ./${PROJECT_NAME}-backend/Makefile ]; then cd ./${PROJECT_NAME}-backend && make install; fi
 	@install -v -o root -g root -m 0500 bin/${PROJECT_NAME}-sign /usr/bin/
-	@install -v -o root -g root -m 0500 bin/${PROJECT_NAME}-manage-yubikey /usr/bin/
+	@install -v -o root -g root -m 0500 bin/${PROJECT_NAME}-fido /usr/bin/
 
 install-core: ## Only install the keysas-core for a network gateway (You need to be sudo).
 	@echo "****************************************************************************"
@@ -77,7 +77,7 @@ uninstall: ## Uninstall Keysas on your GNU/Linux OS, you need to be sudo !
 	@if [ -x ./${PROJECT_NAME}-core/Makefile ]; then cd ./${PROJECT_NAME}-core && make uninstall; fi
 	@if [ -x ./${PROJECT_NAME}-ui/Makefile ]; then cd ./${PROJECT_NAME}-ui && make uninstall; fi
 	@rm /usr/bin/${PROJECT_NAME}-sign | true
-	@rm /usr/bin/${PROJECT_NAME}-manage-yubikey | true
+	@rm /usr/bin/${PROJECT_NAME}-fido | true
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
