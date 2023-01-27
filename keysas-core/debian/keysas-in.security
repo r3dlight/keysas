@@ -30,8 +30,8 @@ MemoryDenyWriteExecute=yes
 TemporaryFileSystem=/etc
 BindReadOnlyPaths=/etc/keysas
 TemporaryFileSystem=/var
+BindPaths=/run/keysas
 BindPaths=/var/local/in
-BindPaths=/var/log/keysas-in
 IPAddressDeny=any
 PrivateNetwork=true
 
