@@ -44,6 +44,9 @@ use std::path::Path;
 use std::process;
 use std::str;
 use yara::*;
+use std::thread as main_thread;
+use std::time::Duration;
+
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
@@ -104,7 +107,7 @@ fn landlock_sandbox(
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(&[socket_out], AccessFs::from_all(abi)))?
+        .add_rules(path_beneath_rules(&[socket_out, "/run/keysas"], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -537,6 +540,7 @@ fn main() -> Result<()> {
         check_files(&mut files, &config);
 
         // Send fd and report to out
-        send_files(&files, &out_stream)
+        send_files(&files, &out_stream);
+        main_thread::sleep(Duration::from_millis(500));
     }
 }
