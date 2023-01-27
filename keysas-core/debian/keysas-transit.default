@@ -13,7 +13,6 @@ DIODEOUT=/run/keysas/sock_out
 
 # Max file size to be transfered
 # You should not touch this parameter.
-# Pay attention to add a slash at the end
 MAX_SIZE=500000000
 
 # Path to Yara rules (don't forget to add index.yar)
