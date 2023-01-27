@@ -196,7 +196,7 @@ fn parse_args() -> Configuration {
                  .value_name("<SECONDS>")
                  .default_value("100")
                  .action(ArgAction::Set)
-                 .value_parser(clap::value_parser!(u16))
+                 .value_parser(clap::value_parser!(i32))
                  .help("Sets a custom timeout for libyara scans"),
          )
           .get_matches();
