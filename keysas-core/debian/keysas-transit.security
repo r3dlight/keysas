@@ -31,5 +31,5 @@ TemporaryFileSystem=/var
 BindPaths=/var/local/transit
 BindPaths=/var/log/keysas-transit
 IPAddressDeny=any
-RestrictAddressFamilies=AF_INET
+RestrictAddressFamilies=AF_INET AF_UNIX
 IPAddressAllow=127.0.0.1/8
