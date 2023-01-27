@@ -89,14 +89,18 @@ struct Configuration {
     yara_rules: Option<Rules>,       // Yara rules
 }
 
-fn landlock_sandbox(socket_in: &String, socket_out: &String) -> Result<(), RulesetError> {
+fn landlock_sandbox(
+    socket_in: &String,
+    socket_out: &String,
+    rule_path: &String,
+) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_in],
+            &[CONFIG_DIRECTORY, socket_in, rule_path],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
@@ -426,7 +430,7 @@ fn main() -> Result<()> {
     let mut config = parse_args();
 
     // landlock init
-    landlock_sandbox(&config.socket_in, &config.socket_out)?;
+    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
 
     // Configure logger
     init_logger();
