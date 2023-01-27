@@ -2,7 +2,7 @@
 # (C) Copyright 2019-2022 Stephane Neveu
 
 [Unit]
-Description=keysas-udev daemon
+Description=keysas-io daemon
 PartOf=keysas.service
 After=keysas.service
 Before=nginx.service
@@ -11,7 +11,7 @@ Before=nginx.service
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/bin/keysas-udev
+ExecStart=/usr/bin/keysas-io
 Restart=always
 RestartSec=2
 
