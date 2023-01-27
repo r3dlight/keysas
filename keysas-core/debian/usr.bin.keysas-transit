@@ -15,9 +15,6 @@
   /run/keysas/socket_in r,
   /run/keysas/socket_out rw,
   /usr/share/keysas/rules/** r,
-  owner /run/diode-out/** w,
   owner /var/local/transit/ r,
   owner /var/local/transit/** rw,
-  owner /var/log/keysas-transit/ r,
-  owner /var/log/keysas-transit/** rw,
 }

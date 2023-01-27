@@ -18,9 +18,6 @@ main() {
 	disable_systemd
 
 	files="
-		/var/log/keysas-in
-		/var/log/keysas-transit
-		/var/log/keysas-out
 		/etc/systemd/system/keysas.service
 		/etc/systemd/system/keysas-in.service
 		/etc/systemd/system/keysas-transit.service
