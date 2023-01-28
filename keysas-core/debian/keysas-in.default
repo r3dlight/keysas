@@ -4,7 +4,7 @@
 
 # Socket_in path
 # You should not touch this parameter.
-SOCKET_IN=/run/keysas/socket_in
+SOCKET_IN=socket_in
 
 # Path where incoming files will be deposited
 # You should not touch this parameter.

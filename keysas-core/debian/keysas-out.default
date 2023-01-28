@@ -4,7 +4,7 @@
 # Socket_out path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-SOCKET_OUT=/run/keysas/socket_out
+SOCKET_OUT=socket_out
 
 # Path where incoming files will be deposited
 # You should not touch this parameter.

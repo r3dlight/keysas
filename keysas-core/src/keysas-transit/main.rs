@@ -23,6 +23,7 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
+#![feature(unix_socket_abstract)]
 
 use anyhow::Result;
 use clam_client::{client::ClamClient, response::ClamScanResult};
@@ -39,14 +40,16 @@ use std::fs::{metadata, File};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
-use std::os::unix::net::{AncillaryData, Messages, SocketAncillary, UnixListener, UnixStream};
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::{
+    AncillaryData, Messages, SocketAddr, SocketAncillary, UnixListener, UnixStream,
+};
 use std::path::Path;
 use std::process;
 use std::str;
-use yara::*;
 use std::thread as main_thread;
 use std::time::Duration;
-
+use yara::*;
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
@@ -107,7 +110,10 @@ fn landlock_sandbox(
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(&[socket_out, "/run/keysas"], AccessFs::from_all(abi)))?
+        .add_rules(path_beneath_rules(
+            &[socket_out, "/run/keysas"],
+            AccessFs::from_all(abi),
+        ))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -135,19 +141,19 @@ fn parse_args() -> Configuration {
              Arg::new("socket_in")
                  .short('i')
                  .long("socket_in")
-                 .value_name("<PATH>")
-                 .default_value("/run/keysas/socket_in")
+                 .value_name("<NAMESPACE>")
+                 .default_value("socket_in")
                  .action(ArgAction::Set)
-                 .help("Sets a custom socket path for input files"),
+                 .help("Sets a custom abstract socket for input files"),
          )
          .arg(
              Arg::new("socket_out")
                  .short('o')
                  .long("socket_out")
-                 .value_name("<PATH>")
-                 .default_value("/run/keysas/socket_out")
+                 .value_name("<NAMESPACE>")
+                 .default_value("socket_out")
                  .action(ArgAction::Set)
-                 .help("Sets a custom socket path for output files"),
+                 .help("Sets a custom abstract socket for output files"),
          )
          .arg(
              Arg::new("max_size")
@@ -427,7 +433,7 @@ fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
 }
 
 fn main() -> Result<()> {
-    // TODO activate seccomp & landlock
+    // TODO activate seccomp
 
     // Parse command arguments
     let mut config = parse_args();
@@ -479,7 +485,8 @@ fn main() -> Result<()> {
     };
 
     // Open socket with keysas-in
-    let sock_in = match UnixStream::connect(&config.socket_in) {
+    let addr_in = SocketAddr::from_abstract_namespace(config.socket_in)?;
+    let sock_in = match UnixStream::connect_addr(&addr_in) {
         Ok(s) => {
             info!("Connected to Keysas-in socket.");
             s
@@ -491,7 +498,8 @@ fn main() -> Result<()> {
     };
 
     // Open socket with keysas-out
-    let sock_out = match UnixListener::bind(&config.socket_out) {
+    let addr_out = SocketAddr::from_abstract_namespace(config.socket_out)?;
+    let sock_out = match UnixListener::bind_addr(&addr_out) {
         Ok(s) => {
             info!("Socket for Keysas-out created.");
             s

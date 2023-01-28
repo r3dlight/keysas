@@ -23,18 +23,24 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
+#![feature(unix_socket_abstract)]
 
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
+use landlock::{
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
+    RulesetStatus, ABI,
+};
 use log::{error, warn};
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
-use std::os::unix::net::{AncillaryData, Messages, SocketAncillary, UnixStream};
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, UnixStream};
 use std::path::PathBuf;
 use std::process;
 use std::str;
@@ -63,8 +69,37 @@ struct FileData {
 
 /// Daemon configuration arguments
 struct Configuration {
-    socket_in: String, // Path for the socket with keysas-transit
-    sas_out: String,   // Path to output directory
+    socket_out: String, // Path for the socket with keysas-transit
+    sas_out: String,    // Path to output directory
+}
+
+fn landlock_sandbox(socket_out: &String, sas_out: &String) -> Result<(), RulesetError> {
+    let abi = ABI::V2;
+    let status = Ruleset::new()
+        .handle_access(AccessFs::from_all(abi))?
+        .create()?
+        // Read-only access.
+        .add_rules(path_beneath_rules(
+            &[CONFIG_DIRECTORY, socket_out],
+            AccessFs::from_read(abi),
+        ))?
+        // Read-write access.
+        .add_rules(path_beneath_rules(&[sas_out], AccessFs::from_all(abi)))?
+        .restrict_self()?;
+    match status.ruleset {
+        // The FullyEnforced case must be tested.
+        RulesetStatus::FullyEnforced => {
+            info!("Keysas-out is now fully sandboxed using Landlock !")
+        }
+        RulesetStatus::PartiallyEnforced => {
+            warn!("Keysas-out is only partially sandboxed using Landlock !")
+        }
+        // Users should be warned that they are not protected.
+        RulesetStatus::NotEnforced => {
+            warn!("Keysas-out: Not sandboxed with Landlock ! Please update your kernel.")
+        }
+    }
+    Ok(())
 }
 
 /// This function parse the command arguments into a structure
@@ -77,10 +112,10 @@ fn parse_args() -> Configuration {
             Arg::new("socket_out")
                 .short('o')
                 .long("socket_out")
-                .value_name("<PATH>")
-                .default_value("/run/keysas/socket_out")
+                .value_name("<NAMESPACE>")
+                .default_value("socket_out")
                 .action(ArgAction::Set)
-                .help("Sets a custom socket path for files coming from transit"),
+                .help("Sets a custom abstract socket for files coming from transit"),
         )
         .arg(
             Arg::new("sas_out")
@@ -95,7 +130,7 @@ fn parse_args() -> Configuration {
 
     // Unwrap should not panic with default values
     Configuration {
-        socket_in: matches.get_one::<String>("socket_out").unwrap().to_string(),
+        socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
     }
 }
@@ -274,19 +309,23 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
 }
 
 fn main() -> Result<()> {
-    // TODO activate seccomp & landlock
+    // TODO activate seccomp
 
     // Parse command arguments
     let config = parse_args();
+
+    //Init Landlock
+    landlock_sandbox(&config.socket_out, &config.sas_out)?;
 
     // Configure logger
     init_logger();
 
     // Open socket with keysas-transit
-    let sock_in = match UnixStream::connect(&config.socket_in) {
+    let addr_out = SocketAddr::from_abstract_namespace(config.socket_out)?;
+    let sock_out = match UnixStream::connect_addr(&config.socket_out) {
         Ok(s) => s,
         Err(e) => {
-            error!("Failed to open socket with keysas-in {e}");
+            error!("Failed to open abstract socket with keysas-transit {e}");
             process::exit(1);
         }
     };
