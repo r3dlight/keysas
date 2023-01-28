@@ -73,6 +73,8 @@ struct Configuration {
     sas_out: String,    // Path to output directory
 }
 
+const CONFIG_DIRECTORY: &str = "/etc/keysas";
+
 fn landlock_sandbox(socket_out: &String, sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
@@ -322,7 +324,7 @@ fn main() -> Result<()> {
 
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_namespace(config.socket_out)?;
-    let sock_out = match UnixStream::connect_addr(&config.socket_out) {
+    let sock_out = match UnixStream::connect_addr(&addr_out) {
         Ok(s) => s,
         Err(e) => {
             error!("Failed to open abstract socket with keysas-transit {e}");
@@ -343,7 +345,7 @@ fn main() -> Result<()> {
         let bufs_in = &mut [IoSliceMut::new(&mut buf_in[..])][..];
 
         // Listen for message on socket
-        match sock_in.recv_vectored_with_ancillary(bufs_in, &mut ancillary_in) {
+        match sock_out.recv_vectored_with_ancillary(bufs_in, &mut ancillary_in) {
             Ok(_) => (),
             Err(e) => {
                 warn!("Failed to receive fds from in: {e}");
