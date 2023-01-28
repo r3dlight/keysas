@@ -4,12 +4,12 @@
 # Socket_in path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-SOCKET_IN=/run/keysas/socket_in
+SOCKET_IN=socket_in
 
 # Socket_out path
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
-SOCKET_OUT=/run/keysas/socket_out
+SOCKET_OUT=socket_out
 
 # Max file size to be transfered
 # You should not touch this parameter.

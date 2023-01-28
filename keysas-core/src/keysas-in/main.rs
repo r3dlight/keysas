@@ -24,6 +24,7 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
+#![feature(unix_socket_abstract)]
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -39,7 +40,8 @@ use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::remove_file;
 use std::fs::File;
-use std::os::unix::net::{SocketAncillary, UnixListener, UnixStream};
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::{SocketAddr, SocketAncillary, UnixListener, UnixStream};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -116,10 +118,10 @@ fn command_args(config: &mut Config) {
             Arg::new("socket_in")
                 .short('s')
                 .long("socket_in")
-                .value_name("Sets path for write-only socket")
-                .default_value("/run/keysas/socket_in")
+                .value_name("<NAMESPACE>")
+                .default_value("socket_in")
                 .action(ArgAction::Set)
-                .help("Path for write only abstract socket_in"),
+                .help("Namespace for in-transit abstract socket"),
         )
         .arg(
             Arg::new("version")
@@ -236,10 +238,11 @@ fn main() -> Result<()> {
             }
         }
     }
-    let sock = match UnixListener::bind(config.socket_in) {
+    let addr = SocketAddr::from_abstract_namespace(config.socket_in)?;
+    let sock = match UnixListener::bind_addr(addr) {
         Ok(s) => s,
         Err(e) => {
-            error!("Failed to open socket {e}");
+            error!("Failed to create abstract socket: {e}");
             process::exit(1);
         }
     };
