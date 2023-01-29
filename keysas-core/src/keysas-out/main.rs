@@ -24,6 +24,8 @@
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
 #![feature(unix_socket_abstract)]
+#[warn(unused_imports)]
+#![feature(tcp_quickack)]
 
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
