@@ -7,7 +7,9 @@
  * This file contains various funtions
  * for building the keysas-in binary.
  */
-
+#![feature(unix_socket_ancillary_data)]
+#![feature(unix_socket_abstract)]
+#![feature(tcp_quickack)]
 #![forbid(unsafe_code)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -23,9 +25,6 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
-#![feature(tcp_quickack)]
 
 use anyhow::{Context, Result};
 use bincode::serialize;
