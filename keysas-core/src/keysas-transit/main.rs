@@ -24,6 +24,7 @@
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
 #![feature(unix_socket_abstract)]
+#![feature(tcp_quickack)]
 
 use anyhow::Result;
 use clam_client::{client::ClamClient, response::ClamScanResult};

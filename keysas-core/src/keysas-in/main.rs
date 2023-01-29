@@ -25,6 +25,8 @@
 #![warn(deprecated)]
 #![feature(unix_socket_ancillary_data)]
 #![feature(unix_socket_abstract)]
+#![feature(tcp_quickack)]
+
 use anyhow::{Context, Result};
 use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
