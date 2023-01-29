@@ -8,6 +8,9 @@
  * for building the keysas-out binary.
  */
 
+#![feature(unix_socket_ancillary_data)]
+#![feature(unix_socket_abstract)]
+#![feature(tcp_quickack)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
@@ -22,9 +25,6 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
-#![feature(tcp_quickack)]
 
 use anyhow::Result;
 use clam_client::{client::ClamClient, response::ClamScanResult};
