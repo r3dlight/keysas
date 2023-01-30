@@ -23,6 +23,7 @@ LockPersonality=yes
 SystemCallArchitectures=native
 NoNewPrivileges=yes
 RemoveIPC=true
+PrivateIPC=true
 MemoryDenyWriteExecute=yes
 IPAddressDeny=any
 IPAddressAllow=127.0.0.1/8
