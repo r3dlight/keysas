@@ -499,7 +499,7 @@ fn main() -> Result<()> {
     };
 
     // Open socket with keysas-out
-    let addr_out = SocketAddr::from_abstract_name(config.socket_out)?;
+    let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
     let sock_out = match UnixListener::bind_addr(&addr_out) {
         Ok(s) => {
             info!("Socket for Keysas-out created.");

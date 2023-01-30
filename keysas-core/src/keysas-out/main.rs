@@ -324,7 +324,7 @@ fn main() -> Result<()> {
     init_logger();
 
     // Open socket with keysas-transit
-    let addr_out = SocketAddr::from_abstract_name(config.socket_out)?;
+    let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
     let sock_out = match UnixStream::connect_addr(&addr_out) {
         Ok(s) => s,
         Err(e) => {
