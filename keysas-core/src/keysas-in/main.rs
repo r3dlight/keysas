@@ -70,7 +70,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             sas_in: "/var/local/in/".to_string(),
-            socket_in: "/run/keysas/socket_in".to_string(),
+            socket_in: "socket_in".to_string(),
         }
     }
 }
