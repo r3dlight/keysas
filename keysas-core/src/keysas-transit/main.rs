@@ -41,6 +41,7 @@ use std::fs::{metadata, File};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
+use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{
     AncillaryData, Messages, SocketAddr, SocketAncillary, UnixListener, UnixStream,
 };
@@ -498,7 +499,7 @@ fn main() -> Result<()> {
     };
 
     // Open socket with keysas-out
-    let addr_out = SocketAddr::from_abstract_namespace(config.socket_out)?;
+    let addr_out = SocketAddr::from_abstract_name(config.socket_out)?;
     let sock_out = match UnixListener::bind_addr(&addr_out) {
         Ok(s) => {
             info!("Socket for Keysas-out created.");

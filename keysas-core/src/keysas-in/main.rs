@@ -41,6 +41,7 @@ use regex::Regex;
 use std::ffi::OsStr;
 use std::fs::remove_file;
 use std::fs::File;
+use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{SocketAddr, SocketAncillary, UnixListener, UnixStream};
 use std::path::Path;
 use std::path::PathBuf;
@@ -238,8 +239,8 @@ fn main() -> Result<()> {
             }
         }
     }
-    let addr = SocketAddr::from_abstract_namespace(config.socket_in)?;
-    let sock = match UnixListener::bind_addr(addr) {
+    let addr = SocketAddr::from_abstract_name(config.socket_in)?;
+    let sock = match UnixListener::bind_addr(&addr) {
         Ok(s) => s,
         Err(e) => {
             error!("Failed to create abstract socket: {e}");
