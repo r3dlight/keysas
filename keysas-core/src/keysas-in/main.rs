@@ -247,16 +247,15 @@ fn main() -> Result<()> {
             process::exit(1);
         }
     };
+    let (unix_stream, _sck_addr) = match sock.accept() {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to accept connection: {e}");
+            process::exit(1);
+        }
+    };
 
     loop {
-        let (unix_stream, _sck_addr) = match sock.accept() {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Failed to accept connection: {e}");
-                process::exit(1);
-            }
-        };
-
         let files = match list_files(&config.sas_in) {
             Ok(fs) => fs,
             Err(e) => {
