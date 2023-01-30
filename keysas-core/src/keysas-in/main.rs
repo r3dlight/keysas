@@ -81,11 +81,11 @@ fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, sas_in],
+            &[CONFIG_DIRECTORY],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(&[socket_in], AccessFs::from_all(abi)))?
+        .add_rules(path_beneath_rules(&[socket_in, sas_in], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
