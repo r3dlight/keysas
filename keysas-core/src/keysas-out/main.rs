@@ -35,13 +35,11 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
-use log::{error, warn};
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
-use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, UnixStream};
 use std::path::PathBuf;
 use std::process;
