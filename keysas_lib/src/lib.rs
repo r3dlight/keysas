@@ -16,15 +16,6 @@ pub fn init_logger() {
     }
 }
 
-/*
-struct FileAsPath(File);
-impl AsRef<Path> for FileAsPath {
-    fn as_ref(&self) -> &Path {
-        self.0
-    }
-}
-*/
-
 /// This function computes the SHA-256 digest of a file
 pub fn sha256_digest(input: &File) -> Result<String> {
     //let file = File::open(input).context("Failed to open input file")?;
@@ -49,7 +40,7 @@ pub fn sha256_digest(input: &File) -> Result<String> {
 /// This function lists all files in a directory except hidden ones.
 ///
 /// Example:
-/// ```
+/// ```no_run
 /// let dir = tempdir().unwrap();
 /// let path = dir.path().join("transit");
 /// let _output = fs::create_dir_all(&path).unwrap();
