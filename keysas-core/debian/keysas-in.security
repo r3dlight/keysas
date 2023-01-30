@@ -26,6 +26,7 @@ SystemCallArchitectures=native
 NoNewPrivileges=yes
 InaccessiblePaths=/proc
 RemoveIPC=true
+PrivateIPC=true
 MemoryDenyWriteExecute=yes
 TemporaryFileSystem=/etc
 BindReadOnlyPaths=/etc/keysas
@@ -33,5 +34,5 @@ TemporaryFileSystem=/var
 BindPaths=/run/keysas
 BindPaths=/var/local/in
 IPAddressDeny=any
-PrivateNetwork=true
+PrivateNetwork=false
 

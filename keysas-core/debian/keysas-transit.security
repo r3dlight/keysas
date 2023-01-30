@@ -23,6 +23,7 @@ SystemCallArchitectures=native
 NoNewPrivileges=yes
 InaccessiblePaths=/proc
 RemoveIPC=true
+PrivateIPC=true
 MemoryDenyWriteExecute=yes
 TemporaryFileSystem=/etc
 BindReadOnlyPaths=/etc/keysas
