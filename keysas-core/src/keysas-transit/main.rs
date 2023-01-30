@@ -486,7 +486,7 @@ fn main() -> Result<()> {
     };
 
     // Open socket with keysas-in
-    let addr_in = SocketAddr::from_abstract_name(config.socket_in)?;
+    let addr_in = SocketAddr::from_abstract_name(&config.socket_in)?;
     let sock_in = match UnixStream::connect_addr(&addr_in) {
         Ok(s) => {
             info!("Connected to Keysas-in socket.");
