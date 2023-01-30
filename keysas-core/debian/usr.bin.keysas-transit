@@ -11,10 +11,6 @@
 /usr/bin/keysas-transit {
   #include <abstractions/base>
   #include <abstractions/apache2-common>
-
-  /run/keysas/ rw,
-  /run/keysas/socket_in r,
-  /run/keysas/socket_out rw,
   /usr/share/keysas/rules/** r,
   owner /var/local/transit/ r,
   owner /var/local/transit/** rw,
