@@ -308,6 +308,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 }
             }
         }
+        drop(file);
     }
 }
 
@@ -329,7 +330,7 @@ fn main() -> Result<()> {
         Ok(s) => {
             info!("Connected to keysas-transit socket.");
             s
-        },
+        }
         Err(e) => {
             error!("Failed to open abstract socket with keysas-transit {e}");
             process::exit(1);
