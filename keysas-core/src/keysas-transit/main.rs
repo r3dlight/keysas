@@ -37,7 +37,6 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
-use std::fs::File;
 use std::fs::{metadata, File};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
