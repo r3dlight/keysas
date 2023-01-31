@@ -27,6 +27,7 @@
 #![warn(deprecated)]
 
 use anyhow::Result;
+use bincode::Options;
 use clam_client::{client::ClamClient, response::ClamScanResult};
 use clap::{crate_version, Arg, ArgAction, Command};
 use infer::get_from_path;
@@ -258,6 +259,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .flatten()
         .filter_map(|fd| {
             // Deserialize metadata
+            let _my_options = bincode::DefaultOptions::new().with_limit(4128);
             match bincode::deserialize_from::<&[u8], InputMetadata>(buffer) {
                 Ok(meta) => {
                     // Initialize with failed value by default
