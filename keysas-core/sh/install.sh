@@ -178,7 +178,7 @@ main() {
 	install_bin
 	install_systemd_units
 	install_config
-	install_apparmor_profiles
+	#install_apparmor_profiles
 	set_acls
 	install_yara_rule
 	enable_systemd
