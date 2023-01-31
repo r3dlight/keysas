@@ -439,11 +439,11 @@ fn main() -> Result<()> {
     // Parse command arguments
     let mut config = parse_args();
 
-    // landlock init
-    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
-
     // Configure logger
     init_logger();
+
+    // landlock init
+    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
 
     // Initilize clamd client
     // Test if ClamAV IP is valid

@@ -318,11 +318,11 @@ fn main() -> Result<()> {
     // Parse command arguments
     let config = parse_args();
 
-    //Init Landlock
-    landlock_sandbox(&config.socket_out, &config.sas_out)?;
-
     // Configure logger
     init_logger();
+
+    //Init Landlock
+    landlock_sandbox(&config.socket_out, &config.sas_out)?;
 
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
