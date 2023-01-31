@@ -326,7 +326,10 @@ fn main() -> Result<()> {
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
     let sock_out = match UnixStream::connect_addr(&addr_out) {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("Connected to keysas-transit socket.");
+            s
+        },
         Err(e) => {
             error!("Failed to open abstract socket with keysas-transit {e}");
             process::exit(1);
