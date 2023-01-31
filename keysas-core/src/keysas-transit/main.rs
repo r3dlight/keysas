@@ -261,6 +261,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match bincode::deserialize_from::<&[u8], InputMetadata>(buffer) {
                 Ok(meta) => {
                     // Initialize with failed value by default
+                    info!("Receiving fd of file: {}", &meta.filename);
                     Some(FileData {
                         fd,
                         md: FileMetadata {
@@ -277,7 +278,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                     })
                 }
                 Err(e) => {
-                    warn!("Failed to deserialize messge from in: {e}");
+                    warn!("Failed to deserialize message from in: {e}");
                     None
                 }
             }
