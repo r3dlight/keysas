@@ -85,7 +85,10 @@ fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(&[socket_in, sas_in], AccessFs::from_all(abi)))?
+        .add_rules(path_beneath_rules(
+            &[socket_in, sas_in],
+            AccessFs::from_all(abi),
+        ))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -194,7 +197,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         ancillary.add_fds(&fds[..]);
         match stream.send_vectored_with_ancillary(&ios[..], &mut ancillary) {
             Ok(_) => {
-                debug!("Chunk of file descriptors is sent");
+                info!("Chunk of file descriptors has been sent");
             }
             Err(e) => error!("Failed to send fds: {e}"),
         }
@@ -202,7 +205,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         for it in fs.iter().zip(fds.iter()) {
             let (file_path, fd) = it;
             match unlinkat(Some(*fd), file_path, UnlinkatFlags::NoRemoveDir) {
-                Ok(_) => info!("File {:?} is now removed.", file_path),
+                Ok(_) => info!("File {:?} has been removed.", file_path),
                 Err(e) => error!("Cannot unlink file {:?}: {:?}", file_path, e),
             };
         }
@@ -228,7 +231,7 @@ fn main() -> Result<()> {
     }
     info!("Keysas-in started :)");
     info!("Running configuration is:");
-    info!("- socket_in: {}", &config.socket_in);
+    info!("- Abstract socket: {}", &config.socket_in);
     info!("- sas_in: {}", &config.sas_in);
     if Path::new(&config.socket_in).exists() {
         match remove_file(&config.socket_in) {
@@ -241,7 +244,10 @@ fn main() -> Result<()> {
     }
     let addr = SocketAddr::from_abstract_name(config.socket_in)?;
     let sock = match UnixListener::bind_addr(&addr) {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("Socket for Keysas-transit created.");
+            s
+        }
         Err(e) => {
             error!("Failed to create abstract socket: {e}");
             process::exit(1);
