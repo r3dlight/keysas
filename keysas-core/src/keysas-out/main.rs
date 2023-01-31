@@ -288,7 +288,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
         } else {
             // Output file
-            let mut reader = BufReader::new(file);
+            let mut reader = BufReader::new(&file);
 
             let mut path = PathBuf::new();
             path.push(&conf.sas_out);
