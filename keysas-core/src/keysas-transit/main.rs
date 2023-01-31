@@ -37,6 +37,7 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
+use std::fs::File;
 use std::fs::{metadata, File};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
@@ -318,7 +319,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
             Err(e) => {
                 warn!(
-                    "Failed to calculate digest for file {}, error {e}",
+                    "Failed to calculate digest for file {}, error {e}.",
                     f.md.filename
                 );
             }
@@ -396,7 +397,7 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
         let data = match bincode::serialize(&file.md) {
             Ok(d) => d,
             Err(e) => {
-                println!("Failed to serialize: {e}");
+                error!("Failed to serialize: {e}");
                 process::exit(1);
             }
         };
@@ -407,8 +408,8 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
         let mut ancillary = SocketAncillary::new(&mut ancillary_buffer);
         ancillary.add_fds(&[file.fd][..]);
         match stream.send_vectored_with_ancillary(&bufs[..], &mut ancillary) {
-            Ok(_) => println!("File sent"),
-            Err(e) => println!("Failed to send file {e}"),
+            Ok(_) => info!("File sent !"),
+            Err(e) => error!("Failed to send file {e}."),
         }
     }
 }
