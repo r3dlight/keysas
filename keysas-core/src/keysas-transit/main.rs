@@ -243,7 +243,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match m {
                 Ok(ad) => Some(ad),
                 Err(e) => {
-                    warn!("failed to get ancillary data: {:?}", e);
+                    log::warn!("failed to get ancillary data: {:?}", e);
                     None
                 }
             }
@@ -261,7 +261,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match bincode::deserialize_from::<&[u8], InputMetadata>(buffer) {
                 Ok(meta) => {
                     // Initialize with failed value by default
-                    info!("Receiving fd of file: {}", &meta.filename);
+                    log::info!("Receiving fd of file: {}", &meta.filename);
                     Some(FileData {
                         fd,
                         md: FileMetadata {
@@ -278,7 +278,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                     })
                 }
                 Err(e) => {
-                    warn!("Failed to deserialize message from in: {e}");
+                    log::warn!("Failed to deserialize message from in: {e}");
                     None
                 }
             }
@@ -536,7 +536,7 @@ fn main() -> Result<()> {
 
         // Listen for message on socket
         match sock_in.recv_vectored_with_ancillary(bufs_in, &mut ancillary_in) {
-            Ok(_) => (),
+            Ok(size) => info!("Receiving data from keysas-in, message size: {size}"),
             Err(e) => {
                 warn!("Failed to receive fds from in: {e}");
                 process::exit(1);
