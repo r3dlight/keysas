@@ -1,4 +1,6 @@
-# Keysas - USB virus cleaning station
+# Keysas - USB virus cleaning station (WIP)
+
+Warning: This is only a work in progress for now.
 
 # Main features
 - Retrieve files from USB or over the network
@@ -21,8 +23,5 @@
 +----------------------------+           +----------------------------+            +--------------------------------+
 ```
 
-Files are passed between daemon in sockets as file descriptors.
-The sockets are located in (for now):
-- /run/keysas/sock_in : sockets between keysas-in and keysas-transit
-- /run/keysas/sock_out : sockets between keysas-transit and keysas-out
+Files are passed between daemons as file descriptors and using abstract sockets.
 
