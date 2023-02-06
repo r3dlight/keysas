@@ -1,0 +1,24 @@
+{
+  "name": "keysas-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@intlify/unplugin-vue-i18n": "^0.8.1",
+    "animate.css": "^4.1.1",
+    "bootstrap": "^5.2.3",
+    "bootstrap-icons": "^1.10.2",
+    "vue": "^3.2.45"
+  },
+  "devDependencies": {
+    "@rollup/plugin-alias": "^4.0.2",
+    "@vitejs/plugin-vue": "^4.0.0",
+    "sass": "^1.56.2",
+    "vite": "^4.0.0"
+  }
+}
