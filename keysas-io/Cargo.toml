@@ -29,7 +29,7 @@ hex = "0.4"
 kv = "0.24"
 yubico_manager = "0.9"
 walkdir = "2.3"
-landlock = { git = "https://github.com/landlock-lsm/rust-landlock", branch = "main" }
+landlock = "0.2" 
 flexi_logger = "0.24"
 
 [dev-dependencies]
