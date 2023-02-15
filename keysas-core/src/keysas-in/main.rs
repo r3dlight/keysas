@@ -27,7 +27,7 @@
 #![warn(deprecated)]
 
 use anyhow::{Context, Result};
-use bincode::serialize;
+//use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
 use itertools::MultiUnzip;
 use landlock::{
@@ -151,7 +151,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
     let mut files = files.to_owned();
     files.retain(|x| !re.is_match(x));
     //Max X files per send in .chunks(X)
-    for batch in files.chunks(2) {
+    for batch in files.chunks(1) {
         let (bufs, fhs, fs): (Vec<Vec<u8>>, Vec<File>, Vec<PathBuf>) = batch
             .iter()
             .map(|f| {
@@ -179,7 +179,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                     filename: f.file_name()?.to_os_string().into(),
                     digest,
                 };
-                let data: Vec<u8> = match serialize(&m) {
+                let data: Vec<u8> = match bincode::serialize(&m) {
                     Ok(d) => d,
                     Err(_e) => {
                         error!("Failed to serialize message");

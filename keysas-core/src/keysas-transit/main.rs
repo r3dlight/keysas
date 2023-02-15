@@ -553,6 +553,6 @@ fn main() -> Result<()> {
 
         // Send fd and report to out
         send_files(&files, &out_stream);
-        main_thread::sleep(Duration::from_millis(500));
+        main_thread::sleep(Duration::from_millis(100));
     }
 }
