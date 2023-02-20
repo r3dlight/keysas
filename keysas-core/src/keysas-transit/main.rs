@@ -296,10 +296,6 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration, filename: &Str
     match get(&buf) {
         Some(info) => conf.magic_list.contains(&info.extension().to_string()),
         None => false,
-        Err(e) => {
-            warn!("Failed to get Mime type for file {} error {e}", filename);
-            false
-        }
     }
 }
 /// This function check each file given in the input vector.
