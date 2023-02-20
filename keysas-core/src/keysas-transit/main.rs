@@ -27,11 +27,10 @@
 #![warn(deprecated)]
 
 use anyhow::Result;
-use std::path::PathBuf;
 use bincode::Options;
 use clam_client::{client::ClamClient, response::ClamScanResult};
 use clap::{crate_version, Arg, ArgAction, Command};
-use infer::get_from_path;
+use infer::get;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
 use landlock::{
@@ -48,6 +47,7 @@ use std::os::unix::net::{
     AncillaryData, Messages, SocketAddr, SocketAncillary, UnixListener, UnixStream,
 };
 use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 use std::str;
 use std::thread as main_thread;
@@ -340,7 +340,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         }
 
         // Check extension
-        debug!("FD number is {}", f.fd);
+        log::debug!("FD number is {}", f.fd);
         let metadata = &file.metadata()?;
         // Read only 1Mo of the file to be faster and do not read large files
         let mut reader = io::BufReader::new(io::Take::new(file, 1024 * 1024));
