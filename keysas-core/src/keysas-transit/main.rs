@@ -292,7 +292,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(buf: PathBuf, conf: &Configuration, filename: &String) -> bool {
+fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration, filename: &String) -> bool {
     match get(&buf) {
         Ok(Some(info)) => conf.magic_list.contains(&info.extension().to_string()),
         Ok(None) => false,
