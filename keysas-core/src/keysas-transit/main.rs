@@ -27,6 +27,7 @@
 #![warn(deprecated)]
 
 use anyhow::Result;
+use std::path::PathBuf;
 use bincode::Options;
 use clam_client::{client::ClamClient, response::ClamScanResult};
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -57,6 +58,7 @@ const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[macro_use]
 extern crate serde_derive;
+use serde_derive::Deserialize;
 
 #[derive(Deserialize, Debug)]
 struct InputMetadata {
@@ -289,8 +291,8 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(filename: &String, conf: &Configuration) -> bool {
-    match get_from_path(filename) {
+fn check_is_extension_allowed(buf: PathBuf, conf: &Configuration, filename: &String) -> bool {
+    match get(&buf) {
         Ok(Some(info)) => conf.magic_list.contains(&info.extension().to_string()),
         Ok(None) => false,
         Err(e) => {
@@ -299,7 +301,6 @@ fn check_is_extension_allowed(filename: &String, conf: &Configuration) -> bool {
         }
     }
 }
-
 /// This function check each file given in the input vector.
 /// Checks are made against the provided configuration.
 /// Checks performed are:
@@ -318,6 +319,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         match sha256_digest(&file) {
             Ok(d) => {
                 f.md.is_digest_ok = f.md.digest.eq(&d);
+                info!("Sha256 digest are matching for file: {}", f.md.filename);
             }
             Err(e) => {
                 warn!(
@@ -328,7 +330,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         }
 
         // Check size
-        match metadata(&f.md.filename) {
+        match &file.metadata() {
             Ok(meta) => {
                 f.md.is_toobig = meta.len().gt(&conf.max_size);
             }
@@ -338,7 +340,11 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         }
 
         // Check extension
-        f.md.is_type_allowed = check_is_extension_allowed(&f.md.filename, conf);
+        debug!("FD number is {}", f.fd);
+        let metadata = &file.metadata()?;
+        // Read only 1Mo of the file to be faster and do not read large files
+        let mut reader = io::BufReader::new(io::Take::new(file, 1024 * 1024));
+        f.md.is_type_allowed = check_is_extension_allowed(reader, conf, &f.md.filename);
 
         // Check anti-virus
         match &conf.clam_client {
