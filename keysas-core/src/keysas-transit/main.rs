@@ -53,6 +53,7 @@ use std::str;
 use std::thread as main_thread;
 use std::time::Duration;
 use yara::*;
+use std::io::{BufReader, Take};
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
