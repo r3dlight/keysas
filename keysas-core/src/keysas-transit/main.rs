@@ -47,7 +47,6 @@ use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{
     AncillaryData, Messages, SocketAddr, SocketAncillary, UnixListener, UnixStream,
 };
-use std::path::Path;
 use std::process;
 use std::str;
 use std::thread as main_thread;
@@ -360,16 +359,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
 
-        // Check extension
-        // Read only 1Mo of the file to be faster and do not read large files
-        let mut reader = BufReader::new(file.take(1024 * 1024));
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer).unwrap();
-        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
-
         // Check yara rules
         match &conf.yara_rules {
-            Some(rules) => match rules.scan_file(Path::new(&f.md.filename), conf.yara_timeout) {
+            Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
                 Ok(results) => match results.is_empty() {
                     true => {
                         f.md.yara_pass = true;
@@ -391,6 +383,12 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 f.md.yara_pass = false;
             }
         }
+        // Check extension
+        // Read only 1Mo of the file to be faster and do not read large files
+        let mut reader = BufReader::new(file.take(1024 * 1024));
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer).unwrap();
+        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
     }
 }
 
