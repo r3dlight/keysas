@@ -39,7 +39,7 @@ use landlock::{
 };
 use log::{error, info, warn};
 use std::fs::{metadata, File};
-use std::io::{BufReader, Take};
+use std::io::{BufReader, Take, Read};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
@@ -294,8 +294,8 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 /// This function returns true if the file type is in the list provided
 fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration, filename: &String) -> bool {
     match get(&buf) {
-        Ok(Some(info)) => conf.magic_list.contains(&info.extension().to_string()),
-        Ok(None) => false,
+        Some(info) => conf.magic_list.contains(&info.extension().to_string()),
+        None => false,
         Err(e) => {
             warn!("Failed to get Mime type for file {} error {e}", filename);
             false
