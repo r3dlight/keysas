@@ -41,6 +41,7 @@ use log::{error, info, warn};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
@@ -385,9 +386,12 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         }
         // Check extension
         // Read only 1Mo of the file to be faster and do not read large files
-        let mut reader = BufReader::new(file.take(1024 * 1024));
+        let mut reader = BufReader::new(&file);
+        limited_reader = reader.take(1024 * 1024);
+        // Forget the BufReader to avoid closing the fd when going oos
+        mem::forget(reader);
         let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer).unwrap();
+        limited_reader.read_to_end(&mut buffer).unwrap();
         f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
     }
 }
