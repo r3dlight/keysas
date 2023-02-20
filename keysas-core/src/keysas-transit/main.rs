@@ -38,8 +38,8 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
-use std::fs::{metadata, File};
-use std::io::{BufReader, Take, Read};
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
@@ -48,7 +48,6 @@ use std::os::unix::net::{
     AncillaryData, Messages, SocketAddr, SocketAncillary, UnixListener, UnixStream,
 };
 use std::path::Path;
-use std::path::PathBuf;
 use std::process;
 use std::str;
 use std::thread as main_thread;
@@ -292,7 +291,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration, filename: &String) -> bool {
+fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
     match get(&buf) {
         Some(info) => conf.magic_list.contains(&info.extension().to_string()),
         None => false,
@@ -336,17 +335,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
 
-        // Check extension
-        log::debug!("FD number is {}", f.fd);
-        // Read only 1Mo of the file to be faster and do not read large files
-        let mut reader = BufReader::new(Take::new(file, 1024 * 1024));
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer)?;
-        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf, &f.md.filename);
-
         // Check anti-virus
         match &conf.clam_client {
-            Some(client) => match client.scan_stream(file) {
+            Some(client) => match client.scan_stream(&file) {
                 Ok(ClamScanResult::Ok) => {}
                 Ok(ClamScanResult::Found(l, v)) => {
                     warn!("Clam found virus {v} at {l}");
@@ -368,6 +359,13 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 f.md.av_pass = false;
             }
         }
+
+        // Check extension
+        // Read only 1Mo of the file to be faster and do not read large files
+        let mut reader = BufReader::new(file.take(1024 * 1024));
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer).unwrap();
+        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
 
         // Check yara rules
         match &conf.yara_rules {
