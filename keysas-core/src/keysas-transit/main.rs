@@ -386,8 +386,8 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         }
         // Check extension
         // Read only 1Mo of the file to be faster and do not read large files
-        let mut reader = BufReader::new(&file);
-        let limited_reader = reader.take(1024 * 1024);
+        let reader = BufReader::new(&file);
+        let mut limited_reader = &reader.take(1024 * 1024);
         // Forget the BufReader to avoid closing the fd when going oos
         mem::forget(reader);
         let mut buffer = Vec::new();
