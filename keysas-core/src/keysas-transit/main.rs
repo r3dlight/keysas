@@ -39,7 +39,7 @@ use landlock::{
 };
 use log::{error, info, warn};
 use std::fs::{metadata, File};
-use std::io::{self, Read, Take};
+use std::io::{BufReader, Take};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
 use std::os::fd::FromRawFd;
@@ -343,7 +343,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         // Check extension
         log::debug!("FD number is {}", f.fd);
         // Read only 1Mo of the file to be faster and do not read large files
-        let mut reader = io::BufReader::new(io::Take::new(file, 1024 * 1024));
+        let mut reader = BufReader::new(Take::new(file, 1024 * 1024));
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer)?;
         f.md.is_type_allowed = check_is_extension_allowed(buffer, conf, &f.md.filename);
