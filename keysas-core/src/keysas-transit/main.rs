@@ -341,7 +341,6 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
 
         // Check extension
         log::debug!("FD number is {}", f.fd);
-        let metadata = &file.metadata()?;
         // Read only 1Mo of the file to be faster and do not read large files
         let mut reader = io::BufReader::new(io::Take::new(file, 1024 * 1024));
         f.md.is_type_allowed = check_is_extension_allowed(reader, conf, &f.md.filename);
