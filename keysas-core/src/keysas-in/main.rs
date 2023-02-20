@@ -38,7 +38,6 @@ use log::{debug, error, info, warn};
 use nix::unistd::unlinkat;
 use nix::unistd::UnlinkatFlags;
 use regex::Regex;
-use std::ffi::OsStr;
 use std::fs::remove_file;
 use std::fs::File;
 use std::os::linux::net::SocketAddrExt;
@@ -57,7 +56,7 @@ const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[derive(Serialize, Debug, Clone)]
 struct Message {
-    filename: Box<OsStr>,
+    filename: String,
     digest: String,
 }
 
@@ -176,7 +175,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                     }
                 };
                 let m = Message {
-                    filename: f.file_name()?.to_os_string().into(),
+                    filename: f.file_name()?.to_str()?.to_string(),
                     digest,
                 };
                 let data: Vec<u8> = match bincode::serialize(&m) {
