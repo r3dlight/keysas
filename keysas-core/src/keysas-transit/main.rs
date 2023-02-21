@@ -42,6 +42,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
+use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{
