@@ -41,6 +41,7 @@ use log::{error, info, warn};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
@@ -390,6 +391,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         // Read only 1Mo of the file to be faster and do not read large files
 
         let fd = file.as_raw_fd(); 
+        mem::forget(fd);
         let mut reader = BufReader::new(&file);
         let limited_reader = &mut reader.by_ref().take(1024 * 1024);
         // On récupère le fd sous-jacent (donc file)
