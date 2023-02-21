@@ -390,16 +390,18 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         // Check extension
         // Read only 1Mo of the file to be faster and do not read large files
 
-        let fd = file.as_raw_fd(); 
-        mem::forget(fd);
-        let mut reader = BufReader::new(&file);
-        let limited_reader = &mut reader.by_ref().take(1024 * 1024);
-        // On récupère le fd sous-jacent (donc file)
+        let reader = BufReader::new(file.try_clone().unwrap());
+        let limited_reader = &mut reader.take(1024 * 1024);
+        //mem::forget(file);
         //let file_descriptor = reader.get_ref().as_raw_fd();
         let mut buffer = Vec::new();
-        //TODO: error handling
-        limited_reader.read_to_end(&mut buffer).unwrap();
-        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
+        match limited_reader.read_to_end(&mut buffer) {
+            Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
+            Err(e)=> {
+                error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                f.md.is_type_allowed = false;
+            }
+        }
     }
 }
 
