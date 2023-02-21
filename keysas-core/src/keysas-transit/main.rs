@@ -296,6 +296,7 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
         None => false,
     }
 }
+
 /// This function check each file given in the input vector.
 /// Checks are made against the provided configuration.
 /// Checks performed are:
@@ -383,16 +384,19 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 f.md.yara_pass = false;
             }
         }
+
         // Check extension
         // Read only 1Mo of the file to be faster and do not read large files
         // Creating a new scope to avoid closing the fd
-        {
-            let reader = BufReader::new(&file);
-            let limited_reader = &mut reader.take(1024 * 1024);
-            let mut buffer = Vec::new();
-            limited_reader.read_to_end(&mut buffer).unwrap();
-            f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
-        }
+
+        let reader = BufReader::new(&file);
+        let limited_reader = &mut reader.take(1024 * 1024);
+        // On récupère le fd sous-jacent (donc file)
+        let file_descriptor = reader.get_ref().as_raw_fd();
+        let mut buffer = Vec::new();
+        //TODO: error handling
+        limited_reader.read_to_end(&mut buffer).unwrap();
+        f.md.is_type_allowed = check_is_extension_allowed(buffer, conf);
     }
 }
 
