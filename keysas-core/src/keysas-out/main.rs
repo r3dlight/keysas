@@ -58,7 +58,7 @@ struct FileMetadata {
     is_toobig: bool,
     is_type_allowed: bool,
     av_pass: bool,
-    av_report: String,
+    av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
 }
@@ -265,7 +265,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.av_pass {
-                match write!(report, "Clam : {}", f.md.av_report) {
+                match write!(report, "Clam : {:?}", f.md.av_report) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
