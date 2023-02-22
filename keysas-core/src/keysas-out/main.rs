@@ -35,6 +35,7 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
+use nix::unistd;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -177,7 +178,8 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 fn output_files(files: Vec<FileData>, conf: &Configuration) {
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
-
+        // Position the cursor at the beginning of the file
+        unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet).unwrap();
         // Check digest
         let digest = match sha256_digest(&file) {
             Ok(d) => d,

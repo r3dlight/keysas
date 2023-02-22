@@ -38,6 +38,7 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
+use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
@@ -311,12 +312,14 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
     for f in files {
         let nfd = nix::unistd::dup2(f.fd, 5).unwrap();
         let file = unsafe { File::from_raw_fd(nfd) };
-
+        // Synchronize the file before calculating the SHA256 hash
+        file.sync_all().unwrap();
+        // Position the cursor at the beginning of the file
+        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
         // Check digest
         match sha256_digest(&file) {
             Ok(d) => {
                 f.md.is_digest_ok = f.md.digest.eq(&d);
-                info!("Sha256 digest are matching for file: {}", f.md.filename);
             }
             Err(e) => {
                 warn!(
@@ -325,6 +328,8 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 );
             }
         }
+        // Position the cursor at the beginning of the file
+        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
 
         // Check size
         match &file.metadata() {
@@ -335,6 +340,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
                 warn!("Failed to get metadata of file {} error {e}", f.md.filename);
             }
         }
+
+        // Position the cursor at the beginning of the file
+        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
 
         // Check anti-virus
         match &conf.clam_client {
@@ -361,6 +369,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
 
+        // Position the cursor at the beginning of the file
+        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
+
         // Check yara rules
         match &conf.yara_rules {
             Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
@@ -386,7 +397,10 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
             }
         }
 
-        // Check extension
+        // Position the cursor at the beginning of the file
+        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
+
+        // Check the magic number
         // Read only 1Mo of the file to be faster and do not read large files
         let reader = BufReader::new(file);
         let limited_reader = &mut reader.take(1024 * 1024);
