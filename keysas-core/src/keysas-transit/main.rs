@@ -311,7 +311,7 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        let nfd = nix::unistd::dup2(f.fd, 5).unwrap();
+        let nfd = nix::unistd::dup2(f.fd, 15).unwrap();
         let mut file = unsafe { File::from_raw_fd(nfd) };
         // Synchronize the file before calculating the SHA256 hash
         file.sync_all().unwrap();
