@@ -208,7 +208,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut path = PathBuf::new();
             path.push(conf.sas_out.clone());
             path.push(&f.md.filename);
-            path.push(&String::from(".report"));
+            path.set_extension("report");
             let mut report = match File::options()
                 .read(true)
                 .write(true)
