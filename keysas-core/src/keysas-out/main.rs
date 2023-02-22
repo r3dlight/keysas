@@ -204,8 +204,9 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             || !f.md.av_pass
             || !f.md.yara_pass
         {
-            // Checks have failed write a report
+            // Checks have failed writing a report
             let mut path = PathBuf::new();
+            path.push(conf.sas_out.clone());
             path.push(&f.md.filename);
             path.push(&String::from(".report"));
             let mut report = match File::options()
