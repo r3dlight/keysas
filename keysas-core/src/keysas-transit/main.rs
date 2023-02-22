@@ -28,7 +28,9 @@
 
 use anyhow::Result;
 use bincode::Options;
-use clam_client::{client::ClamClient, response::ClamScanResult};
+use clamav_tcp;
+use clamav_tcp::scan;
+use clamav_tcp::version;
 use clap::{crate_version, Arg, ArgAction, Command};
 use infer::get;
 use keysas_lib::init_logger;
@@ -43,6 +45,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
 use std::net::IpAddr;
+use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{
@@ -74,7 +77,7 @@ struct FileMetadata {
     is_toobig: bool,
     is_type_allowed: bool,
     av_pass: bool,
-    av_report: String,
+    av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
 }
@@ -87,16 +90,15 @@ struct FileData {
 
 /// Daemon configuration arguments
 struct Configuration {
-    socket_in: String,               // path for the socket with keysas-in
-    socket_out: String,              // path for the socket with keysas-out
-    max_size: u64,                   // Maximum size for files
-    magic_list: Vec<String>,         // List of allowed file type
-    clamav_ip: String,               // ClamAV IP address
-    clamav_port: u16,                // ClamAV port number
-    clam_client: Option<ClamClient>, // Client for clamd
-    rule_path: String,               // Path to yara rules
-    yara_timeout: i32,               // Timeout for yara
-    yara_rules: Option<Rules>,       // Yara rules
+    socket_in: String,         // path for the socket with keysas-in
+    socket_out: String,        // path for the socket with keysas-out
+    max_size: u64,             // Maximum size for files
+    magic_list: Vec<String>,   // List of allowed file type
+    clamav_ip: String,         // ClamAV IP address
+    clamav_port: u16,          // ClamAV port number
+    rule_path: String,         // Path to yara rules
+    yara_timeout: i32,         // Timeout for yara
+    yara_rules: Option<Rules>, // Yara rules
 }
 
 fn landlock_sandbox(
@@ -231,7 +233,6 @@ fn parse_args() -> Configuration {
             .collect(),
         clamav_ip: matches.get_one::<String>("clamavip").unwrap().to_string(),
         clamav_port: *matches.get_one::<u16>("clamavport").unwrap(),
-        clam_client: None,
         rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
         yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
         yara_rules: None,
@@ -275,7 +276,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             is_toobig: true,
                             is_type_allowed: false,
                             av_pass: false,
-                            av_report: String::new(),
+                            av_report: Vec::new(),
                             yara_pass: false,
                             yara_report: String::new(),
                         },
@@ -308,10 +309,10 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 ///     - Yara rules check
 /// Checks results are marked in file metadata.
 /// This function does not modify the files.
-fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
+fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
         let nfd = nix::unistd::dup2(f.fd, 5).unwrap();
-        let file = unsafe { File::from_raw_fd(nfd) };
+        let mut file = unsafe { File::from_raw_fd(nfd) };
         // Synchronize the file before calculating the SHA256 hash
         file.sync_all().unwrap();
         // Position the cursor at the beginning of the file
@@ -345,26 +346,13 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
         unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
 
         // Check anti-virus
-        match &conf.clam_client {
-            Some(client) => match client.scan_stream(&file) {
-                Ok(ClamScanResult::Ok) => {}
-                Ok(ClamScanResult::Found(l, v)) => {
-                    warn!("Clam found virus {v} at {l}");
-                    f.md.av_report
-                        .push_str(format!("Clam report: {l} - {v}").as_str());
-                    f.md.av_pass = false;
-                }
-                Ok(ClamScanResult::Error(e)) => {
-                    error!("Clam error while scanning file {e}");
-                    f.md.av_pass = false;
-                }
-                Err(e) => {
-                    error!("Failed to run clam on file {e}");
-                    f.md.av_pass = false;
-                }
-            },
-            None => {
-                error!("Clamd client failed");
+        match scan(clam_addr.clone(), &mut file, None) {
+            Ok(result) => {
+                f.md.av_pass = !result.is_infected;
+                f.md.av_report = result.detected_infections;
+            }
+            Err(e) => {
+                error!("Failed to run clam on file {e}");
                 f.md.av_pass = false;
             }
         }
@@ -440,7 +428,7 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
 }
 
 /// This function returns a client to clamd
-fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
+/*fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
     match ClamClient::new_with_timeout(clamav_ip, clamav_port, 5) {
         Ok(client) => match client.version() {
             Ok(version) => {
@@ -457,7 +445,7 @@ fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
             None
         }
     }
-}
+}*/
 
 fn main() -> Result<()> {
     // TODO activate seccomp
@@ -481,11 +469,25 @@ fn main() -> Result<()> {
         }
     }
     // Test if clamd is responding
-    config.clam_client = get_clamd_client(&config.clamav_ip, config.clamav_port);
-    if config.clam_client.is_none() {
-        error!("Failed to get clamd client");
-        process::exit(1);
-    }
+    let url = format!("{}{}{}", &config.clamav_ip, ":", config.clamav_port);
+    match url.to_socket_addrs() {
+        Ok(mut socket_addrs) => match socket_addrs.next() {
+            Some(clam_addr) => match version(clam_addr) {
+                Ok(v) => info!("Version: {v}"),
+                Err(e) => {
+                    error!("Clamav not available: {e:?}, killing my self.");
+                    process::exit(1);
+                }
+            },
+            None => {
+                error!("Cannot parse any valid SocketAddr for connecting to clamav server, killing my self.");
+                process::exit(1);
+            }
+        },
+        Err(e) => {
+            error!("Cannot parse clamav configuration: {e:?}")
+        }
+    };
 
     // Initialize yara rules
     match Compiler::new() {
@@ -572,7 +574,7 @@ fn main() -> Result<()> {
         let mut files = parse_messages(ancillary_in.messages(), &buf_in);
 
         // Run check on message received
-        check_files(&mut files, &config);
+        check_files(&mut files, &config, url.clone());
 
         // Send fd and report to out
         send_files(&files, &out_stream);
