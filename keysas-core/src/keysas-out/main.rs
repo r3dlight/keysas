@@ -303,6 +303,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                     continue;
                 }
             };
+            // Position the cursor at the beginning of the file
+            unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet).unwrap();
             let mut writer = BufWriter::new(output);
             match io::copy(&mut reader, &mut writer) {
                 Ok(_) => (),
