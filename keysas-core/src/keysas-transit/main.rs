@@ -41,9 +41,7 @@ use log::{error, info, warn};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
-use std::mem;
 use std::net::IpAddr;
-use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{
@@ -311,7 +309,8 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
     for f in files {
-        let file = unsafe { File::from_raw_fd(f.fd) };
+        let nfd = nix::unistd::dup2(f.fd, 5).unwrap();
+        let file = unsafe { File::from_raw_fd(nfd) };
 
         // Check digest
         match sha256_digest(&file) {
@@ -389,15 +388,12 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration) {
 
         // Check extension
         // Read only 1Mo of the file to be faster and do not read large files
-
-        let reader = BufReader::new(file.try_clone().unwrap());
+        let reader = BufReader::new(file);
         let limited_reader = &mut reader.take(1024 * 1024);
-        //mem::forget(file);
-        //let file_descriptor = reader.get_ref().as_raw_fd();
         let mut buffer = Vec::new();
         match limited_reader.read_to_end(&mut buffer) {
             Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
-            Err(e)=> {
+            Err(e) => {
                 error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
                 f.md.is_type_allowed = false;
             }
