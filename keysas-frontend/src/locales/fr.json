@@ -1,0 +1,108 @@
+{
+  "guichet_IN": {
+    "is_ready": "Sas d'entrée prêt",
+    "is_working": "Sas d'entrée en cours de traitement",
+    "usb_device": {
+      "not_found": "Aucun périphérique détecté",
+      "connected": "Périphérique USB détecté",
+      "insert_placeholder": "Insérez un périphérique USB avec les fichiers que vous désirez copier."
+    },
+    "files": {
+      "not_found": "Aucun fichier détecté",
+      "x_files_analysed": "{count} fichier en cours d'analyse | {count} fichier en cours d'analyse | {count} fichiers en cours d'analyse",
+      "list": {
+        "show": "Afficher le détail",
+        "hide": "Masquer le détail"
+      }
+    },
+    "tasks": {
+      "analysing_files": "En cours de traitement",
+      "analysing_files_awaiting_yubikey": "En attente de la Yubikey"
+    }
+  },
+  "guichet_OUT": {
+    "is_ready": "Sas de sortie prêt",
+    "is_working": "Sas de sortie en cours de traitement",
+    "usb_device": {
+      "not_found": "Aucun périphérique USB signé détecté",
+      "connected": "Périphérique USB signé détecté"
+    },
+    "files": {
+      "not_found": "Aucun fichier analysé",
+      "x_files_ready_for_transfer": "{count} fichier prêt à être transféré | {count} fichier prêt à être transféré | {count} fichiers prêts à être transférés",
+      "x_files_verified_available": "{count} fichier vérifié disponible | {count} fichier vérifié disponible | {count} fichiers vérifiés disponibles",
+      "x_files_refused": "{count} fichier refusé | {count} fichier refusé | {count} fichiers refusés",
+      "error": {
+        "reason": {
+          "antivirus": "virus détecté",
+          "forbidden": "extension interdite",
+          "yara": "virus potentiel détecté",
+          "toobig": "fichier trop gros",
+          "failed": "erreur de transfert",
+          "unknown": "erreur inconnue"
+        }
+      }
+    },
+    "tasks": {
+      "transferring_files": "Transfert des fichiers"
+    }
+  },
+  "main": {
+    "usb_device": {
+      "unregistered": "Périphérique non connu détecté. Contactez votre administrateur pour ajouter de nouveaux périphériques."
+    }
+  },
+  "header": {
+    "app": {
+      "state" : {
+        "starting" : {
+          "color" : "inactive",
+          "message" : "Démarrage en cours ...",
+          "instruction" : ""
+        },
+        "deamon_down" : {
+          "color" : "danger",
+          "message" : "Les analyseurs sont arrêtés",
+          "instruction" : "Merci de patienter"
+        },
+        "ready" : {
+          "color" : "inactive",
+          "message" : "Prêt",
+          "instruction" : "Vous pouvez brancher une clé USB"
+        },
+        "reading_device_content" : {
+          "color" : "working",
+          "message" : "Lecture de la clé en cours",
+          "instruction" : "\uD83D\uDC49 Ne retirez pas la clé ! \uD83D\uDC48"
+        },
+        "analysing_files" : {
+          "color" : "working",
+          "message" : "Analyse des fichiers en cours",
+          "instruction" : "\uD83D\uDC49 Ne retirez pas la clé ! \uD83D\uDC48"
+        },
+        "transferred_and_analysed" : {
+          "color" : "ok",
+          "message" : "Fichiers transférés et analysés",
+          "instruction" : "\uD83D\uDC49 Vous pouvez retirer la clé en toute sécurité \uD83D\uDC48"
+        },
+        "writing_device_content" : {
+          "color" : "working",
+          "message" : "Écriture des fichiers en cours",
+          "instruction" : "\uD83D\uDC49 Ne retirez pas la clé ! \uD83D\uDC48"
+        },
+        "transfer_complete" : {
+          "color" : "ok",
+          "message" : "Transfert terminé",
+          "instruction" :  "\uD83D\uDC49 Vous pouvez retirer la clé en toute sécurité \uD83D\uDC48"
+        }
+      }
+    },
+    "menu": {
+      "working": "Traitement en cours",
+      "ready": "Prêt",
+      "reload": "Recharger",
+      "show_wizard": "Afficher l'aide",
+      "close_wizard": "Fermer l'aide"
+    }
+  }
+}

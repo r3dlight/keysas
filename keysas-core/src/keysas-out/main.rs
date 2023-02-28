@@ -35,6 +35,7 @@ use landlock::{
     RulesetStatus, ABI,
 };
 use log::{error, info, warn};
+use nix::unistd;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -45,6 +46,7 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, U
 use std::path::PathBuf;
 use std::process;
 use std::str;
+use keysas_lib::append_ext;
 
 #[macro_use]
 extern crate serde_derive;
@@ -57,7 +59,7 @@ struct FileMetadata {
     is_toobig: bool,
     is_type_allowed: bool,
     av_pass: bool,
-    av_report: String,
+    av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
 }
@@ -177,7 +179,14 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 fn output_files(files: Vec<FileData>, conf: &Configuration) {
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
-
+        // Position the cursor at the beginning of the file
+        match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                process::exit(1);
+            }
+        }
         // Check digest
         let digest = match sha256_digest(&file) {
             Ok(d) => d,
@@ -202,17 +211,21 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             || !f.md.av_pass
             || !f.md.yara_pass
         {
-            // Checks have failed write a report
+            // Checks have failed writing a report
             let mut path = PathBuf::new();
+            path.push(conf.sas_out.clone());
             path.push(&f.md.filename);
-            path.push(&String::from(".report"));
+            let path = append_ext("report", path);
             let mut report = match File::options()
                 .read(true)
                 .write(true)
                 .create_new(true)
-                .open(path)
+                .open(&path)
             {
-                Ok(f) => f,
+                Ok(f) => {
+                    info!("Writing a report on path: {}", path.display());
+                    f
+                }
                 Err(e) => {
                     error!(
                         "Failed to create report for file {}, error {e}",
@@ -223,7 +236,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             };
 
             if !f.md.is_digest_ok {
-                match write!(report, "Invalid hash - original hash is {}", f.md.digest) {
+                match writeln!(report, "Invalid hash - original hash is {}", f.md.digest) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -236,7 +249,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if f.md.is_toobig {
-                match write!(report, "File is too big") {
+                match writeln!(report, "File was too big") {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -249,7 +262,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.is_type_allowed {
-                match write!(report, "File extension is forbidden") {
+                match writeln!(report, "File extension is forbidden") {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -262,7 +275,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.av_pass {
-                match write!(report, "Clam : {}", f.md.av_report) {
+                match writeln!(report, "Clam : {:?}", f.md.av_report) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -275,7 +288,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.yara_pass {
-                match write!(report, "Yara : {}", f.md.yara_report) {
+                match writeln!(report, "Yara : {}", f.md.yara_report) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -300,6 +313,14 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                     continue;
                 }
             };
+            // Position the cursor at the beginning of the file
+            match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            }
             let mut writer = BufWriter::new(output);
             match io::copy(&mut reader, &mut writer) {
                 Ok(_) => (),

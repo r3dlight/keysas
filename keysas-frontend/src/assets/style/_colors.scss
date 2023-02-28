@@ -1,0 +1,24 @@
+
+$white: rgb(255,255,255);
+$grey-light: rgb(245,245,245);
+$grey-medium: rgb(194, 194, 194);
+$grey-dark: rgb(71, 71, 71);
+
+$navy: rgb(0,30,71);
+$red: rgb(210, 0, 0);
+$red-light: rgb(232, 115, 115);
+$green: rgb(73, 200, 112);
+$green-light: rgb(160, 226, 180);
+$mustard: rgb(224,162,52);
+$cyan: rgb(55,233,189);
+
+$status-bg-off: $grey-medium;
+$status-off: $grey-dark;
+$status-bg-working: $mustard;
+$status-working: $white;
+$status-bg-danger: $red-light;
+$status-danger: $white;
+$status-bg-ok: $green;
+$status-ok: $white;
+$status-ok-light: $green-light;
+

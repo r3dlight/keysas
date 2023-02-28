@@ -1,0 +1,107 @@
+{
+  "guichet_IN": {
+    "is_ready": "Sas IN is ready",
+    "is_working": "Sas IN is working",
+    "usb_device": {
+      "not_found": "No unsigned USB device detected",
+      "connected": "Unsigned USB device detected",
+      "insert_placeholder": "Insert the USB device with the files you want to copy."
+    },
+    "files": {
+      "not_found": "No files detected",
+      "x_files_analysed": "{count} files analysed | {count} file analysed | {count} files analysed",
+      "list": {
+        "show": "Show detail",
+        "hide": "Hide detail"
+      }
+    },
+    "tasks": {
+      "analysing_files": "Analysing files"
+    }
+  },
+  "guichet_OUT": {
+    "is_ready": "Sas OUT is ready",
+    "is_working": "Sas OUT is working",
+    "usb_device": {
+      "not_found": "No signed USB device detected",
+      "connected": "Signed USB device detected"
+    },
+    "files": {
+      "not_found": "No files analysed",
+      "x_files_ready_for_transfer": "{count} files ready for transfer | {count} file ready for transfer | {count} files ready for transfer",
+      "x_files_verified_available": "{count} verified files available | {count} verified file available | {count} verified files available",
+      "x_files_refused": "{count} refused files | {count} refused file | {count} refused files",
+      "error": {
+        "reason": {
+          "antivirus": "virus detected",
+          "forbidden": "extension forbidden",
+          "yara": "potential virus detected",
+          "toobig": "file too big",
+          "failed": "I/O error",
+          "unknown": "unknown error"
+        }
+      }
+    },
+    "tasks": {
+      "transferring_files": "Transferring files"
+    }
+  },
+  "main": {
+    "usb_device": {
+      "unregistered": "Unregistered device discovered. Contact your administrator to add new devices."
+    }
+  },
+  "header": {
+    "app": {
+      "state" : {
+        "starting" : {
+          "color" : "inactive",
+          "message" : "Starting...",
+          "instruction" : ""
+        },
+        "deamon_down" : {
+          "color" : "danger",
+          "message" : "Analysers are off",
+          "instruction" : "Please wait"
+        },
+        "ready" : {
+          "color" : "inactive",
+          "message" : "Ready",
+          "instruction" : "Plug new USB key"
+        },
+        "reading_device_content" : {
+          "color" : "working",
+          "message" : "Reading device content",
+          "instruction" : "\uD83D\uDC49 Do not remove device \uD83D\uDC48"
+        },
+        "analysing_files" : {
+          "color" : "working",
+          "message" : "Analysing files",
+          "instruction" : "\uD83D\uDC49 Do not remove device \uD83D\uDC48"
+        },
+        "transferred_and_analysed" : {
+          "color" : "ok",
+          "message" : "Files transferred and analysed",
+          "instruction" :  "\uD83D\uDC49 You can safely remove device \uD83D\uDC48"
+        },
+        "writing_device_content" : {
+          "color" : "working",
+          "message" : "Writing files",
+          "instruction" : "\uD83D\uDC49 Do not remove device \uD83D\uDC48"
+        },
+        "transfer_complete" : {
+          "color" : "ok",
+          "message" : "Transfert OK",
+          "instruction" :  "\uD83D\uDC49 You can safely remove device \uD83D\uDC48"
+        }
+      }
+    },
+    "menu": {
+      "working": "Working",
+      "ready": "Ready",
+      "Reload": "Reload",
+      "show_wizard": "Show help",
+      "close_wizard": "Close help"
+    }
+  }
+}
