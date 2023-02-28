@@ -435,8 +435,15 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 process::exit(1);
             }
         };
-        //Forget f for now, we'll drop it later.
-        mem::forget(f);
+        log::info!(
+            "{}: digest_ok: {}, type_allowed: {}, yara_pass: {}, av_pass: {}, too_big: {}",
+            f.md.is_digest_ok,
+            f.md.filename,
+            f.md.is_type_allowed,
+            f.md.yara_pass,
+            f.md.av_pass,
+            f.md.is_toobig
+        );
     }
 }
 
@@ -461,7 +468,6 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
             Ok(_) => info!("File sent !"),
             Err(e) => error!("Failed to send file {e}."),
         }
-        drop(file);
     }
 }
 
