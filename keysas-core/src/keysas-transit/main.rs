@@ -44,6 +44,7 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -311,95 +312,131 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        let nfd = nix::unistd::dup2(f.fd, 15).unwrap();
-        let mut file = unsafe { File::from_raw_fd(nfd) };
-        // Synchronize the file before calculating the SHA256 hash
-        file.sync_all().unwrap();
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-        // Check digest
-        match sha256_digest(&file) {
-            Ok(d) => {
-                f.md.is_digest_ok = f.md.digest.eq(&d);
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to calculate digest for file {}, error {e}.",
-                    f.md.filename
-                );
-            }
-        }
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check size
-        match &file.metadata() {
-            Ok(meta) => {
-                f.md.is_toobig = meta.len().gt(&conf.max_size);
-            }
-            Err(e) => {
-                warn!("Failed to get metadata of file {} error {e}", f.md.filename);
-            }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check anti-virus
-        match scan(clam_addr.clone(), &mut file, None) {
-            Ok(result) => {
-                f.md.av_pass = !result.is_infected;
-                f.md.av_report = result.detected_infections;
-            }
-            Err(e) => {
-                error!("Failed to run clam on file {e}");
-                f.md.av_pass = false;
-            }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check yara rules
-        match &conf.yara_rules {
-            Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
-                Ok(results) => match results.is_empty() {
-                    true => {
-                        f.md.yara_pass = true;
+        match nix::unistd::dup2(f.fd, 50) {
+            Ok(nfd) => {
+                let mut file = unsafe { File::from_raw_fd(nfd) };
+                // Synchronize the file before calculating the SHA256 hash
+                file.sync_all().unwrap();
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
                     }
-                    false => {
-                        for result in results {
-                            f.md.yara_report.push_str(result.identifier);
-                        }
-                        f.md.yara_pass = false;
-                        warn!("Yara rules matched");
-                    }
-                },
-                Err(e) => {
-                    error!("Yara cannot scan file {} error {e}", f.md.filename);
                 }
-            },
-            None => {
-                error!("Yara rules not present");
-                f.md.yara_pass = false;
+                // Check digest
+                match sha256_digest(&file) {
+                    Ok(d) => {
+                        f.md.is_digest_ok = f.md.digest.eq(&d);
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to calculate digest for file {}, error {e}.",
+                            f.md.filename
+                        );
+                    }
+                }
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+
+                // Check size
+                match &file.metadata() {
+                    Ok(meta) => {
+                        f.md.is_toobig = meta.len().gt(&conf.max_size);
+                    }
+                    Err(e) => {
+                        warn!("Failed to get metadata of file {} error {e}", f.md.filename);
+                    }
+                }
+
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check anti-virus
+                match scan(clam_addr.clone(), &mut file, None) {
+                    Ok(result) => {
+                        f.md.av_pass = !result.is_infected;
+                        f.md.av_report = result.detected_infections;
+                    }
+                    Err(e) => {
+                        error!("Failed to run clam on file {e}");
+                        f.md.av_pass = false;
+                    }
+                }
+
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check yara rules
+                match &conf.yara_rules {
+                    Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
+                        Ok(results) => match results.is_empty() {
+                            true => {
+                                f.md.yara_pass = true;
+                            }
+                            false => {
+                                for result in results {
+                                    f.md.yara_report.push_str(result.identifier);
+                                }
+                                f.md.yara_pass = false;
+                                warn!("Yara rules matched");
+                            }
+                        },
+                        Err(e) => {
+                            error!("Yara cannot scan file {} error {e}", f.md.filename);
+                        }
+                    },
+                    None => {
+                        error!("Yara rules not present");
+                        f.md.yara_pass = false;
+                    }
+                }
+
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check the magic number
+                // Read only 1Mo of the file to be faster and do not read large files
+                let reader = BufReader::new(file);
+                let limited_reader = &mut reader.take(1024 * 1024);
+                let mut buffer = Vec::new();
+                match limited_reader.read_to_end(&mut buffer) {
+                    Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
+                    Err(e) => {
+                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                        f.md.is_type_allowed = false;
+                    }
+                }
             }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check the magic number
-        // Read only 1Mo of the file to be faster and do not read large files
-        let reader = BufReader::new(file);
-        let limited_reader = &mut reader.take(1024 * 1024);
-        let mut buffer = Vec::new();
-        match limited_reader.read_to_end(&mut buffer) {
-            Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
             Err(e) => {
-                error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
-                f.md.is_type_allowed = false;
+                error!("Cannot duplicate file descriptor for analysing: {e:?}, killing myself.");
+                process::exit(1);
             }
-        }
+        };
+        //Forget f for now, we'll drop it later.
+        mem::forget(f);
     }
 }
 
@@ -424,28 +461,9 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
             Ok(_) => info!("File sent !"),
             Err(e) => error!("Failed to send file {e}."),
         }
+        drop(file);
     }
 }
-
-/// This function returns a client to clamd
-/*fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
-    match ClamClient::new_with_timeout(clamav_ip, clamav_port, 5) {
-        Ok(client) => match client.version() {
-            Ok(version) => {
-                info!("Clamd version {:?}", version);
-                Some(client)
-            }
-            Err(e) => {
-                error!("Clamd is not responding {e}");
-                None
-            }
-        },
-        Err(e) => {
-            error!("Failed to contact clamd {e}");
-            None
-        }
-    }
-}*/
 
 fn main() -> Result<()> {
     // TODO activate seccomp
