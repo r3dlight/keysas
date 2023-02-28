@@ -46,6 +46,7 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, U
 use std::path::PathBuf;
 use std::process;
 use std::str;
+use keysas_lib::append_ext;
 
 #[macro_use]
 extern crate serde_derive;
@@ -214,7 +215,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut path = PathBuf::new();
             path.push(conf.sas_out.clone());
             path.push(&f.md.filename);
-            path.set_extension("report");
+            let path = append_ext("report", path);
             let mut report = match File::options()
                 .read(true)
                 .write(true)
