@@ -28,6 +28,7 @@
 #[warn(unused_imports)]
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
+use keysas_lib::append_ext;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
 use landlock::{
@@ -46,7 +47,6 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, U
 use std::path::PathBuf;
 use std::process;
 use std::str;
-use keysas_lib::append_ext;
 
 #[macro_use]
 extern crate serde_derive;
