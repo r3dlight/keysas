@@ -137,6 +137,42 @@ fn landlock_sandbox(
     Ok(())
 }
 
+fn landlock_sandbox(
+    socket_in: &String,
+    socket_out: &String,
+    rule_path: &String,
+) -> Result<(), RulesetError> {
+    let abi = ABI::V2;
+    let status = Ruleset::new()
+        .handle_access(AccessFs::from_all(abi))?
+        .create()?
+        // Read-only access.
+        .add_rules(path_beneath_rules(
+            &[CONFIG_DIRECTORY, socket_in, rule_path],
+            AccessFs::from_read(abi),
+        ))?
+        // Read-write access.
+        .add_rules(path_beneath_rules(
+            &[socket_out, "/run/keysas"],
+            AccessFs::from_all(abi),
+        ))?
+        .restrict_self()?;
+    match status.ruleset {
+        // The FullyEnforced case must be tested.
+        RulesetStatus::FullyEnforced => {
+            info!("Keysas-transit is now fully sandboxed using Landlock !")
+        }
+        RulesetStatus::PartiallyEnforced => {
+            warn!("Keysas-transit is only partially sandboxed using Landlock !")
+        }
+        // Users should be warned that they are not protected.
+        RulesetStatus::NotEnforced => {
+            warn!("Keysas-transit: Not sandboxed with Landlock ! Please update your kernel.")
+        }
+    }
+    Ok(())
+}
+
 /// This function parse the command arguments into a structure
 fn parse_args() -> Configuration {
     let matches = Command::new("keysas-transit")
