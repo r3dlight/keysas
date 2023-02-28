@@ -179,7 +179,13 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
         // Position the cursor at the beginning of the file
-        unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet).unwrap();
+        match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                process::exit(1);
+            }
+        }
         // Check digest
         let digest = match sha256_digest(&file) {
             Ok(d) => d,
@@ -213,9 +219,12 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 .read(true)
                 .write(true)
                 .create_new(true)
-                .open(path)
+                .open(&path)
             {
-                Ok(f) => f,
+                Ok(f) => {
+                    info!("Writing a report on path: {}", path.display());
+                    f
+                }
                 Err(e) => {
                     error!(
                         "Failed to create report for file {}, error {e}",
@@ -304,7 +313,13 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 }
             };
             // Position the cursor at the beginning of the file
-            unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet).unwrap();
+            match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            }
             let mut writer = BufWriter::new(output);
             match io::copy(&mut reader, &mut writer) {
                 Ok(_) => (),
