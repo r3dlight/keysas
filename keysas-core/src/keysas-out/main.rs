@@ -226,7 +226,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             };
 
             if !f.md.is_digest_ok {
-                match write!(report, "Invalid hash - original hash is {}\n", f.md.digest) {
+                match writeln!(report, "Invalid hash - original hash is {}", f.md.digest) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -239,7 +239,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if f.md.is_toobig {
-                match write!(report, "File was too big\n") {
+                match writeln!(report, "File was too big") {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -252,7 +252,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.is_type_allowed {
-                match write!(report, "File extension is forbidden\n") {
+                match writeln!(report, "File extension is forbidden") {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -265,7 +265,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.av_pass {
-                match write!(report, "Clam : {:?}\n", f.md.av_report) {
+                match writeln!(report, "Clam : {:?}", f.md.av_report) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
@@ -278,7 +278,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             }
 
             if !f.md.yara_pass {
-                match write!(report, "Yara : {}\n", f.md.yara_report) {
+                match writeln!(report, "Yara : {}", f.md.yara_report) {
                     Ok(_) => (),
                     Err(e) => {
                         error!(
