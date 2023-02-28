@@ -43,7 +43,7 @@ use std::net::TcpStream;
 use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 use tauri_plugin_store::PluginBuilder;
-
+use regex::Regex;
 use std::io::BufReader;
 mod errors;
 
@@ -332,31 +332,62 @@ async fn is_alive(ip: String, private_key: String) -> bool {
     true
 }
 
+/// This function initialize the keys in the station by
+///  0. Test if new password is robust
+///  1. Generate a key pair for file signature on the station
+///  2. Set correct file attributes for the private key file
+///  3. Recover the public part of the key
+///  4. Generate a certificate for the public key
+///  5. Export the created certificate on the station
+///  6. Finally it loads the admin USB signing certificate
+/// Rule for password
+///  - At least 12 chars
 #[command]
 async fn generate_keypair(ip: String, private_key: String, password: String) -> bool {
+    // 0. Test if new password is robust
+    let reg = match Regex::new(r"^.{12,}$") {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Failed to generate regex");
+            return false;
+        }
+    };
+    if !re.is_match(password) {
+        println!("Password must be at least 12 chars");
+        return false;
+    }
     let password = sha256_digest(&password.trim()).unwrap();
-    //println!("generate: Password digest is: {}", password);
+
+    // Connect to the host
     let host = format!("{}{}", ip.trim(), ":22");
-    println!(
-        "Rust will try generating a signing keypair on host: {}",
-        host
-    );
     match connect_key(&ip, &private_key) {
         Ok(session) => {
             let mut session = session.run_local();
             match session.open_exec() {
                 Ok(exec) => {
+                    // 1. Generate a keypair for file signature
+                    // 2. set correct attributes for private key file
+                    // 3. Get the public part of the key
                     let command = format!("{}{}{}","sudo /usr/bin/keysas-sign --generate --password=", password, " && sudo /usr/bin/chmod 600 /etc/keysas/keysas.priv && sudo /usr/bin/chattr +i /etc/keysas/keysas.priv");
-                    match exec.send_command(&command) {
-                        Ok(_) => {
+                    let pubkey = match exec.send_command(&command) {
+                        Ok(res) => {
                             println!("New signing keypair successfully generated.");
-                            session.close();
+                            match String::from_utf8(res) {
+                                Ok(key) => key,
+                                Err(e) => {
+                                    println!("failed to convert command output");
+                                    return false;
+                                }
+                            }
                         }
                         Err(why) => {
                             println!("Error on open_exec: {:?}", why);
                             return false;
                         }
-                    }
+                    };
+                    // 4. Generate a certificate from the public key
+                    ///  5. Export the created certificate on the station
+                    ///  6. Finally it loads the admin USB signing certificate
                 }
                 Err(why) => {
                     println!("Error while trying session.open_exec: {:?}", why);

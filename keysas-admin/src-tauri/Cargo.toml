@@ -24,6 +24,7 @@ anyhow ="*"
 async-std = "*"
 nom = "*"
 sha2 ="*"
+regex="*"
 
 [features]
 # by default Tauri runs in production mode
