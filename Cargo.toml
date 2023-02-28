@@ -7,4 +7,5 @@ members = [
     "keysas-sign/",
     "keysas-fido/",
     "keysas_lib/",
+    "keysas-admin/src-tauri",
 ]

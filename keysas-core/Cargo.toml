@@ -17,12 +17,10 @@ clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
 regex = "1.7"
 infer = "0.12"
-clam-client = { git = "https://gitlab.com/r3dlight/clam-client", branch = "master" }
 clamav-tcp = "0.2.1"
 yara = "0.17"
 landlock = "0.2"
 itertools ="0.10"
-
 
 [[bin]]
 name = "keysas-in"
