@@ -435,9 +435,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             }
         };
         log::info!(
-            "{}: digest_ok: {}, type_allowed: {}, yara_pass: {}, av_pass: {}, too_big: {}",
-            f.md.is_digest_ok,
+            "Report for {}: digest_ok: {}, type_allowed: {}, yara_pass: {}, av_pass: {}, too_big: {}",
             f.md.filename,
+            f.md.is_digest_ok,
             f.md.is_type_allowed,
             f.md.yara_pass,
             f.md.av_pass,
