@@ -2,11 +2,11 @@ use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::env;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, IoSlice, Read};
 use std::os::unix::io::AsRawFd;
-use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 
 // Init logger
