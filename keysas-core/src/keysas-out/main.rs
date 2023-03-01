@@ -28,6 +28,7 @@
 #[warn(unused_imports)]
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
+use keysas_lib::append_ext;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
 use landlock::{
@@ -46,7 +47,6 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, U
 use std::path::PathBuf;
 use std::process;
 use std::str;
-use keysas_lib::append_ext;
 
 #[macro_use]
 extern crate serde_derive;
@@ -74,6 +74,7 @@ struct FileData {
 struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
+    yara_clean: bool,
 }
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -131,12 +132,27 @@ fn parse_args() -> Configuration {
                 .action(ArgAction::Set)
                 .help("Sets the out sas path for transfering files"),
         )
+        .arg(
+            Arg::new("yara_clean")
+                .short('c')
+                .long("yara_clean")
+                .action(clap::ArgAction::SetTrue)
+                .help("Remove the file if a Yara rule matched"),
+        )
+        .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
+        )
         .get_matches();
 
     // Unwrap should not panic with default values
     Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
+        yara_clean: matches.get_flag("yara_clean"),
     }
 }
 
@@ -296,6 +312,36 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                             f.md.filename
                         );
                         continue;
+                    }
+                }
+                if !conf.yara_clean {
+                    // Output file
+                    let mut reader = BufReader::new(&file);
+
+                    let mut path = PathBuf::new();
+                    path.push(&conf.sas_out);
+                    path.push(&f.md.filename);
+                    let output = match File::options().write(true).create_new(true).open(path) {
+                        Ok(f) => f,
+                        Err(e) => {
+                            error!("Failed to create output file {}, error {e}", f.md.filename);
+                            continue;
+                        }
+                    };
+                    // Position the cursor at the beginning of the file
+                    match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                            process::exit(1);
+                        }
+                    }
+                    let mut writer = BufWriter::new(output);
+                    match io::copy(&mut reader, &mut writer) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Failed to output file {}, error {e}", f.md.filename);
+                        }
                     }
                 }
             }
