@@ -28,7 +28,6 @@
 
 use anyhow::Result;
 use bincode::Options;
-use clamav_tcp;
 use clamav_tcp::scan;
 use clamav_tcp::version;
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -218,6 +217,13 @@ fn parse_args() -> Configuration {
                  .value_parser(clap::value_parser!(i32))
                  .help("Sets a custom timeout for libyara scans"),
          )
+         .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
+        )
           .get_matches();
 
     // Unwrap should not panic with default values
