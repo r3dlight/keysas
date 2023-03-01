@@ -10,5 +10,3 @@ SOCKET_OUT=socket_out
 # You should not touch this parameter.
 # Pay attention to add a slash at the end
 SAS_OUT=/var/local/out/
-
-
