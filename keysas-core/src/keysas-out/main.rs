@@ -279,7 +279,10 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let output = match File::options().write(true).create_new(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Failed to create output file {}: {e}, killing myself.", f.md.filename);
+                    error!(
+                        "Failed to create output file {}: {e}, killing myself.",
+                        f.md.filename
+                    );
                     process::exit(1);
                 }
             };
