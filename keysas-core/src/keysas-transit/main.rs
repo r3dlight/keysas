@@ -28,7 +28,6 @@
 
 use anyhow::Result;
 use bincode::Options;
-use clamav_tcp;
 use clamav_tcp::scan;
 use clamav_tcp::version;
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -99,42 +98,7 @@ struct Configuration {
     rule_path: String,         // Path to yara rules
     yara_timeout: i32,         // Timeout for yara
     yara_rules: Option<Rules>, // Yara rules
-}
-
-fn landlock_sandbox(
-    socket_in: &String,
-    socket_out: &String,
-    rule_path: &String,
-) -> Result<(), RulesetError> {
-    let abi = ABI::V2;
-    let status = Ruleset::new()
-        .handle_access(AccessFs::from_all(abi))?
-        .create()?
-        // Read-only access.
-        .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_in, rule_path],
-            AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_out, "/run/keysas"],
-            AccessFs::from_all(abi),
-        ))?
-        .restrict_self()?;
-    match status.ruleset {
-        // The FullyEnforced case must be tested.
-        RulesetStatus::FullyEnforced => {
-            info!("Keysas-transit is now fully sandboxed using Landlock !")
-        }
-        RulesetStatus::PartiallyEnforced => {
-            warn!("Keysas-transit is only partially sandboxed using Landlock !")
-        }
-        // Users should be warned that they are not protected.
-        RulesetStatus::NotEnforced => {
-            warn!("Keysas-transit: Not sandboxed with Landlock ! Please update your kernel.")
-        }
-    }
-    Ok(())
+    type_off: bool,
 }
 
 /// This function parse the command arguments into a structure
@@ -218,6 +182,20 @@ fn parse_args() -> Configuration {
                  .value_parser(clap::value_parser!(i32))
                  .help("Sets a custom timeout for libyara scans"),
          )
+         .arg(
+            Arg::new("type_off")
+                .short('m')
+                .long("type_off")
+                .action(clap::ArgAction::SetTrue)
+                .help("Disable the magic number check"),
+        )
+         .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
+        )
           .get_matches();
 
     // Unwrap should not panic with default values
@@ -236,6 +214,7 @@ fn parse_args() -> Configuration {
         rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
         yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
         yara_rules: None,
+        type_off: matches.get_flag("type_off"),
     }
 }
 
@@ -407,26 +386,29 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                         f.md.yara_pass = false;
                     }
                 }
-
-                // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
-                        process::exit(1);
+                if !conf.type_off {
+                    // Position the cursor at the beginning of the file
+                    match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                            process::exit(1);
+                        }
                     }
-                }
-                // Check the magic number
-                // Read only 1Mo of the file to be faster and do not read large files
-                let reader = BufReader::new(file);
-                let limited_reader = &mut reader.take(1024 * 1024);
-                let mut buffer = Vec::new();
-                match limited_reader.read_to_end(&mut buffer) {
-                    Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
-                    Err(e) => {
-                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
-                        f.md.is_type_allowed = false;
+                    // Check the magic number
+                    // Read only 1Mo of the file to be faster and do not read large files
+                    let reader = BufReader::new(file);
+                    let limited_reader = &mut reader.take(1024 * 1024);
+                    let mut buffer = Vec::new();
+                    match limited_reader.read_to_end(&mut buffer) {
+                        Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
+                        Err(e) => {
+                            error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                            f.md.is_type_allowed = false;
+                        }
                     }
+                } else {
+                    f.md.is_type_allowed = true;
                 }
             }
             Err(e) => {

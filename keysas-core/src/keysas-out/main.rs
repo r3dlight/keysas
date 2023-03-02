@@ -51,7 +51,7 @@ use std::str;
 #[macro_use]
 extern crate serde_derive;
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct FileMetadata {
     filename: String,
     digest: String,
@@ -74,6 +74,7 @@ struct FileData {
 struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
+    yara_clean: bool,
 }
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -131,12 +132,27 @@ fn parse_args() -> Configuration {
                 .action(ArgAction::Set)
                 .help("Sets the out sas path for transfering files"),
         )
+        .arg(
+            Arg::new("yara_clean")
+                .short('c')
+                .long("yara_clean")
+                .action(clap::ArgAction::SetTrue)
+                .help("Remove the file if a Yara rule matched"),
+        )
+        .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
+        )
         .get_matches();
 
     // Unwrap should not panic with default values
     Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
+        yara_clean: matches.get_flag("yara_clean"),
     }
 }
 
@@ -166,8 +182,8 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match bincode::deserialize_from::<&[u8], FileMetadata>(buffer) {
                 Ok(meta) => Some(FileData { fd, md: meta }),
                 Err(e) => {
-                    warn!("Failed to deserialize messge from in: {e}");
-                    None
+                    warn!("Failed to deserialize messge from keysas-transit: {e}, killing myself.");
+                    process::exit(1);
                 }
             }
         })
@@ -191,115 +207,69 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         let digest = match sha256_digest(&file) {
             Ok(d) => d,
             Err(e) => {
-                warn!(
-                    "Failed to calculate digest for file {}, error {e}",
+                error!(
+                    "Failed to calculate digest for file {}: {e}, killing myself.",
                     f.md.filename
                 );
-                continue;
+                process::exit(1);
             }
         };
+
         // Test if digest is correct
         if digest.ne(&f.md.digest) {
             warn!("Digest invalid for file {}", f.md.filename);
             f.md.is_digest_ok = false;
         }
-
-        // Test if the check passed, if not write a report
-        if !f.md.is_digest_ok
-            || f.md.is_toobig
-            || !f.md.is_type_allowed
-            || !f.md.av_pass
-            || !f.md.yara_pass
+        // Always Write a report to json format
+        let mut path = PathBuf::new();
+        path.push(conf.sas_out.clone());
+        path.push(&f.md.filename);
+        let path = append_ext("krp", path);
+        let mut report = match File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
         {
-            // Checks have failed writing a report
-            let mut path = PathBuf::new();
-            path.push(conf.sas_out.clone());
-            path.push(&f.md.filename);
-            let path = append_ext("report", path);
-            let mut report = match File::options()
-                .read(true)
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(f) => {
-                    info!("Writing a report on path: {}", path.display());
-                    f
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to create report for file {}, error {e}",
-                        f.md.filename
-                    );
-                    continue;
-                }
-            };
-
-            if !f.md.is_digest_ok {
-                match writeln!(report, "Invalid hash - original hash is {}", f.md.digest) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!(
-                            "Failed to write report for file {}, error {e}",
-                            f.md.filename
-                        );
-                        continue;
-                    }
-                }
+            Ok(f) => {
+                info!("Writing a report on path: {}", path.display());
+                f
             }
-
-            if f.md.is_toobig {
-                match writeln!(report, "File was too big") {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!(
-                            "Failed to write report for file {}, error {e}",
-                            f.md.filename
-                        );
-                        continue;
-                    }
-                }
+            Err(e) => {
+                error!(
+                    "Failed to create report for file {}: {e}, killing myself.",
+                    f.md.filename
+                );
+                process::exit(1);
             }
-
-            if !f.md.is_type_allowed {
-                match writeln!(report, "File extension is forbidden") {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!(
-                            "Failed to write report for file {}, error {e}",
-                            f.md.filename
-                        );
-                        continue;
-                    }
-                }
+        };
+        let json_report = match serde_json::to_string(&f.md) {
+            Ok(j) => j,
+            Err(e) => {
+                error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
+                process::exit(1);
             }
+        };
 
-            if !f.md.av_pass {
-                match writeln!(report, "Clam : {:?}", f.md.av_report) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!(
-                            "Failed to write report for file {}, error {e}",
-                            f.md.filename
-                        );
-                        continue;
-                    }
-                }
+        match writeln!(report, "{}", json_report) {
+            Ok(_) => (),
+            Err(e) => {
+                error!(
+                    "Failed to write report for file {}: {e}, killing myself.",
+                    f.md.filename
+                );
+                process::exit(1);
             }
+        }
 
-            if !f.md.yara_pass {
-                match writeln!(report, "Yara : {}", f.md.yara_report) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!(
-                            "Failed to write report for file {}, error {e}",
-                            f.md.filename
-                        );
-                        continue;
-                    }
-                }
-            }
-        } else {
+        // Test if the check passed, if yes write the file to sas_out
+        if f.md.is_digest_ok
+            || !f.md.is_toobig
+            || f.md.is_type_allowed
+            || f.md.av_pass
+            || f.md.yara_pass
+            || (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
+        {
             // Output file
             let mut reader = BufReader::new(&file);
 
@@ -309,8 +279,11 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let output = match File::options().write(true).create_new(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Failed to create output file {}, error {e}", f.md.filename);
-                    continue;
+                    error!(
+                        "Failed to create output file {}: {e}, killing myself.",
+                        f.md.filename
+                    );
+                    process::exit(1);
                 }
             };
             // Position the cursor at the beginning of the file

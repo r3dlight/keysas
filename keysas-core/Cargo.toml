@@ -21,6 +21,7 @@ clamav-tcp = "0.2.1"
 yara = "0.17"
 landlock = "0.2"
 itertools ="0.10"
+serde_json = "1.0"
 
 [[bin]]
 name = "keysas-in"
