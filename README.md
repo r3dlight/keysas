@@ -2,7 +2,7 @@
 <img  src ="img/logo-keysas.png"  alt="Keysas"  width=300px/>
 </div>
 
-# Keysas - USB virus cleaning station (WIP)
+# USB virus cleaning station (WIP)
 
 Warning: This is only a work in progress for now.
 
