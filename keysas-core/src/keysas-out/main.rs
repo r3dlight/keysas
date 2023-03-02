@@ -268,7 +268,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             || f.md.is_type_allowed
             || f.md.av_pass
             || f.md.yara_pass
-            || (!f.md.yara_pass && !conf.yara_clean)
+            || (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
         {
             // Output file
             let mut reader = BufReader::new(&file);
