@@ -1,5 +1,5 @@
 <div align="center">
-<img  src ="img/logo.svg"  alt="Keysas"  width=300px/>
+<img  src ="img/logo-keysas.png"  alt="Keysas"  width=300px/>
 </div>
 
 # Keysas - USB virus cleaning station (WIP)
