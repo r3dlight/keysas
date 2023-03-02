@@ -98,6 +98,7 @@ struct Configuration {
     rule_path: String,         // Path to yara rules
     yara_timeout: i32,         // Timeout for yara
     yara_rules: Option<Rules>, // Yara rules
+    type_off: bool,
 }
 
 fn landlock_sandbox(
@@ -218,6 +219,13 @@ fn parse_args() -> Configuration {
                  .help("Sets a custom timeout for libyara scans"),
          )
          .arg(
+            Arg::new("type_off")
+                .short('m')
+                .long("type_off")
+                .action(clap::ArgAction::SetTrue)
+                .help("Disable the magic number check"),
+        )
+         .arg(
             Arg::new("version")
                 .short('v')
                 .long("version")
@@ -242,6 +250,7 @@ fn parse_args() -> Configuration {
         rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
         yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
         yara_rules: None,
+        type_off: matches.get_flag("type_off"),
     }
 }
 
@@ -413,26 +422,29 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                         f.md.yara_pass = false;
                     }
                 }
-
-                // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
-                        process::exit(1);
+                if !conf.type_off {
+                    // Position the cursor at the beginning of the file
+                    match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                            process::exit(1);
+                        }
                     }
-                }
-                // Check the magic number
-                // Read only 1Mo of the file to be faster and do not read large files
-                let reader = BufReader::new(file);
-                let limited_reader = &mut reader.take(1024 * 1024);
-                let mut buffer = Vec::new();
-                match limited_reader.read_to_end(&mut buffer) {
-                    Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
-                    Err(e) => {
-                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
-                        f.md.is_type_allowed = false;
+                    // Check the magic number
+                    // Read only 1Mo of the file to be faster and do not read large files
+                    let reader = BufReader::new(file);
+                    let limited_reader = &mut reader.take(1024 * 1024);
+                    let mut buffer = Vec::new();
+                    match limited_reader.read_to_end(&mut buffer) {
+                        Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
+                        Err(e) => {
+                            error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                            f.md.is_type_allowed = false;
+                        }
                     }
+                } else {
+                    f.md.is_type_allowed = true;
                 }
             }
             Err(e) => {
