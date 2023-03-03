@@ -67,7 +67,7 @@ struct FileMetadata {
 }
 
 impl FileMetadata {
-    fn compute_sha256(&self) -> [u8; 32] {
+    fn compute_sha256(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(self.filename.as_bytes());
         hasher.update(self.digest.as_bytes());
@@ -89,9 +89,7 @@ impl FileMetadata {
         hasher.update(self.yara_report.as_bytes());
 
         let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result[..]);
-        hash
+        format!("{result:x}")
     }
 }
 
@@ -104,7 +102,7 @@ struct FileData {
 #[derive(Serialize, Deserialize)]
 struct Report {
     md: FileMetadata,
-    md_digest: [u8; 32],
+    md_digest: String,
 }
 
 /// Daemon configuration arguments
