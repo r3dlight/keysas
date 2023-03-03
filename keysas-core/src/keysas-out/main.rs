@@ -243,7 +243,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 process::exit(1);
             }
         };
-        let json_report = match serde_json::to_string(&f.md) {
+        let json_report = match serde_json::to_string_pretty(&f.md) {
             Ok(j) => j,
             Err(e) => {
                 error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
