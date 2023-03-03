@@ -37,6 +37,8 @@ use landlock::{
 };
 use log::{error, info, warn};
 use nix::unistd;
+use sha2::Digest;
+use sha2::Sha256;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -51,7 +53,7 @@ use std::str;
 #[macro_use]
 extern crate serde_derive;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileMetadata {
     filename: String,
     digest: String,
@@ -64,10 +66,45 @@ struct FileMetadata {
     yara_report: String,
 }
 
+impl FileMetadata {
+    fn compute_sha256(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(self.filename.as_bytes());
+        hasher.update(self.digest.as_bytes());
+        hasher.update(if self.is_digest_ok { "true" } else { "false" }.as_bytes());
+        hasher.update(if self.is_toobig { "true" } else { "false" }.as_bytes());
+        hasher.update(
+            if self.is_type_allowed {
+                "true"
+            } else {
+                "false"
+            }
+            .as_bytes(),
+        );
+        hasher.update(if self.av_pass { "true" } else { "false" }.as_bytes());
+        for report in &self.av_report {
+            hasher.update(report.as_bytes());
+        }
+        hasher.update(if self.yara_pass { "true" } else { "false" }.as_bytes());
+        hasher.update(self.yara_report.as_bytes());
+
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result[..]);
+        hash
+    }
+}
+
 #[derive(Debug)]
 struct FileData {
     fd: i32,
     md: FileMetadata,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Report {
+    md: FileMetadata,
+    md_digest: [u8; 32],
 }
 
 /// Daemon configuration arguments
@@ -243,7 +280,12 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 process::exit(1);
             }
         };
-        let json_report = match serde_json::to_string_pretty(&f.md) {
+
+        let struct_report = Report {
+            md: f.md.clone(),
+            md_digest: f.md.compute_sha256(),
+        };
+        let json_report = match serde_json::to_string_pretty(&struct_report) {
             Ok(j) => j,
             Err(e) => {
                 error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
