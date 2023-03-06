@@ -16,14 +16,14 @@ keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
 regex = "1.7"
-infer = "0.12"
-clamav-tcp = "0.2.1"
+infer = "0.13"
+clamav-tcp = "0.2"
 yara = "0.17"
 landlock = "0.2"
 itertools ="0.10"
 serde_json = "1.0"
 syscallz = "0.16"
-
+time = "0.3"
 
 [[bin]]
 name = "keysas-in"

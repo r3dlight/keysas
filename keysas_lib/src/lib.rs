@@ -19,9 +19,27 @@ pub fn init_logger() {
 }
 
 /// This function computes the SHA-256 digest of a file
+///
+/// Example:
+///```
+/// use keysas_lib::sha256_digest;
+/// use std::path::Path;
+/// use tempfile::tempdir;
+/// use std::fs::File;
+/// use std::fs;
+///
+/// let dir = tempdir().unwrap();
+/// let path = dir.path().join("test");
+/// let _output = fs::create_dir_all(&path).unwrap();
+/// assert_eq!(true, Path::new(&path).exists());
+/// let path = path.join("file.txt");
+/// let _file = File::create(&path).unwrap();
+/// let fd = File::open(path).unwrap();
+/// //assert_eq!(true, Path::new(&fd).exists());
+/// let digest = sha256_digest(&fd).unwrap();
+/// assert_eq!(digest, String::from("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
+/// ```
 pub fn sha256_digest(input: &File) -> Result<String> {
-    //let file = File::open(input).context("Failed to open input file")?;
-
     let mut reader = BufReader::new(input);
 
     let digest = {
@@ -42,7 +60,13 @@ pub fn sha256_digest(input: &File) -> Result<String> {
 /// This function lists all files in a directory except hidden ones.
 ///
 /// Example:
-/// ```no_run
+/// ```
+/// use keysas_lib::list_files;
+/// use std::path::Path;
+/// use tempfile::tempdir;
+/// use std::fs::File;
+/// use std::fs;
+///
 /// let dir = tempdir().unwrap();
 /// let path = dir.path().join("transit");
 /// let _output = fs::create_dir_all(&path).unwrap();
@@ -91,7 +115,7 @@ pub fn convert_ioslice<'a>(
 /// Note: does not check if the path is a file or directory; you should do that.
 /// # Example
 /// ```
-/// use pathext::append_ext;
+/// use keysas_lib::append_ext;
 /// use std::path::PathBuf;
 /// let path = PathBuf::from("foo/bar/baz.txt");
 /// if !path.is_dir() {

@@ -47,6 +47,7 @@ use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
+use time::OffsetDateTime;
 
 #[macro_use]
 extern crate serde_derive;
@@ -55,9 +56,10 @@ use keysas_lib::{convert_ioslice, init_logger, list_files, sha256_digest};
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[derive(Serialize, Debug, Clone)]
-struct Message {
+struct FileMetadata {
     filename: String,
     digest: String,
+    timestamp: String,
 }
 
 struct Config {
@@ -73,7 +75,7 @@ impl Default for Config {
         }
     }
 }
-fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError> {
+fn landlock_sandbox(sas_in: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
@@ -84,10 +86,7 @@ fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_in, sas_in],
-            AccessFs::from_all(abi),
-        ))?
+        .add_rules(path_beneath_rules(&[sas_in], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -174,14 +173,26 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                         return None;
                     }
                 };
-                let m = Message {
+                let timestamp = format!(
+                    "{}-{}-{}_{}-{}-{}-{}",
+                    OffsetDateTime::now_utc().day(),
+                    OffsetDateTime::now_utc().month(),
+                    OffsetDateTime::now_utc().year(),
+                    OffsetDateTime::now_utc().hour(),
+                    OffsetDateTime::now_utc().minute(),
+                    OffsetDateTime::now_utc().second(),
+                    OffsetDateTime::now_utc().nanosecond()
+                );
+
+                let m = FileMetadata {
                     filename: f.file_name()?.to_str()?.to_string(),
                     digest,
+                    timestamp,
                 };
                 let data: Vec<u8> = match bincode::serialize(&m) {
                     Ok(d) => d,
                     Err(_e) => {
-                        error!("Failed to serialize message");
+                        error!("Failed to serialize FileMetadata");
                         return None;
                     }
                 };
@@ -219,15 +230,9 @@ fn main() -> Result<()> {
 
     let mut config = Config::default();
     command_args(&mut config);
-    let socket = Path::new(&config.socket_in);
     init_logger();
-    match socket.parent() {
-        Some(parent) => landlock_sandbox(parent.to_str().unwrap(), &config.sas_in)?,
-        None => {
-            error!("Failed to find parent directory for socket");
-            process::exit(1);
-        }
-    }
+    landlock_sandbox(&config.sas_in)?;
+
     info!("Keysas-in started :)");
     info!("Running configuration is:");
     info!("- Abstract socket: {}", &config.socket_in);

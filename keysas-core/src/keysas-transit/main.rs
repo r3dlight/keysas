@@ -25,6 +25,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
+#![allow(clippy::forget_ref)]
 
 use anyhow::Result;
 use bincode::Options;
@@ -43,6 +44,7 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -66,6 +68,7 @@ use serde_derive::Deserialize;
 struct InputMetadata {
     filename: String,
     digest: String,
+    timestamp: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -79,6 +82,7 @@ struct FileMetadata {
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
+    timestamp: String,
 }
 
 #[derive(Debug)]
@@ -101,24 +105,15 @@ struct Configuration {
     type_off: bool,
 }
 
-fn landlock_sandbox(
-    socket_in: &String,
-    socket_out: &String,
-    rule_path: &String,
-) -> Result<(), RulesetError> {
+fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_in, rule_path],
+            &[CONFIG_DIRECTORY, rule_path],
             AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_out, "/run/keysas"],
-            AccessFs::from_all(abi),
         ))?
         .restrict_self()?;
     match status.ruleset {
@@ -294,6 +289,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             av_report: Vec::new(),
                             yara_pass: false,
                             yara_report: String::new(),
+                            timestamp: meta.timestamp,
                         },
                     })
                 }
@@ -326,7 +322,7 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        match nix::unistd::dup2(f.fd, 50) {
+        match nix::unistd::dup2(f.fd, 500) {
             Ok(nfd) => {
                 let mut file = unsafe { File::from_raw_fd(nfd) };
                 // Synchronize the file before calculating the SHA256 hash
@@ -461,6 +457,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             f.md.av_pass,
             f.md.is_toobig
         );
+        mem::forget(f);
     }
 }
 
@@ -498,7 +495,7 @@ fn main() -> Result<()> {
     init_logger();
 
     // landlock init
-    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
+    landlock_sandbox(&config.rule_path)?;
 
     // Initilize clamd client
     // Test if ClamAV IP is valid

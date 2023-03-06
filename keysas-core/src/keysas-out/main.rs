@@ -37,6 +37,8 @@ use landlock::{
 };
 use log::{error, info, warn};
 use nix::unistd;
+use sha2::Digest;
+use sha2::Sha256;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -51,7 +53,7 @@ use std::str;
 #[macro_use]
 extern crate serde_derive;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileMetadata {
     filename: String,
     digest: String,
@@ -62,12 +64,46 @@ struct FileMetadata {
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
+    timestamp: String,
+}
+
+impl FileMetadata {
+    fn compute_sha256(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(self.filename.as_bytes());
+        hasher.update(self.digest.as_bytes());
+        hasher.update(if self.is_digest_ok { "true" } else { "false" }.as_bytes());
+        hasher.update(if self.is_toobig { "true" } else { "false" }.as_bytes());
+        hasher.update(
+            if self.is_type_allowed {
+                "true"
+            } else {
+                "false"
+            }
+            .as_bytes(),
+        );
+        hasher.update(if self.av_pass { "true" } else { "false" }.as_bytes());
+        for report in &self.av_report {
+            hasher.update(report.as_bytes());
+        }
+        hasher.update(if self.yara_pass { "true" } else { "false" }.as_bytes());
+        hasher.update(self.yara_report.as_bytes());
+
+        let result = hasher.finalize();
+        format!("{result:x}")
+    }
 }
 
 #[derive(Debug)]
 struct FileData {
     fd: i32,
     md: FileMetadata,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Report {
+    md: FileMetadata,
+    md_digest: String,
 }
 
 /// Daemon configuration arguments
@@ -79,14 +115,14 @@ struct Configuration {
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
-fn landlock_sandbox(socket_out: &String, sas_out: &String) -> Result<(), RulesetError> {
+fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_out],
+            &[CONFIG_DIRECTORY],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
@@ -228,7 +264,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         let mut report = match File::options()
             .read(true)
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(&path)
         {
             Ok(f) => {
@@ -243,7 +279,12 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 process::exit(1);
             }
         };
-        let json_report = match serde_json::to_string(&f.md) {
+
+        let struct_report = Report {
+            md: f.md.clone(),
+            md_digest: f.md.compute_sha256(),
+        };
+        let json_report = match serde_json::to_string_pretty(&struct_report) {
             Ok(j) => j,
             Err(e) => {
                 error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
@@ -264,11 +305,10 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
 
         // Test if the check passed, if yes write the file to sas_out
         if f.md.is_digest_ok
-            || !f.md.is_toobig
-            || f.md.is_type_allowed
-            || f.md.av_pass
-            || f.md.yara_pass
-            || (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
+            && !f.md.is_toobig
+            && f.md.is_type_allowed
+            && f.md.av_pass
+            && (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
         {
             // Output file
             let mut reader = BufReader::new(&file);
@@ -276,7 +316,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut path = PathBuf::new();
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
-            let output = match File::options().write(true).create_new(true).open(path) {
+            let output = match File::options().write(true).create(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
                     error!(
@@ -316,7 +356,7 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
-    landlock_sandbox(&config.socket_out, &config.sas_out)?;
+    landlock_sandbox(&config.sas_out)?;
 
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
