@@ -43,6 +43,7 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -329,8 +330,9 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        match nix::unistd::dup2(f.fd, 50) {
+        match nix::unistd::dup2(f.fd, 500) {
             Ok(nfd) => {
+                mem::forget(f);
                 let mut file = unsafe { File::from_raw_fd(nfd) };
                 // Synchronize the file before calculating the SHA256 hash
                 file.sync_all().unwrap();
@@ -464,6 +466,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             f.md.av_pass,
             f.md.is_toobig
         );
+        drop(nfd);
     }
 }
 
