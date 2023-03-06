@@ -45,7 +45,12 @@ use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 use tauri_plugin_store::PluginBuilder;
 use regex::Regex;
 use std::io::BufReader;
+
 mod errors;
+mod pki;
+use crate::pki::*;
+
+use openssl::pkey::PKey;
 
 const TIMEOUT: u64 = 60 * 1000;
 const USER: &str = "keysas";
@@ -140,6 +145,7 @@ async fn init_tauri() -> Result<()> {
             sign_key,
             revoke_key,
             validate_privatekey,
+            generate_pki_in_dir,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -352,7 +358,7 @@ async fn generate_keypair(ip: String, private_key: String, password: String) -> 
             return false;
         }
     };
-    if !re.is_match(password) {
+    if !reg.is_match(&password) {
         println!("Password must be at least 12 chars");
         return false;
     }
@@ -375,7 +381,7 @@ async fn generate_keypair(ip: String, private_key: String, password: String) -> 
                             match String::from_utf8(res) {
                                 Ok(key) => key,
                                 Err(e) => {
-                                    println!("failed to convert command output");
+                                    println!("failed to convert command output: {:?}", e);
                                     return false;
                                 }
                             }
@@ -386,8 +392,8 @@ async fn generate_keypair(ip: String, private_key: String, password: String) -> 
                         }
                     };
                     // 4. Generate a certificate from the public key
-                    ///  5. Export the created certificate on the station
-                    ///  6. Finally it loads the admin USB signing certificate
+                    //  5. Export the created certificate on the station
+                    //  6. Finally it loads the admin USB signing certificate
                 }
                 Err(why) => {
                     println!("Error while trying session.open_exec: {:?}", why);
@@ -564,6 +570,106 @@ async fn validate_privatekey(public_key: String, private_key: String) -> bool {
     if Path::new(&public_key.trim()).is_file().await
         && Path::new(&private_key.trim()).is_file().await
     {
+        true
+    } else {
+        false
+    }
+}
+
+#[command]
+async fn validate_rootkey(root_key: String) -> bool {
+    if Path::new(&root_key.trim()).is_file().await
+    {
+        true
+    } else {
+        false
+    }
+}
+
+/// Generate a new PKI in an empty directory
+#[command]
+async fn generate_pki_in_dir(pki_dir: String, admin_pwd: String) -> bool {
+    // Test if the directory is valid
+    if Path::new(&pki_dir.trim()).is_dir().await
+    {
+        // Create the root CA key pair
+        let root_key = match PKey::generate_ed25519() {
+            Ok(k) => k,
+            Err(e) => {
+                println!("Failed to generate root CA private key: {e}");
+                return false;
+            }
+        };
+
+        // Generate root certificate
+        let fields = CertificateFields{validity: 3650};
+        let root_cert = match generate_root_cert(root_key.as_ref(), &fields) {
+            Ok(c) => c,
+            Err(e) => {
+                println!("Failed to generate root certificate: {e}");
+                return false;
+            }
+        };
+
+        // Store root key and certificate in PKCS#12
+
+        //let rd = match BigNum::new_secure()
+
+        // Create Keysas station CA key pair
+        let (st_key, st_cert) = match generate_signed_keypair(root_key.as_ref()) {
+            Ok(p) => p,
+            Err(e) => {
+                println!("Failed to generate Station signing key pair: {e}");
+                return false;
+            }
+        };
+
+        // Create the USB signing key pair
+        let (usb_key, usb_cert) = match generate_signed_keypair(root_key.as_ref()) {
+            Ok(p) => p,
+            Err(e) => {
+                println!("Failed to generate USB key pair: {e}");
+                return false;
+            }
+        };
+
+        // Store the PKI in PKCS#12 files
+        let base_path = match pki_dir.ends_with("/") {
+            true => pki_dir,
+            false => {
+                format!("{}{}", &pki_dir, "/")
+            }
+        };
+        let root_path = format!("{}{}", &base_path, "root.pk12");
+        if let Err(e) = store_pkcs12(&admin_pwd, 
+                                                        &String::from("Root CA"),
+                                                        root_key.as_ref(),
+                                                        root_cert.as_ref(),
+                                                        &root_path) {
+            println!("Failed to store root key: {e}");
+            return false;
+        }
+
+        let usb_path = format!("{}{}", &base_path, "usb.pk12");
+        if let Err(e) = store_pkcs12(&admin_pwd, 
+                                                        &String::from("USB"),
+                                                        usb_key.as_ref(),
+                                                        usb_cert.as_ref(),
+                                                        &usb_path) {
+            println!("Failed to store root key: {e}");
+            return false;
+        }
+
+        let st_path = format!("{}{}", &base_path, "st.pk12");
+        if let Err(e) = store_pkcs12(&admin_pwd, 
+                                                        &String::from("Station CA"),
+                                                        st_key.as_ref(),
+                                                        st_cert.as_ref(),
+                                                        &st_path) {
+            println!("Failed to store root key: {e}");
+            return false;
+        }
+
         true
     } else {
         false

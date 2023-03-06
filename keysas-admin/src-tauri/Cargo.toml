@@ -25,6 +25,8 @@ async-std = "*"
 nom = "*"
 sha2 ="*"
 regex="*"
+openssl = "*"
+openssl-sys = "*"
 
 [features]
 # by default Tauri runs in production mode

@@ -155,6 +155,53 @@ export async function validateKeys(publicKey, privateKey) {
     }
 }
 
+// Generate a new PKI from a Root CA keypair
+export async function generateFromRootKey(rootKey) {
+    try {
+        console.log("Rootkey: " + rootKey);
+        let res = await invoke('validate_rootkey', {
+            rootKey: rootKey
+        })
+        console.log("validate_rootkey: " + res)
+        return res;
+    } catch(e) {
+        console.log(e)
+        return Promise.reject(e);
+    }
+}
+
+// Generate a new PKI from scratch
+export async function generatePKI(pkiDir) {
+    try {
+        console.log("PKI Directory: " + pkiDir);
+        let res = await invoke('generate_pki_in_dir', {
+            pkiDir: pkiDir,
+            adminPwd: "root"
+
+        })
+        console.log("generate_pki_in_dir: " + res)
+        return res;
+    } catch(e) {
+        console.log(e)
+        return Promise.reject(e);
+    }
+}
+
+// Load an existing PKI from a folder
+export async function loadPKI(pkiFolder) {
+    try {
+        console.log("Rootkey: " + rootKey);
+        let res = await invoke('validate_rootkey', {
+            rootKey: rootKey
+        })
+        console.log("validate_rootkey: " + res)
+        return res;
+    } catch(e) {
+        console.log(e)
+        return Promise.reject(e);
+    }
+}
+
 export async function getPublicKeyPath() {
     try {
       const SelectedPath = await open({
@@ -167,9 +214,9 @@ export async function getPublicKeyPath() {
       console.log(e);
       return Promise.reject(e);
     }
-  }
+}
 
-  export async function getPrivateKeyPath() {
+export async function getPrivateKeyPath() {
     try {
       const SelectedPath = await open({
         multiple: false,
@@ -181,4 +228,49 @@ export async function getPublicKeyPath() {
       console.log(e);
       return Promise.reject(e);
     }
-  }
+}
+
+export async function getRootKeyPath() {
+    try {
+      const SelectedPath = await open({
+        multiple: false,
+        directory: false,
+        title: "Select your root CA key file..."
+      });
+      console.log(SelectedPath);
+      return SelectedPath;
+    } catch(e){
+      console.log(e);
+      return Promise.reject(e);
+    }
+}
+
+export async function getPKIFolder() {
+    try {
+      const SelectedPath = await open({
+        multiple: false,
+        directory: true,
+        title: "Select your PKI folder..."
+      });
+      console.log(SelectedPath);
+      return SelectedPath;
+    } catch(e){
+      console.log(e);
+      return Promise.reject(e);
+    }
+}
+
+export async function getPKIDir() {
+    try {
+      const SelectedPath = await open({
+        multiple: false,
+        directory: true,
+        title: "Select a directory for your PKI..."
+      });
+      console.log(SelectedPath);
+      return SelectedPath;
+    } catch(e){
+      console.log(e);
+      return Promise.reject(e);
+    }
+}
