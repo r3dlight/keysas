@@ -171,12 +171,18 @@ export async function generateFromRootKey(rootKey) {
 }
 
 // Generate a new PKI from scratch
-export async function generatePKI(pkiDir) {
+export async function generatePKI(orgName, orgUnit, country, validity, sigAlgo,
+                                    adminPwd, pkiDir) {
     try {
         console.log("PKI Directory: " + pkiDir);
         let res = await invoke('generate_pki_in_dir', {
-            pkiDir: pkiDir,
-            adminPwd: "root"
+            orgName: orgName,
+            orgUnit: orgUnit,
+            country: country,
+            validity: validity,
+            sigAlgo: sigAlgo,
+            adminPwd: adminPwd,
+            pkiDir: pkiDir
 
         })
         console.log("generate_pki_in_dir: " + res)

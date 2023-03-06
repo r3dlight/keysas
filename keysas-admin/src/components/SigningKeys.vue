@@ -67,8 +67,20 @@
   </div>
   <div v-if="showPkiDirForm">
     <form class="add-form" @submit.prevent="onSubmit">
+      <label type="text"> Organization name:</label>
+      <input type="text" required v-model="orgName" id="orgName"/>
+      <label type="text"> PKI name:</label>
+      <input type="text" required v-model="orgUnit" id="orgUnit"/>
+      <label type="text"> Country (first two letters):</label>
+      <input type="text" required v-model="country" id="country"/>
+      <label type="text"> Validity (days):</label>
+      <input type="text" required v-model="validity" id="validity"/>
+      <label type="text"> Signature algorithm (default ed25519 / ed448):</label>
+      <input type="text" required v-model="sigAlgo" id="sigAlgo"/>
       <label type="text"> Select directory:</label>
       <input type="text" required v-model="pkiDir" id="pkiDir"/>
+      <label type="text"> Password:</label>
+      <input type="text" required v-model="adminPwd" id="adminPwd"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIDir">Browse</button>
       </div>
@@ -100,6 +112,12 @@ export default {
     return {
       rootKeyPath: '',
       pkiDir: '',
+      orgName: '',
+      orgUnit: '',
+      country: '',
+      validity: '',
+      sigAlgo: '',
+      adminPwd: '',
       pkiFolder: '',
       keysError: '',
       show: false,
@@ -131,7 +149,13 @@ export default {
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
       this.keysError = '';
-      this.keysError = await generatePKI(this.pkiDir) ?
+      this.keysError = await generatePKI(this.orgName,
+                                          this.orgUnit,
+                                          this.country,
+                                          this.validity,
+                                          this.sigAlgo,
+                                          this.adminPwd,
+                                          this.pkiDir) ?
                                 '' : 'Failed to generate PKI in directory';
       console.log("keysError:", this.keysError);
     },

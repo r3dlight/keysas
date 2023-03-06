@@ -33,6 +33,7 @@ use async_std::path::Path;
 use async_std::task;
 use nom::bytes::complete::take_until;
 use nom::IResult;
+use openssl::pkey::Id;
 use sha2::{Digest, Sha256};
 use ssh_rs::algorithm;
 use ssh_rs::ssh;
@@ -354,7 +355,7 @@ async fn generate_keypair(ip: String, private_key: String, password: String) -> 
     let reg = match Regex::new(r"^.{12,}$") {
         Ok(r) => r,
         Err(e) => {
-            println!("Failed to generate regex");
+            println!("Failed to generate regex: {e}");
             return false;
         }
     };
@@ -588,22 +589,45 @@ async fn validate_rootkey(root_key: String) -> bool {
 
 /// Generate a new PKI in an empty directory
 #[command]
-async fn generate_pki_in_dir(pki_dir: String, admin_pwd: String) -> bool {
+async fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
+                                validity: String, sig_algo: String, admin_pwd: String,
+                                pki_dir: String) -> bool {
+    // Validate user inputs
+    let infos = match validate_input_cert_fields(&org_name, &org_unit, 
+                                            &country, &validity, &sig_algo) {
+        Ok(i) => i,
+        Err(_) => {
+            println!("Failed to validate user input");
+            return false;
+        }
+    };
     // Test if the directory is valid
     if Path::new(&pki_dir.trim()).is_dir().await
     {
         // Create the root CA key pair
-        let root_key = match PKey::generate_ed25519() {
-            Ok(k) => k,
-            Err(e) => {
-                println!("Failed to generate root CA private key: {e}");
-                return false;
+        let root_key = match infos.sig_algo {
+            Id::ED448 => {
+                match PKey::generate_ed448() {
+                    Ok(k) => k,
+                    Err(e) => {
+                        println!("Failed to generate root CA private key: {e}");
+                        return false;
+                    }
+                }
+            },
+            _ => {
+                match PKey::generate_ed25519() {
+                    Ok(k) => k,
+                    Err(e) => {
+                        println!("Failed to generate root CA private key: {e}");
+                        return false;
+                    }
+                }
             }
         };
 
         // Generate root certificate
-        let fields = CertificateFields{validity: 3650};
-        let root_cert = match generate_root_cert(root_key.as_ref(), &fields) {
+        let root_cert = match generate_root_cert(root_key.as_ref(), &infos) {
             Ok(c) => c,
             Err(e) => {
                 println!("Failed to generate root certificate: {e}");
@@ -611,12 +635,8 @@ async fn generate_pki_in_dir(pki_dir: String, admin_pwd: String) -> bool {
             }
         };
 
-        // Store root key and certificate in PKCS#12
-
-        //let rd = match BigNum::new_secure()
-
         // Create Keysas station CA key pair
-        let (st_key, st_cert) = match generate_signed_keypair(root_key.as_ref()) {
+        let (st_key, st_cert) = match generate_signed_keypair(root_key.as_ref(), &infos) {
             Ok(p) => p,
             Err(e) => {
                 println!("Failed to generate Station signing key pair: {e}");
@@ -625,7 +645,7 @@ async fn generate_pki_in_dir(pki_dir: String, admin_pwd: String) -> bool {
         };
 
         // Create the USB signing key pair
-        let (usb_key, usb_cert) = match generate_signed_keypair(root_key.as_ref()) {
+        let (usb_key, usb_cert) = match generate_signed_keypair(root_key.as_ref(), &infos) {
             Ok(p) => p,
             Err(e) => {
                 println!("Failed to generate USB key pair: {e}");
