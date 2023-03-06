@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sha2 = "*"
-anyhow = "*"
-clap = "*"
-walkdir ="*"
+sha2 = "0.10"
+anyhow = "1.0"
+clap = "4.1"
+walkdir = "2.3"
 regex ="1.7.1"
 log = "0.4"
 simple_logger = "4.0"
