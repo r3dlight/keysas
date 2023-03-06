@@ -264,7 +264,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         let mut report = match File::options()
             .read(true)
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(&path)
         {
             Ok(f) => {
@@ -317,7 +317,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut path = PathBuf::new();
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
-            let output = match File::options().write(true).create_new(true).open(path) {
+            let output = match File::options().write(true).create(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
                     error!(
