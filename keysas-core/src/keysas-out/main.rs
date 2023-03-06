@@ -115,14 +115,14 @@ struct Configuration {
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
-fn landlock_sandbox(socket_out: &String, sas_out: &String) -> Result<(), RulesetError> {
+fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_out],
+            &[CONFIG_DIRECTORY],
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
@@ -356,7 +356,7 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
-    landlock_sandbox(&config.socket_out, &config.sas_out)?;
+    landlock_sandbox(&config.sas_out)?;
 
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;

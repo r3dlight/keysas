@@ -75,7 +75,7 @@ impl Default for Config {
         }
     }
 }
-fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError> {
+fn landlock_sandbox(sas_in: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
@@ -86,10 +86,7 @@ fn landlock_sandbox(socket_in: &str, sas_in: &String) -> Result<(), RulesetError
             AccessFs::from_read(abi),
         ))?
         // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_in, sas_in],
-            AccessFs::from_all(abi),
-        ))?
+        .add_rules(path_beneath_rules(&[sas_in], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.
@@ -233,15 +230,9 @@ fn main() -> Result<()> {
 
     let mut config = Config::default();
     command_args(&mut config);
-    let socket = Path::new(&config.socket_in);
     init_logger();
-    match socket.parent() {
-        Some(parent) => landlock_sandbox(parent.to_str().unwrap(), &config.sas_in)?,
-        None => {
-            error!("Failed to find parent directory for socket");
-            process::exit(1);
-        }
-    }
+    landlock_sandbox(&config.sas_in)?;
+
     info!("Keysas-in started :)");
     info!("Running configuration is:");
     info!("- Abstract socket: {}", &config.socket_in);

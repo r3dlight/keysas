@@ -105,24 +105,15 @@ struct Configuration {
     type_off: bool,
 }
 
-fn landlock_sandbox(
-    socket_in: &String,
-    socket_out: &String,
-    rule_path: &String,
-) -> Result<(), RulesetError> {
+fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_in, rule_path],
+            &[CONFIG_DIRECTORY, rule_path],
             AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_out, "/run/keysas"],
-            AccessFs::from_all(abi),
         ))?
         .restrict_self()?;
     match status.ruleset {
@@ -504,7 +495,7 @@ fn main() -> Result<()> {
     init_logger();
 
     // landlock init
-    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
+    landlock_sandbox(&config.rule_path)?;
 
     // Initilize clamd client
     // Test if ClamAV IP is valid
