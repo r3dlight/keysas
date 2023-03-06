@@ -47,6 +47,7 @@ use std::path::PathBuf;
 use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
+use time::OffsetDateTime;
 
 #[macro_use]
 extern crate serde_derive;
@@ -55,9 +56,10 @@ use keysas_lib::{convert_ioslice, init_logger, list_files, sha256_digest};
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
 #[derive(Serialize, Debug, Clone)]
-struct Message {
+struct FileMetadata {
     filename: String,
     digest: String,
+    timestamp: String,
 }
 
 struct Config {
@@ -174,14 +176,26 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                         return None;
                     }
                 };
-                let m = Message {
+                let timestamp = format!(
+                    "{}-{}-{}_{}-{}-{}-{}",
+                    OffsetDateTime::now_utc().day(),
+                    OffsetDateTime::now_utc().month(),
+                    OffsetDateTime::now_utc().year(),
+                    OffsetDateTime::now_utc().hour(),
+                    OffsetDateTime::now_utc().minute(),
+                    OffsetDateTime::now_utc().second(),
+                    OffsetDateTime::now_utc().nanosecond()
+                );
+
+                let m = FileMetadata {
                     filename: f.file_name()?.to_str()?.to_string(),
                     digest,
+                    timestamp,
                 };
                 let data: Vec<u8> = match bincode::serialize(&m) {
                     Ok(d) => d,
                     Err(_e) => {
-                        error!("Failed to serialize message");
+                        error!("Failed to serialize FileMetadata");
                         return None;
                     }
                 };

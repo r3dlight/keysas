@@ -64,6 +64,7 @@ struct FileMetadata {
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
+    timestamp: String,
 }
 
 impl FileMetadata {

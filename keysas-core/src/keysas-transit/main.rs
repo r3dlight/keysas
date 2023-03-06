@@ -66,6 +66,7 @@ use serde_derive::Deserialize;
 struct InputMetadata {
     filename: String,
     digest: String,
+    timestamp: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -79,6 +80,7 @@ struct FileMetadata {
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
+    timestamp: String,
 }
 
 #[derive(Debug)]
@@ -294,6 +296,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             av_report: Vec::new(),
                             yara_pass: false,
                             yara_report: String::new(),
+                            timestamp: meta.timestamp,
                         },
                     })
                 }
