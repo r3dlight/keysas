@@ -25,7 +25,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-
+#[allow(clippy::forget_ref)]
 use anyhow::Result;
 use bincode::Options;
 use clamav_tcp::scan;
