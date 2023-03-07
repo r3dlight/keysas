@@ -145,6 +145,40 @@ fn command_args(config: &mut Config) {
     }
 }
 
+fn is_corrupted(file: PathBuf) -> bool {
+    if file.exists() && file.is_file() {
+        match file.extension() {
+            Some(ext) => {
+                if ext.eq("ioerror") {
+                    debug!("Ioerror report detected.");
+                    let corrupted_file = match file.file_stem() {
+                        Some(c) => c,
+                        None => return false,
+                    };
+                    let corrupted_file_path = Path::new(corrupted_file);
+                    if corrupted_file_path.exists() && corrupted_file_path.is_file() {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            None => {
+                let ioerror = append_ext("ioerror", file);
+                if ioerror.exists() && ioerror.is_file() {
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    } else {
+        false
+    }
+}
+
 fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<()> {
     //Remove any file starting by .(dot)
     let re = Regex::new(r"^\.([a-z])*")?;
@@ -187,12 +221,11 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 );
 
                 // check if file is corrupted or not
-                let ioerror = append_ext("ioerror", f.clone());
                 let m = FileMetadata {
                     filename: f.file_name()?.to_str()?.to_string(),
                     digest,
                     timestamp,
-                    is_corrupted: ioerror.is_file(),
+                    is_corrupted: is_corrupted(f.clone()),
                 };
                 let data: Vec<u8> = match bincode::serialize(&m) {
                     Ok(d) => d,
