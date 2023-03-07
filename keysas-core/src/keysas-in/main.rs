@@ -30,6 +30,7 @@ use anyhow::{Context, Result};
 //use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
 use itertools::MultiUnzip;
+use keysas_lib::append_ext;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -60,6 +61,7 @@ struct FileMetadata {
     filename: String,
     digest: String,
     timestamp: String,
+    is_corrupted: bool,
 }
 
 struct Config {
@@ -184,10 +186,13 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                     OffsetDateTime::now_utc().nanosecond()
                 );
 
+                // check if file is corrupted or not
+                let ioerror = append_ext("ioerror", f.clone());
                 let m = FileMetadata {
                     filename: f.file_name()?.to_str()?.to_string(),
                     digest,
                     timestamp,
+                    is_corrupted: ioerror.is_file(),
                 };
                 let data: Vec<u8> = match bincode::serialize(&m) {
                     Ok(d) => d,

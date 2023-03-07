@@ -69,6 +69,7 @@ struct InputMetadata {
     filename: String,
     digest: String,
     timestamp: String,
+    is_corrupted: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -83,6 +84,7 @@ struct FileMetadata {
     yara_pass: bool,
     yara_report: String,
     timestamp: String,
+    is_corrupted: bool,
 }
 
 #[derive(Debug)]
@@ -290,6 +292,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             yara_pass: false,
                             yara_report: String::new(),
                             timestamp: meta.timestamp,
+                            is_corrupted: meta.is_corrupted,
                         },
                     })
                 }
