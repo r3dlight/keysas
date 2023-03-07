@@ -49,6 +49,7 @@ use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, U
 use std::path::PathBuf;
 use std::process;
 use std::str;
+use time::OffsetDateTime;
 
 #[macro_use]
 extern crate serde_derive;
@@ -59,6 +60,7 @@ struct FileMetadata {
     digest: String,
     is_digest_ok: bool,
     is_toobig: bool,
+    size: u64,
     is_type_allowed: bool,
     av_pass: bool,
     av_report: Vec<String>,
@@ -66,6 +68,7 @@ struct FileMetadata {
     yara_report: String,
     timestamp: String,
     is_corrupted: bool,
+    file_type: String,
 }
 
 impl FileMetadata {
@@ -103,6 +106,11 @@ struct FileData {
 
 #[derive(Serialize, Deserialize)]
 struct Report {
+    //station_id: String,
+    name: String,
+    date: String,
+    file_type: String,
+    is_valid: bool,
     md: FileMetadata,
     md_digest: String,
 }
@@ -280,8 +288,28 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 process::exit(1);
             }
         };
+        let timestamp = format!(
+            "{}-{}-{}_{}-{}-{}-{}",
+            OffsetDateTime::now_utc().day(),
+            OffsetDateTime::now_utc().month(),
+            OffsetDateTime::now_utc().year(),
+            OffsetDateTime::now_utc().hour(),
+            OffsetDateTime::now_utc().minute(),
+            OffsetDateTime::now_utc().second(),
+            OffsetDateTime::now_utc().nanosecond()
+        );
 
         let struct_report = Report {
+            name: f.md.filename.clone(),
+            date: timestamp,
+            file_type: f.md.file_type.clone(),
+            // Do have to manage yara_clean or not here?
+            is_valid: f.md.av_pass
+                && f.md.yara_pass
+                && !f.md.is_toobig
+                && !f.md.is_corrupted
+                && f.md.is_digest_ok
+                && f.md.is_type_allowed,
             md: f.md.clone(),
             md_digest: f.md.compute_sha256(),
         };
