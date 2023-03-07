@@ -151,12 +151,17 @@ fn is_corrupted(file: PathBuf) -> bool {
             Some(ext) => {
                 if ext.eq("ioerror") {
                     debug!("Ioerror report detected.");
-                    let corrupted_file = match file.file_stem() {
+                    let corrupted_filename = match file.file_stem() {
                         Some(c) => c,
                         None => return false,
                     };
-                    let corrupted_file_path = Path::new(corrupted_file);
-                    if corrupted_file_path.exists() && corrupted_file_path.is_file() {
+                    let mut path = match file.parent() {
+                        Some(p) => p.to_path_buf(),
+                        None => PathBuf::new(),
+                    };
+                    path.push(corrupted_filename);
+                    debug!("Corrupted file should be: {:?}", path);
+                    if path.exists() && path.is_file() {
                         true
                     } else {
                         false
