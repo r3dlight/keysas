@@ -161,18 +161,10 @@ fn is_corrupted(file: PathBuf) -> bool {
                     };
                     path.push(corrupted_filename);
                     debug!("Corrupted file should be: {:?}", path);
-                    if path.exists() && path.is_file() {
-                        true
-                    } else {
-                        false
-                    }
+                    path.exists() && path.is_file()
                 } else {
                     let ioerror = append_ext("ioerror", file);
-                    if ioerror.exists() && ioerror.is_file() {
-                        true
-                    } else {
-                        false
-                    }
+                    ioerror.exists() && ioerror.is_file()
                 }
             }
             None => {
@@ -240,6 +232,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                     is_corrupted: is_corrupted(f.clone()),
                 };
 
+                // Remove the report in sas_in
                 if m.is_corrupted {
                     let ioerror_report = append_ext("ioerror", f.clone());
                     match remove_file(ioerror_report) {
