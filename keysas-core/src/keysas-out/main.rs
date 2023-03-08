@@ -71,33 +71,6 @@ struct FileMetadata {
     file_type: String,
 }
 
-impl FileMetadata {
-    fn compute_sha256(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(self.filename.as_bytes());
-        hasher.update(self.digest.as_bytes());
-        hasher.update(if self.is_digest_ok { "true" } else { "false" }.as_bytes());
-        hasher.update(if self.is_toobig { "true" } else { "false" }.as_bytes());
-        hasher.update(
-            if self.is_type_allowed {
-                "true"
-            } else {
-                "false"
-            }
-            .as_bytes(),
-        );
-        hasher.update(if self.av_pass { "true" } else { "false" }.as_bytes());
-        for report in &self.av_report {
-            hasher.update(report.as_bytes());
-        }
-        hasher.update(if self.yara_pass { "true" } else { "false" }.as_bytes());
-        hasher.update(self.yara_report.as_bytes());
-
-        let result = hasher.finalize();
-        format!("{result:x}")
-    }
-}
-
 #[derive(Debug)]
 struct FileData {
     fd: i32,
@@ -112,6 +85,7 @@ struct MetaData {
     is_valid: bool,
     report: FileReport,
 }
+
 #[derive(Serialize, Deserialize, Clone)]
 struct Bd {
     //station_certificate: String,
@@ -120,7 +94,7 @@ struct Bd {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct ReportNew {
+struct Report {
     metadata: MetaData,
     binding: Bd,
 }
@@ -132,6 +106,7 @@ struct FileReport {
     type_allowed: bool,
     size: u64,
     corrupted: bool,
+    toobig: bool,
 }
 
 /// Daemon configuration arguments
@@ -324,6 +299,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             type_allowed: f.md.is_type_allowed,
             size: f.md.size,
             corrupted: f.md.is_corrupted,
+            toobig: f.md.is_toobig,
         };
 
         let new_metadata = MetaData {
@@ -339,12 +315,16 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 && f.md.is_type_allowed,
             report: new_file_report,
         };
-
+        let json_string = serde_json::to_string(&new_metadata).unwrap();
+        let mut hasher = Sha256::new();
+        hasher.update(json_string.as_bytes());
+        let result = hasher.finalize();
+        let meta_digest = format!("{result:x}");
         let new_bd = Bd {
             file_digest: f.md.digest.clone(),
-            metadata_digest: f.md.compute_sha256(),
+            metadata_digest: meta_digest,
         };
-        let new_report = ReportNew {
+        let new_report = Report {
             metadata: new_metadata,
             binding: new_bd,
         };
