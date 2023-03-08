@@ -310,8 +310,8 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(buf: &Vec<u8>, conf: &Configuration) -> bool {
-    match get(&buf) {
+fn check_is_extension_allowed(buf: &[u8], conf: &Configuration) -> bool {
+    match get(buf) {
         Some(info) => conf.magic_list.contains(&info.extension().to_string()),
         None => false,
     }
@@ -448,7 +448,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 match limited_reader.read_to_end(&mut buffer) {
                     Ok(_) => {
                         if !conf.type_off {
-                            f.md.is_type_allowed = check_is_extension_allowed(&buffer, &conf);
+                            f.md.is_type_allowed = check_is_extension_allowed(&buffer, conf);
                             f.md.file_type = get_extension(buffer);
                         } else {
                             f.md.is_type_allowed = true;

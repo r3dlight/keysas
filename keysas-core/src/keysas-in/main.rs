@@ -169,11 +169,8 @@ fn is_corrupted(file: PathBuf) -> bool {
             }
             None => {
                 let ioerror = append_ext("ioerror", file);
-                if ioerror.exists() && ioerror.is_file() {
-                    true
-                } else {
-                    false
-                }
+                ioerror.exists() && ioerror.is_file()
+
             }
         }
     } else {
