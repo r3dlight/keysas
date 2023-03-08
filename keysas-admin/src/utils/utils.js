@@ -70,6 +70,25 @@ export async function update(ip) {
     }
 }
 
+export async function init(name, ip, pwd) {
+    try {
+        var paths = localStorage.getItem('ssh');
+        var priv_key = JSON.parse(paths).priv;
+        console.log("Trying to initialize Keysas:", ip);
+        let res = await invoke('init_keysas', {
+            ip: ip,
+            name: name,
+            pkiPwd: pwd,
+            privateKey: priv_key,
+        })
+        console.log(res)
+        return res;
+    } catch(e) {
+        console.log(e)
+        return Promise.reject(e);
+    }
+}
+
 export async function is_alive(ip) {
     try {
         var paths = localStorage.getItem('ssh');

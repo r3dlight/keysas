@@ -197,7 +197,7 @@ pub fn generate_cert_request<T: HasPublic + HasPrivate>(key: &PKeyRef<T>,
     builder.set_version(2)?;
 
     // Set subject name
-    let name_builder = X509NameBuilder::new()?;
+    let mut name_builder = X509NameBuilder::new()?;
     name_builder.append_entry_by_nid(Nid::ORGANIZATIONNAME, &infos.org_name)?;
     name_builder.append_entry_by_nid(Nid::ORGANIZATIONALUNITNAME, &infos.org_unit)?;
     name_builder.append_entry_by_nid(Nid::COUNTRYNAME, &infos.country)?;

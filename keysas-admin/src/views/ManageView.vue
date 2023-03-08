@@ -81,9 +81,13 @@
         <li class="list-group-item list-group-item transparent">
           <div class="btn-group" role="group" aria-label="Basic outlined example">
             <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
+            ShowPasswordInit = !ShowPasswordInit">
+              <span class="bi bi-magic"> Initialize</span>
+            </button>
+            <!-- <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
             ShowPasswordGenerateKeypair = !ShowPasswordGenerateKeypair">
               <span class="bi bi-magic"> Generate a signing keypair</span>
-            </button>
+            </button> -->
             <button class="send btn btn-lg btn-outline-success shadow" @click="flush();
             ShowPasswordSign = !ShowPasswordSign;
             ">
@@ -112,7 +116,7 @@
         </li>
       </ul>
     </div>
-    <div v-if="ShowPasswordGenerateKeypair" class="add-form">
+    <div v-if="ShowPasswordInit" class="add-form">
       <div class="container">
         <div class="row">
           <div class="col-sm">
@@ -120,10 +124,8 @@
               <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
               <br>
               <span class="tip-text">We need to create a dedicated keypair on this Keysas station to be able to sign
-                output USB keys.
-                This can be easily done here, simply choose a password to protect the private key that will be remotly
-                generated on the current Keysas station.
-                Once done, you will be able to sign your output keys.
+                output files.
+                No need to create a password to protect this key pair but need for the PKI password
               </span>
               <br><br>
               <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
@@ -132,8 +134,8 @@
             </div>
           </div>
           <div class="col-sm">
-            <form class="add-form password" @submit.prevent="onSubmit">
-              <label type="text">New password:</label>
+            <form class="add-form password" @submit.prevent="onSubmitInit">
+              <label type="text">TODO remove:</label>
               <input type="password" required v-model="password" placeholder="8 characters minimum" id="password" />
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
@@ -203,6 +205,11 @@
     <ShutdownKeysas v-if="ShowShutdownKeysas" :shutdownStatus="shutdown_status"></ShutdownKeysas>
     <ExportSSH v-if="ShowExportSSH" :exportSSHStatus="export_ssh_status"></ExportSSH>
   </div>
+  <div style="display:none" id="pwdpopup">
+    <div>Enter PKI password:</div>
+    <input id="pass" type="password"/>
+    <button onclick="done()">OK</button>
+  </div>
 </template>
 
 <script>
@@ -219,7 +226,7 @@ import ShutdownKeysas from '../components/ShutdownKeysas.vue'
 import ExportSSH from '../components/ExportSSH.vue'
 
 import { getKeys, loadStore, removeKey, getData, getStatus } from '../store/store.js'
-import { reboot, shutdown, addsshpukey, update, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
+import { reboot, shutdown, addsshpukey, update, init, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
 import { confirm } from '@tauri-apps/api/dialog';
 
 export default {
@@ -257,7 +264,7 @@ export default {
       ShowShutdownKeysas: false,
       ShowExportSSH: false,
       ShowActionButtons: true,
-      ShowPasswordGenerateKeypair: false,
+      ShowPasswordInit: false,
       ShowPasswordSign: false,
       reboot_status: undefined,
       update_status: undefined,
@@ -376,20 +383,16 @@ export default {
       await this.getKeysasIP(device);
       this.revoke_usb_status = await revoke_USB(this.current_ip);
     },
-    async onSubmit() {
-      this.create_keypair_status = undefined;
-      console.log('Form submitted (Keygen password)');
-      this.passwordError = this.password.length > 7 ?
-        '' : "Password must be at least 8 chars long"
-      //console.log("Password is:", this.password);
-      if (!this.passwordError) {
+    async onSubmitInit() {
+      await this.getKeysasIP(device);
+      this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
+      var password = prompt("Enter PKI password");
+      if (this.confirmed == true) {
+        this.update_status = await init(device, this.current_ip, password);
+        this.confirmed = false;
         this.ShowGenKeypair = true;
-        await this.CreateKeypair(this.current_keysas, this.password);
-        this.password = undefined;
-        console.log("create_keypair_status: " + this.create_keypair_status);
-      }
-      else {
-        console.log('CreateKeypair not called!')
+      } else {
+        this.ShowUpdateKeysas = false;
       }
     },
     async onSubmitSign() {
