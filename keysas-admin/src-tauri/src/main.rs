@@ -34,12 +34,12 @@ use async_std::task;
 use nom::bytes::complete::take_until;
 use nom::IResult;
 use openssl::pkey::Id;
+use openssl::x509::X509Req;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 use tauri_plugin_store::PluginBuilder;
-use regex::Regex;
 use std::io::BufReader;
 
 mod errors;
@@ -100,7 +100,6 @@ async fn init_tauri() -> Result<()> {
             shutdown,
             export_sshpubkey,
             is_alive,
-            generate_keypair,
             sign_key,
             revoke_key,
             validate_privatekey,
@@ -117,10 +116,9 @@ async fn init_tauri() -> Result<()> {
 ///  4. Generate a certificate for the public key
 ///  5. Export the created certificate on the station
 ///  6. Finally it loads the admin USB signing certificate on the station
-/// Rule for password
-///  - At least 8 chars
 #[command]
-async fn init_keysas(ip: String, name: String, pki_pwd: String,
+async fn init_keysas(ip: String, org: String, name: String, country: String,
+                        ca_pwd: String, st_ca_file: String, usb_ca_file: String,
                         private_key: String) -> bool {
     // Connect to the host
     let host = format!("{}{}", ip.trim(), ":22");
@@ -132,28 +130,119 @@ async fn init_keysas(ip: String, name: String, pki_pwd: String,
         }
     };
 
-    let password = "Changeme007";
-
-    let command = format!("{}{}{}","sudo /usr/bin/keysas-sign --generate --password=", password, " && sudo /usr/bin/chmod 600 /etc/keysas/keysas.priv && sudo /usr/bin/chattr +i /etc/keysas/keysas.priv");
-    let pubkey = match session_exec(&mut session, &command) {
+    //  1. Generate a key pair for file signature on the station
+    //  2. Set correct file attributes for the private key file
+    //  3. Recover the certification for the key
+    let command = format!("{}{}{}{}{}{}{}{}{}",
+                                "sudo /usr/bin/keysas-sign --generate",
+                                " --orgname ", org,
+                                " --orgunit ", name,
+                                " --country ", country,
+                                " && sudo /usr/bin/chmod 600 /etc/keysas/file-sign-priv.pem",
+                                " && sudo /usr/bin/chattr +i /etc/keysas/file-sign-priv.pem");
+    let cert_req = match session_exec(&mut session, &command) {
         Ok(res) => {
-            println!("New signing keypair successfully generated.");
-            match String::from_utf8(res) {
-                Ok(key) => key,
+            match X509Req::from_pem(&res) {
+                Ok(req) => req,
                 Err(e) => {
                     println!("failed to convert command output: {:?}", e);
+                    session.close();
                     return false;
                 }
             }
         },
         Err(why) => {
             println!("Error on send_command: {:?}", why);
+            session.close();
             return false;
         }
     };
-    // 4. Generate a certificate from the public key
-    //  5. Export the created certificate on the station
-    //  6. Finally it loads the admin USB signing certificate
+    // 4. Generate a certificate from the request
+    // Load PKI admin key
+    let (root_key, _root_cert) = match load_pkcs12(&st_ca_file, &ca_pwd) {
+        Ok(k) => k,
+        Err(e) => {
+            println!("Failed to load PKI private key: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    // Generate certificate
+    let cert = match generate_cert_from_request(&cert_req, &root_key) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Failed to generate certificate from request: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    // 5. Export the created certificate on the station
+    let output = match cert.to_pem() {
+        Ok(o) => {
+            match String::from_utf8(o) {
+                Ok(out) => out,
+                Err(e) => {
+                    println!("Failed to convert certificate to string: {e}");
+                    session.close();
+                    return false;
+                }
+            }
+        },
+        Err(e) => {
+            println!("Failed to convert certificate to PEM: {e}");
+            session.close();
+            return false;
+        }
+    };
+    
+    let command = format!("{}{}",
+            "sudo /usr/bin/keysas-sign --load --certtype file --cert ",
+            output);
+    if let Err(e) = session_exec(&mut session, &command) {
+        println!("Failed to load certificate on the station: {e}");
+        session.close();
+        return false;
+    }
+
+    // 6. Finally it loads the admin USB signing certificate
+    // Load USB CA cert
+    let (_usb_key, usb_cert) = match load_pkcs12(&usb_ca_file, &ca_pwd) {
+        Ok(k) => k,
+        Err(e) => {
+            println!("Failed to load USB CA certificate: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    let output = match usb_cert.to_pem() {
+        Ok(o) => {
+            match String::from_utf8(o) {
+                Ok(out) => out,
+                Err(e) => {
+                    println!("Failed to convert USB certificate to string: {e}");
+                    session.close();
+                    return false;
+                }
+            }
+        },
+        Err(e) => {
+            println!("Failed to convert USB certificate to PEM: {e}");
+            session.close();
+            return false;
+        }
+    };
+    
+    let command = format!("{}{}",
+            "sudo /usr/bin/keysas-sign --load --certtype usb --cert ",
+            output);
+    if let Err(e) = session_exec(&mut session, &command) {
+        println!("Failed to load USB certificate on the station: {e}");
+        session.close();
+        return false;
+    }
 
     session.close();
 
@@ -303,69 +392,6 @@ async fn is_alive(ip: String, private_key: String) -> bool {
         }
     }
     session.close();
-    true
-}
-
-/// This function initialize the keys in the station by
-///  0. Test if new password is robust
-///  1. Generate a key pair for file signature on the station
-///  2. Set correct file attributes for the private key file
-///  3. Recover the public part of the key
-///  4. Generate a certificate for the public key
-///  5. Export the created certificate on the station
-///  6. Finally it loads the admin USB signing certificate
-/// Rule for password
-///  - At least 12 chars
-#[command]
-async fn generate_keypair(ip: String, private_key: String, password: String) -> bool {
-    // 0. Test if new password is robust
-    let reg = match Regex::new(r"^.{12,}$") {
-        Ok(r) => r,
-        Err(e) => {
-            println!("Failed to generate regex: {e}");
-            return false;
-        }
-    };
-    if !reg.is_match(&password) {
-        println!("Password must be at least 12 chars");
-        return false;
-    }
-    let password = sha256_digest(&password.trim()).unwrap();
-
-    // Connect to the host
-    let host = format!("{}{}", ip.trim(), ":22");
-    let mut session = match connect_key(&ip, &private_key) {
-        Ok(s) => s,
-        Err(e) => {
-            println!("Failed to open ssh connection with station: {e}");
-            return false;
-        }
-    };
-
-    // 1. Generate a keypair for file signature
-    // 2. set correct attributes for private key file
-    // 3. Get the public part of the key
-    let command = format!("{}{}{}","sudo /usr/bin/keysas-sign --generate --password=", password, " && sudo /usr/bin/chmod 600 /etc/keysas/keysas.priv && sudo /usr/bin/chattr +i /etc/keysas/keysas.priv");
-    let pubkey = match session_exec(&mut session, &command) {
-        Ok(res) => {
-            println!("New signing keypair successfully generated.");
-            match String::from_utf8(res) {
-                Ok(key) => key,
-                Err(e) => {
-                    println!("failed to convert command output: {:?}", e);
-                    return false;
-                }
-            }
-        },
-        Err(why) => {
-            println!("Error on open_exec: {:?}", why);
-            return false;
-        }
-    };
-    // 4. Generate a certificate from the public key
-    //  5. Export the created certificate on the station
-    //  6. Finally it loads the admin USB signing certificate
-            
     true
 }
 

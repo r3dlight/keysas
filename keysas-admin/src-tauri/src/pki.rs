@@ -216,12 +216,14 @@ pub fn generate_cert_request<T: HasPublic + HasPrivate>(key: &PKeyRef<T>,
 }
 
 /// Generate a certificate from a request
-pub fn generate_cert_from_request<T: HasPrivate, U: HasPublic>(req: &X509ReqRef,
-                                                pub_key: &PKeyRef<U>,
+pub fn generate_cert_from_request<T: HasPrivate>(req: &X509ReqRef,
                                                 root_key: &PKeyRef<T>)
                                             -> Result<X509, ErrorStack>{
+    // Get the public key
+    let pub_key = req.public_key()?;
+    
     // Verify the request
-    if !req.verify(pub_key)? {
+    if !req.verify(&pub_key)? {
         println!("Wrong request signature");
         return Err(ErrorStack::get());
     }
@@ -231,7 +233,7 @@ pub fn generate_cert_from_request<T: HasPrivate, U: HasPublic>(req: &X509ReqRef,
 
     builder.set_version(2)?;
 
-    builder.set_pubkey(pub_key)?;
+    builder.set_pubkey(&pub_key)?;
 
     builder.sign(root_key, MessageDigest::null())?;
 
@@ -276,11 +278,7 @@ pub fn generate_signed_keypair<T: HasPrivate>(root_key: &PKeyRef<T>,
     let req = generate_cert_request(key.as_ref(), infos)?;
 
     // Generate certificate
-    let pub_raw = key.raw_public_key()?;
-
-    let pub_key = PKey::public_key_from_raw_bytes(&pub_raw, key.id())?;
-
-    let cert = generate_cert_from_request(&req, pub_key.as_ref(), root_key)?;
+    let cert = generate_cert_from_request(&req, root_key)?;
 
     Ok((key, cert))
 }
