@@ -65,7 +65,7 @@ struct FileMetadata {
     av_pass: bool,
     av_report: Vec<String>,
     yara_pass: bool,
-    yara_report: String,
+    yara_report: String, // this should be a vec
     timestamp: String,
     is_corrupted: bool,
     file_type: String,
@@ -103,16 +103,35 @@ struct FileData {
     fd: i32,
     md: FileMetadata,
 }
-
-#[derive(Serialize, Deserialize)]
-struct Report {
-    //station_id: String,
+#[derive(Serialize, Deserialize, Clone)]
+struct MetaData {
+    station_id: String,
     name: String,
     date: String,
     file_type: String,
     is_valid: bool,
-    md: FileMetadata,
-    md_digest: String,
+    report: FileReport,
+}
+#[derive(Serialize, Deserialize, Clone)]
+struct Bd {
+    //station_certificate: String,
+    file_digest: String,
+    metadata_digest: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ReportNew {
+    metadata: MetaData,
+    binding: Bd,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct FileReport {
+    yara: String,
+    av: Vec<String>,
+    type_allowed: bool,
+    size: u64,
+    corrupted: bool,
 }
 
 /// Daemon configuration arguments
@@ -299,21 +318,38 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             OffsetDateTime::now_utc().nanosecond()
         );
 
-        let struct_report = Report {
+        let new_file_report = FileReport {
+            yara: f.md.yara_report.clone(),
+            av: f.md.av_report.clone(),
+            type_allowed: f.md.is_type_allowed,
+            size: f.md.size,
+            corrupted: f.md.is_corrupted,
+        };
+
+        let new_metadata = MetaData {
+            station_id: "TODO".into(),
             name: f.md.filename.clone(),
             date: timestamp,
             file_type: f.md.file_type.clone(),
-            // Do have to manage yara_clean or not here?
             is_valid: f.md.av_pass
                 && f.md.yara_pass
                 && !f.md.is_toobig
                 && !f.md.is_corrupted
                 && f.md.is_digest_ok
                 && f.md.is_type_allowed,
-            md: f.md.clone(),
-            md_digest: f.md.compute_sha256(),
+            report: new_file_report,
         };
-        let json_report = match serde_json::to_string_pretty(&struct_report) {
+
+        let new_bd = Bd {
+            file_digest: f.md.digest.clone(),
+            metadata_digest: f.md.compute_sha256(),
+        };
+        let new_report = ReportNew {
+            metadata: new_metadata,
+            binding: new_bd,
+        };
+
+        let json_report = match serde_json::to_string_pretty(&new_report) {
             Ok(j) => j,
             Err(e) => {
                 error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
