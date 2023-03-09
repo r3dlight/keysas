@@ -91,10 +91,9 @@ struct MetaData {
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Bd {
-    //station_certificate: String,
     file_digest: String,
     metadata_digest: String,
-    station_certificate: Vec<u8>,
+    station_certificate: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -372,7 +371,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         let new_bd = Bd {
             file_digest: f.md.digest.clone(),
             metadata_digest: meta_digest,
-            station_certificate: cert_file,
+            station_certificate: String::from_utf8(cert_file)?,
         };
         let new_report = Report {
             metadata: new_metadata,
