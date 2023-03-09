@@ -37,6 +37,8 @@ use landlock::{
 };
 use log::{error, info, warn};
 use nix::unistd;
+use openssl::nid::Nid;
+use openssl::x509::X509;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
@@ -46,6 +48,7 @@ use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, UnixStream};
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str;
@@ -91,6 +94,7 @@ struct Bd {
     //station_certificate: String,
     file_digest: String,
     metadata_digest: String,
+    station_certificate: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -114,6 +118,7 @@ struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
     yara_clean: bool,
+    pem_cert: String,
 }
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -179,6 +184,14 @@ fn parse_args() -> Configuration {
                 .help("Remove the file if a Yara rule matched"),
         )
         .arg(
+            Arg::new("pem_cert")
+                .short('p')
+                .long("pem_cert")
+                .default_value("/etc/keysas/file-sign.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to PEM certificat"),
+        )
+        .arg(
             Arg::new("version")
                 .short('v')
                 .long("version")
@@ -192,6 +205,7 @@ fn parse_args() -> Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
         yara_clean: matches.get_flag("yara_clean"),
+        pem_cert: matches.get_one::<String>("pem_cert").unwrap().to_string(),
     }
 }
 
@@ -229,9 +243,22 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .collect()
 }
 
+fn get_x509_subject(cert_file: Vec<u8>) -> Result<String> {
+    let cert = X509::from_pem(&cert_file)?;
+    match cert.subject_name().entries_by_nid(Nid::COMMONNAME).next() {
+        Some(subject) => {
+            return Ok(subject.data().as_utf8()?.to_string());
+        }
+        None => {
+            error!("Cannot convert subject.data as UTF8");
+            return Ok("".to_string());
+        }
+    }
+}
+
 /// This function output files and report received from transit
 /// The function first check the digest of the file received
-fn output_files(files: Vec<FileData>, conf: &Configuration) {
+fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
         // Position the cursor at the beginning of the file
@@ -302,8 +329,30 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             toobig: f.md.is_toobig,
         };
 
+        let mut subject_utf8 = String::new();
+        let cert_file = Vec::new();
+        // Get data from pem cert located in /etc/keysas
+        if Path::new(&conf.pem_cert).exists() && Path::new(&conf.pem_cert).is_file() {
+            let cert_file = match std::fs::read(&conf.pem_cert) {
+                Ok(cert_file) => cert_file,
+                Err(e) => {
+                    error!("Cannot read certificate: {e}");
+                    continue;
+                }
+            };
+
+            subject_utf8 = match get_x509_subject(cert_file) {
+                Ok(subject) => subject,
+                Err(e) => {
+                    error!("{e}");
+                    //If no subject return an empty string
+                    "".to_string()
+                }
+            };
+        }
+
         let new_metadata = MetaData {
-            station_id: "TODO".into(),
+            station_id: subject_utf8.to_string(),
             name: f.md.filename.clone(),
             date: timestamp,
             file_type: f.md.file_type.clone(),
@@ -323,6 +372,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         let new_bd = Bd {
             file_digest: f.md.digest.clone(),
             metadata_digest: meta_digest,
+            station_certificate: cert_file,
         };
         let new_report = Report {
             metadata: new_metadata,
@@ -390,6 +440,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         }
         drop(file);
     }
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -442,6 +493,6 @@ fn main() -> Result<()> {
         let files = parse_messages(ancillary_in.messages(), &buf_in);
 
         // Output file
-        output_files(files, &config);
+        output_files(files, &config)?;
     }
 }
