@@ -24,6 +24,7 @@ itertools ="0.10"
 serde_json = "1.0"
 syscallz = "0.16"
 time = "0.3"
+openssl = "0.10"
 
 [[bin]]
 name = "keysas-in"
