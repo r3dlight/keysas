@@ -363,7 +363,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 && f.md.is_type_allowed,
             report: new_file_report,
         };
-        let json_string = serde_json::to_string(&new_metadata).unwrap();
+        let json_string = serde_json::to_string_pretty(&new_metadata)?;
         let mut hasher = Sha256::new();
         hasher.update(json_string.as_bytes());
         let result = hasher.finalize();
