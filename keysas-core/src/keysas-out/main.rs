@@ -330,7 +330,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         };
 
         let mut subject_utf8 = String::new();
-        let cert_file = Vec::new();
+        let mut cert_file = Vec::new();
         // Get data from pem cert located in /etc/keysas
         if Path::new(&conf.pem_cert).exists() && Path::new(&conf.pem_cert).is_file() {
             cert_file = match std::fs::read(&conf.pem_cert) {
@@ -341,7 +341,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 }
             };
 
-            subject_utf8 = match get_x509_subject(cert_file) {
+            subject_utf8 = match get_x509_subject(cert_file.clone()) {
                 Ok(subject) => subject,
                 Err(e) => {
                     error!("{e}");
