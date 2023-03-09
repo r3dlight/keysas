@@ -333,7 +333,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         let cert_file = Vec::new();
         // Get data from pem cert located in /etc/keysas
         if Path::new(&conf.pem_cert).exists() && Path::new(&conf.pem_cert).is_file() {
-            let cert_file = match std::fs::read(&conf.pem_cert) {
+            cert_file = match std::fs::read(&conf.pem_cert) {
                 Ok(cert_file) => cert_file,
                 Err(e) => {
                     error!("Cannot read certificate: {e}");
