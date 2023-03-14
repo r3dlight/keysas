@@ -427,7 +427,10 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         }
 
         let mut signature = String::new();
-        if Path::new(&conf.signing_key).is_file() {
+        if Path::new(&conf.signing_key).is_file()
+            && new_metadata.is_valid
+            && Path::new(&conf.signing_cert).is_file()
+        {
             let opt_signature = match pq_sign(&file, &conf.signing_key) {
                 Ok(signature) => signature,
                 Err(e) => {
