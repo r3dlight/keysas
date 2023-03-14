@@ -25,8 +25,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#[warn(unused_imports)]
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
@@ -39,10 +38,13 @@ use log::{error, info, warn};
 use nix::unistd;
 use openssl::nid::Nid;
 use openssl::x509::X509;
+use oqs::sig::Signature;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
 use std::io;
+#[warn(unused_imports)]
+use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
@@ -94,6 +96,7 @@ struct Bd {
     file_digest: String,
     metadata_digest: String,
     station_certificate: String,
+    file_signature: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -117,7 +120,8 @@ struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
     yara_clean: bool,
-    pem_cert: String,
+    signing_cert: String,
+    signing_key: String,
 }
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -183,12 +187,20 @@ fn parse_args() -> Configuration {
                 .help("Remove the file if a Yara rule matched"),
         )
         .arg(
-            Arg::new("pem_cert")
+            Arg::new("signing_cert")
                 .short('p')
-                .long("pem_cert")
+                .long("signing_cert")
                 .default_value("/etc/keysas/file-sign.pem")
                 .action(clap::ArgAction::Set)
-                .help("Path to PEM certificat"),
+                .help("Path to signing PEM certificat (must be imported and signed)"),
+        )
+        .arg(
+            Arg::new("signing_key")
+                .short('s')
+                .long("signing_key")
+                .default_value("/etc/keysas/file-sign.key")
+                .action(clap::ArgAction::Set)
+                .help("Path to secret signing key"),
         )
         .arg(
             Arg::new("version")
@@ -204,7 +216,14 @@ fn parse_args() -> Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
         yara_clean: matches.get_flag("yara_clean"),
-        pem_cert: matches.get_one::<String>("pem_cert").unwrap().to_string(),
+        signing_cert: matches
+            .get_one::<String>("signing_cert")
+            .unwrap()
+            .to_string(),
+        signing_key: matches
+            .get_one::<String>("signing_cert")
+            .unwrap()
+            .to_string(),
     }
 }
 
@@ -252,6 +271,35 @@ fn get_x509_subject(cert_file: Vec<u8>) -> Result<String> {
             error!("Cannot convert subject.data as UTF8");
             return Ok("".to_string());
         }
+    }
+}
+
+fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
+    // Important: initialize liboqs
+    oqs::init();
+    let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::SphincsSha256256fRobust)
+        .with_context(|| "Unable to create new signature scheme")?;
+
+    if Path::new(secret_pq_key).exists()
+        && Path::new(secret_pq_key).is_file()
+    {
+        let sig_sk_bytes =
+            std::fs::read(secret_pq_key).with_context(|| "Unable to read secret file")?;
+        //TODO: fix this unwrap()    
+        let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes).unwrap();
+        let sig_sk = tmp_sig_sk.to_owned();
+        // Read the file
+        let mut contents = Vec::new();
+        let mut file_clone = file.try_clone()?;
+        file_clone.read_to_end(&mut contents)?;
+        //let contents = std::fs::read(f).with_context(|| "Unable to read file to sign")?;
+        // get the signature
+        let signature = scheme
+            .sign(&contents, &sig_sk)
+            .with_context(|| "Unable to create signature")?;
+        Ok(Some(signature))
+    } else {
+        Ok(None)
     }
 }
 
@@ -331,8 +379,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         let mut subject_utf8 = String::new();
         let mut cert_file = Vec::new();
         // Get data from pem cert located in /etc/keysas
-        if Path::new(&conf.pem_cert).exists() && Path::new(&conf.pem_cert).is_file() {
-            cert_file = match std::fs::read(&conf.pem_cert) {
+        if Path::new(&conf.signing_cert).exists() && Path::new(&conf.signing_cert).is_file() {
+            cert_file = match std::fs::read(&conf.signing_cert) {
                 Ok(cert_file) => cert_file,
                 Err(e) => {
                     error!("Cannot read certificate: {e}");
@@ -368,10 +416,32 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         hasher.update(json_string.as_bytes());
         let result = hasher.finalize();
         let meta_digest = format!("{result:x}");
+        match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                process::exit(1);
+            }
+        }
+        //if Path::new(&file).is_file(){}
+        let opt_signature = match pq_sign(&file, &conf.signing_key) {
+            Ok(signature)=> signature,
+            Err(e) => {
+                error!("Secret signing key is present but unable to sign on file descriptor: {e:?}, killing myself.");
+                process::exit(1);
+
+            }
+        };
+        let signature = match opt_signature {
+            Some(signature)=> std::str::from_utf8(signature.as_ref())?.to_string(),
+            None => "".to_string(),
+        };
+
         let new_bd = Bd {
             file_digest: f.md.digest.clone(),
             metadata_digest: meta_digest,
             station_certificate: String::from_utf8(cert_file)?,
+            file_signature: signature,
         };
         let new_report = Report {
             metadata: new_metadata,
