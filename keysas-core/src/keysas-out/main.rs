@@ -25,6 +25,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
+#[warn(unused_imports)]
 use anyhow::{Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::append_ext;
@@ -43,7 +44,6 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
 use std::io;
-#[warn(unused_imports)]
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::{BufWriter, IoSliceMut, Write};
@@ -221,7 +221,7 @@ fn parse_args() -> Configuration {
             .unwrap()
             .to_string(),
         signing_key: matches
-            .get_one::<String>("signing_cert")
+            .get_one::<String>("signing_key")
             .unwrap()
             .to_string(),
     }
@@ -297,6 +297,7 @@ fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
             .with_context(|| "Unable to create signature")?;
         Ok(Some(signature))
     } else {
+        log::warn!("No signature was created.");
         Ok(None)
     }
 }
@@ -433,7 +434,10 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
             };
             signature = match opt_signature {
                 Some(signature) => std::str::from_utf8(signature.as_ref())?.to_string(),
-                None => String::new(),
+                None => {
+                    log::error!("Cannot get signature from utf8.");
+                    String::new()
+                }
             };
         }
 
