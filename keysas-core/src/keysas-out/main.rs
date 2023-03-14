@@ -27,6 +27,7 @@
 #![warn(deprecated)]
 #[warn(unused_imports)]
 use anyhow::{Context, Result};
+use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
@@ -289,7 +290,9 @@ fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
         // Read the file
         let mut contents = Vec::new();
         let mut file_clone = file.try_clone()?;
-        file_clone.read_to_end(&mut contents)?;
+        file_clone
+            .read_to_end(&mut contents)
+            .with_context(|| "Unable to read file to sign")?;
         //let contents = std::fs::read(f).with_context(|| "Unable to read file to sign")?;
         // get the signature
         let signature = scheme
@@ -433,9 +436,9 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 }
             };
             signature = match opt_signature {
-                Some(signature) => std::str::from_utf8(signature.as_ref())?.to_string(),
+                Some(signature) => general_purpose::STANDARD.encode(signature.as_ref()),
                 None => {
-                    log::error!("Cannot get signature from utf8.");
+                    log::error!("Cannot get base64 encoded signature from bytes.");
                     String::new()
                 }
             };
