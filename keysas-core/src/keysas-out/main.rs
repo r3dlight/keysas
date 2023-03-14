@@ -280,12 +280,10 @@ fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
     let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::SphincsSha256256fRobust)
         .with_context(|| "Unable to create new signature scheme")?;
 
-    if Path::new(secret_pq_key).exists()
-        && Path::new(secret_pq_key).is_file()
-    {
+    if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
         let sig_sk_bytes =
             std::fs::read(secret_pq_key).with_context(|| "Unable to read secret file")?;
-        //TODO: fix this unwrap()    
+        //TODO: fix this unwrap()
         let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes).unwrap();
         let sig_sk = tmp_sig_sk.to_owned();
         // Read the file
@@ -423,19 +421,21 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 process::exit(1);
             }
         }
-        //if Path::new(&file).is_file(){}
-        let opt_signature = match pq_sign(&file, &conf.signing_key) {
-            Ok(signature)=> signature,
-            Err(e) => {
-                error!("Secret signing key is present but unable to sign on file descriptor: {e:?}, killing myself.");
-                process::exit(1);
 
-            }
-        };
-        let signature = match opt_signature {
-            Some(signature)=> std::str::from_utf8(signature.as_ref())?.to_string(),
-            None => "".to_string(),
-        };
+        let mut signature = String::new();
+        if Path::new(&conf.signing_key).is_file() {
+            let opt_signature = match pq_sign(&file, &conf.signing_key) {
+                Ok(signature) => signature,
+                Err(e) => {
+                    error!("Secret signing key is present but unable to sign on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            };
+            signature = match opt_signature {
+                Some(signature) => std::str::from_utf8(signature.as_ref())?.to_string(),
+                None => String::new(),
+            };
+        }
 
         let new_bd = Bd {
             file_digest: f.md.digest.clone(),
