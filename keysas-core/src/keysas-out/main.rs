@@ -419,8 +419,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         }
 
         let new_bd = Bd {
-            file_digest: f.md.digest.clone(),
-            metadata_digest: meta_digest,
+            file_digest: general_purpose::STANDARD.encode(f.md.digest.clone()),
+            metadata_digest: general_purpose::STANDARD.encode(meta_digest),
             station_certificate: String::from_utf8(cert_file)?,
             file_signature: signature,
         };
