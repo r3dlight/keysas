@@ -38,14 +38,11 @@ use landlock::{
 };
 use log::{error, info, warn};
 use nix::unistd;
-use openssl::nid::Nid;
-use openssl::x509::X509;
 use oqs::sig::Signature;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
 use std::io;
-use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
@@ -84,7 +81,6 @@ struct FileData {
 }
 #[derive(Serialize, Deserialize, Clone)]
 struct MetaData {
-    station_id: String,
     name: String,
     date: String,
     file_type: String,
@@ -262,20 +258,11 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .collect()
 }
 
-fn get_x509_subject(cert_file: Vec<u8>) -> Result<String> {
-    let cert = X509::from_pem(&cert_file)?;
-    match cert.subject_name().entries_by_nid(Nid::COMMONNAME).next() {
-        Some(subject) => {
-            return Ok(subject.data().as_utf8()?.to_string());
-        }
-        None => {
-            error!("Cannot convert subject.data as UTF8");
-            return Ok("".to_string());
-        }
-    }
-}
-
-fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
+fn pq_sign(
+    file_digest: &String,
+    meta_digest: &String,
+    secret_pq_key: &str,
+) -> Result<Option<Signature>> {
     // Important: initialize liboqs
     oqs::init();
     let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::SphincsSha256256fRobust)
@@ -287,16 +274,11 @@ fn pq_sign(file: &File, secret_pq_key: &str) -> Result<Option<Signature>> {
         //TODO: fix this unwrap()
         let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes).unwrap();
         let sig_sk = tmp_sig_sk.to_owned();
-        // Read the file
-        let mut contents = Vec::new();
-        let mut file_clone = file.try_clone()?;
-        file_clone
-            .read_to_end(&mut contents)
-            .with_context(|| "Unable to read file to sign")?;
-        //let contents = std::fs::read(f).with_context(|| "Unable to read file to sign")?;
+        // Concat both digest
+        let concat = format!("{}-{}", file_digest, meta_digest);
         // get the signature
         let signature = scheme
-            .sign(&contents, &sig_sk)
+            .sign(&concat.as_bytes(), &sig_sk)
             .with_context(|| "Unable to create signature")?;
         Ok(Some(signature))
     } else {
@@ -378,7 +360,6 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
             toobig: f.md.is_toobig,
         };
 
-        let mut subject_utf8 = String::new();
         let mut cert_file = Vec::new();
         // Get data from pem cert located in /etc/keysas
         if Path::new(&conf.signing_cert).exists() && Path::new(&conf.signing_cert).is_file() {
@@ -389,19 +370,9 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                     continue;
                 }
             };
-
-            subject_utf8 = match get_x509_subject(cert_file.clone()) {
-                Ok(subject) => subject,
-                Err(e) => {
-                    error!("{e}");
-                    //If no subject return an empty string
-                    "".to_string()
-                }
-            };
         }
 
         let new_metadata = MetaData {
-            station_id: subject_utf8.to_string(),
             name: f.md.filename.clone(),
             date: timestamp,
             file_type: f.md.file_type.clone(),
@@ -431,7 +402,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
             && new_metadata.is_valid
             && Path::new(&conf.signing_cert).is_file()
         {
-            let opt_signature = match pq_sign(&file, &conf.signing_key) {
+            let opt_signature = match pq_sign(&f.md.digest, &meta_digest, &conf.signing_key) {
                 Ok(signature) => signature,
                 Err(e) => {
                     error!("Secret signing key is present but unable to sign on file descriptor: {e:?}, killing myself.");
