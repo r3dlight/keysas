@@ -29,6 +29,8 @@
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::Signature as ECSignature;
+use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signer};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
@@ -39,8 +41,10 @@ use landlock::{
 use log::{error, info, warn};
 use nix::unistd;
 use oqs::sig::Signature;
+use rand::rngs::OsRng;
 use sha2::Digest;
 use sha2::Sha256;
+use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -117,6 +121,8 @@ struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
     yara_clean: bool,
+    signing_pq_cert: String,
+    signing_pq_key: String,
     signing_cert: String,
     signing_key: String,
 }
@@ -184,8 +190,24 @@ fn parse_args() -> Configuration {
                 .help("Remove the file if a Yara rule matched"),
         )
         .arg(
-            Arg::new("signing_cert")
+            Arg::new("signing_pq_cert")
                 .short('p')
+                .long("signing_pq_cert")
+                .default_value("/etc/keysas/file-pq-sign.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to post-quantum signing PEM certificat (must be imported and signed)"),
+        )
+        .arg(
+            Arg::new("signing_pq_key")
+                .short('s')
+                .long("signing_pq_key")
+                .default_value("/etc/keysas/file-pq-sign.key")
+                .action(clap::ArgAction::Set)
+                .help("Path to secret post-quantum signing key"),
+        )
+        .arg(
+            Arg::new("signing_cert")
+                .short('z')
                 .long("signing_cert")
                 .default_value("/etc/keysas/file-sign.pem")
                 .action(clap::ArgAction::Set)
@@ -193,7 +215,7 @@ fn parse_args() -> Configuration {
         )
         .arg(
             Arg::new("signing_key")
-                .short('s')
+                .short('w')
                 .long("signing_key")
                 .default_value("/etc/keysas/file-sign.key")
                 .action(clap::ArgAction::Set)
@@ -213,6 +235,14 @@ fn parse_args() -> Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
         yara_clean: matches.get_flag("yara_clean"),
+        signing_pq_cert: matches
+            .get_one::<String>("signing_pq_cert")
+            .unwrap()
+            .to_string(),
+        signing_pq_key: matches
+            .get_one::<String>("signing_pq_key")
+            .unwrap()
+            .to_string(),
         signing_cert: matches
             .get_one::<String>("signing_cert")
             .unwrap()
@@ -258,31 +288,61 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .collect()
 }
 
+fn ec_sign(
+    file_digest: &String,
+    meta_digest: &String,
+    secret_key: &str,
+) -> Result<Option<ECSignature>> {
+    // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
+    if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
+        let secret_key_bytes = fs::read(secret_key)?;
+        let secret_key = SecretKey::from_bytes(&secret_key_bytes)?;
+        // Get the pub key back
+        let public_key: PublicKey = (&secret_key).into();
+        // Get some random numbers
+        let mut _csprng = OsRng {};
+        // Rebuild the keypair struct
+        let keypair = Keypair {
+            public: public_key,
+            secret: secret_key,
+        };
+        // Prepare the String to sign ans sign it
+        let concat = format!("{}-{}", file_digest, meta_digest);
+        let signature = keypair.sign(concat.as_bytes());
+        Ok(Some(signature))
+    } else {
+        log::warn!("No EC signature was created.");
+        Ok(None)
+    }
+}
+
 fn pq_sign(
     file_digest: &String,
     meta_digest: &String,
+    ec_signature: String,
     secret_pq_key: &str,
 ) -> Result<Option<Signature>> {
     // Important: initialize liboqs
     oqs::init();
-    let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::SphincsSha256256fRobust)
-        .with_context(|| "Unable to create new signature scheme")?;
+    // Choosing Dilithium Level 5
+    let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5)
+        .context("Unable to create new signature scheme")?;
 
+    // Check that secret key is on disk
     if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
-        let sig_sk_bytes =
-            std::fs::read(secret_pq_key).with_context(|| "Unable to read secret file")?;
-        //TODO: fix this unwrap()
-        let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes).unwrap();
+        let sig_sk_bytes = std::fs::read(secret_pq_key).context("Unable to read secret file")?;
+        let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes)
+            .context("Cannot get secret pq key from bytes")?;
         let sig_sk = tmp_sig_sk.to_owned();
-        // Concat both digest
-        let concat = format!("{}-{}", file_digest, meta_digest);
-        // get the signature
+        // Concat both digest and previously created EC signature
+        let concat = format!("{}-{}-{}", file_digest, meta_digest, ec_signature);
+        // Get the final signature
         let signature = scheme
-            .sign(&concat.as_bytes(), &sig_sk)
-            .with_context(|| "Unable to create signature")?;
+            .sign(concat.as_bytes(), &sig_sk)
+            .context("Unable to create signature")?;
         Ok(Some(signature))
     } else {
-        log::warn!("No signature was created.");
+        log::warn!("No PQ signature was created.");
         Ok(None)
     }
 }
@@ -362,8 +422,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
 
         let mut cert_file = Vec::new();
         // Get data from pem cert located in /etc/keysas
-        if Path::new(&conf.signing_cert).exists() && Path::new(&conf.signing_cert).is_file() {
-            cert_file = match std::fs::read(&conf.signing_cert) {
+        if Path::new(&conf.signing_pq_cert).exists() && Path::new(&conf.signing_pq_cert).is_file() {
+            cert_file = match std::fs::read(&conf.signing_pq_cert) {
                 Ok(cert_file) => cert_file,
                 Err(e) => {
                     error!("Cannot read certificate: {e}");
@@ -396,20 +456,42 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 process::exit(1);
             }
         }
-
+        //Check that file is safe and that private keys exist and that pem certs have been generated
         let mut signature = String::new();
-        if Path::new(&conf.signing_key).is_file()
+        if Path::new(&conf.signing_pq_key).is_file()
             && new_metadata.is_valid
+            && Path::new(&conf.signing_pq_cert).is_file()
+            && Path::new(&conf.signing_key).is_file()
             && Path::new(&conf.signing_cert).is_file()
         {
-            let opt_signature = match pq_sign(&f.md.digest, &meta_digest, &conf.signing_key) {
+            let opt_ec_signature = match ec_sign(&f.md.digest, &meta_digest, &conf.signing_key) {
                 Ok(signature) => signature,
                 Err(e) => {
-                    error!("Secret signing key is present but unable to sign on file descriptor: {e:?}, killing myself.");
+                    error!("Secret signing key is present but unable to sign (EC) on file descriptor: {e:?}, killing myself.");
                     process::exit(1);
                 }
             };
-            signature = match opt_signature {
+            let ec_signature = match opt_ec_signature {
+                Some(signature) => String::from_utf8(signature.as_ref().to_vec())?,
+                None => {
+                    log::error!("Cannot get base64 encoded signature from bytes.");
+                    String::new()
+                }
+            };
+
+            let opt_pq_signature = match pq_sign(
+                &f.md.digest,
+                &meta_digest,
+                ec_signature,
+                &conf.signing_pq_key,
+            ) {
+                Ok(signature) => signature,
+                Err(e) => {
+                    error!("Secret signing key is present but unable to sign (PQ) on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            };
+            signature = match opt_pq_signature {
                 Some(signature) => general_purpose::STANDARD.encode(signature.as_ref()),
                 None => {
                     log::error!("Cannot get base64 encoded signature from bytes.");
