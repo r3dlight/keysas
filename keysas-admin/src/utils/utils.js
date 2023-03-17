@@ -1,15 +1,13 @@
+"use strict";
+
 import { invoke } from "@tauri-apps/api";
 import { open } from "@tauri-apps/api/dialog";
 
-
 export async function reboot(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Rebooting':", ip);
         let res = await invoke('reboot', {
-            ip: ip,
-            privateKey: priv_key,
+            ip: ip
         });
         console.log("Rebooting result:" + res);
         return res;
@@ -21,12 +19,9 @@ export async function reboot(ip) {
 
 export async function shutdown(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Poweroff:", ip);
         let res = await invoke('shutdown', {
-            ip: ip,
-            privateKey: priv_key,
+            ip: ip
         })
         console.log(res)
         return res;
@@ -38,12 +33,9 @@ export async function shutdown(ip) {
 
 export async function addsshpukey(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var public_key = JSON.parse(paths).pub;
         console.log("Adding SSH pubkey to host:", ip);
         let res = await invoke('export_sshpubkey', {
-            ip: ip,
-            publicKey: public_key,
+            ip: ip
         })
         console.log(res)
         return res;
@@ -55,12 +47,9 @@ export async function addsshpukey(ip) {
 
 export async function update(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to update Keysas:", ip);
         let res = await invoke('update', {
-            ip: ip,
-            privateKey: priv_key,
+            ip: ip
         })
         console.log(res)
         return res;
@@ -70,16 +59,25 @@ export async function update(ip) {
     }
 }
 
-export async function init(name, ip, pwd) {
+/**
+ * 
+ * @param {String} ip         IP address of the station
+ * @param {String} name       Name of the station
+ * @param {String} caPwd      Password to load the CA keys
+ * @param {String} stCaFile   Path to the Station CA key file
+ * @param {String} usbCaFile  Path to the USB CA key file
+ * @returns Result of the call to the back-end and the initilization of the station
+ */
+export async function init(ip, name, caPwd,
+                                stCaFile, usbCaFile) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to initialize Keysas:", ip);
         let res = await invoke('init_keysas', {
             ip: ip,
             name: name,
-            pkiPwd: pwd,
-            privateKey: priv_key,
+            caPwd: caPwd,
+            stCaFile: stCaFile,
+            usbCaFile: usbCaFile
         })
         console.log(res)
         return res;
@@ -91,12 +89,9 @@ export async function init(name, ip, pwd) {
 
 export async function is_alive(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to ping Keysas:", ip);
         let res = await invoke('is_alive', {
-            ip: ip,
-            privateKey: priv_key,
+            ip: ip
         })
         console.log(res)
         return res;
@@ -108,12 +103,9 @@ export async function is_alive(ip) {
 
 export async function generate_keypair(ip, password) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to generate a new keypair:", ip);
         let res = await invoke('generate_keypair', {
             ip: ip,
-            privateKey: priv_key,
             password: password,
         })
         console.log("generate_keypair: " + res)
@@ -126,12 +118,9 @@ export async function generate_keypair(ip, password) {
 
 export async function sign_USB(ip, password) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to sign a new USB device: ", ip);
         let res = await invoke('sign_key', {
             ip: ip,
-            privateKey: priv_key,
             password: password,
         })
         console.log("sign_USB: " + res)
@@ -144,29 +133,11 @@ export async function sign_USB(ip, password) {
 
 export async function revoke_USB(ip) {
     try {
-        var paths = localStorage.getItem('ssh');
-        var priv_key = JSON.parse(paths).priv;
         console.log("Trying to revoke the USB device: ", ip);
         let res = await invoke('revoke_key', {
-            ip: ip,
-            privateKey: priv_key,
+            ip: ip
         })
         console.log("revoke_USB: " + res)
-        return res;
-    } catch(e) {
-        console.log(e)
-        return Promise.reject(e);
-    }
-}
-
-export async function validateKeys(publicKey, privateKey) {
-    try {
-        console.log("Pubkey: " + publicKey + "Privkey: " + privateKey);
-        let res = await invoke('validate_privatekey', {
-            publicKey: publicKey,
-            privateKey: privateKey,
-        })
-        console.log("validate_privatekey: " + res)
         return res;
     } catch(e) {
         console.log(e)
@@ -182,29 +153,6 @@ export async function generateFromRootKey(rootKey) {
             rootKey: rootKey
         })
         console.log("validate_rootkey: " + res)
-        return res;
-    } catch(e) {
-        console.log(e)
-        return Promise.reject(e);
-    }
-}
-
-// Generate a new PKI from scratch
-export async function generatePKI(orgName, orgUnit, country, validity, sigAlgo,
-                                    adminPwd, pkiDir) {
-    try {
-        console.log("PKI Directory: " + pkiDir);
-        let res = await invoke('generate_pki_in_dir', {
-            orgName: orgName,
-            orgUnit: orgUnit,
-            country: country,
-            validity: validity,
-            sigAlgo: sigAlgo,
-            adminPwd: adminPwd,
-            pkiDir: pkiDir
-
-        })
-        console.log("generate_pki_in_dir: " + res)
         return res;
     } catch(e) {
         console.log(e)

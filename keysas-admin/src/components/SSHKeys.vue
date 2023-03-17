@@ -24,8 +24,10 @@
 </template>
 
 <script>
+"use strict";
 
-import { getPublicKeyPath, getPrivateKeyPath, validateKeys } from "../utils/utils";
+import { invoke } from "@tauri-apps/api";
+import { getPublicKeyPath, getPrivateKeyPath} from "../utils/utils";
 
 
 export default {
@@ -49,18 +51,15 @@ export default {
       this.privateKey = await getPrivateKeyPath();
     },
     async onSubmit() {
-      this.keysError = '';
       console.log('Form submitted');
-      this.keysError = await validateKeys(this.publicKey, this.privateKey) ?
-        '' : "Incorrect format or paths for keys !"
-      console.log("keysError:", this.keysError);
-      if (!this.keysError) {
-        console.log('setData called');
-        localStorage.setItem("ssh", JSON.stringify({ pub: this.publicKey, priv: this.privateKey}));
+      if (await invoke('save_sshkeys', {
+            public: this.publicKey,
+            private: this.privateKey,
+      })) {
         this.ShowTwoSec();
-      }
-      else {
-        console.log('setData Not called')
+        console.log("SSH keys saved");
+      } else {
+        console.log("Failed to save ssh keys");
       }
    },
     ShowTwoSec() {

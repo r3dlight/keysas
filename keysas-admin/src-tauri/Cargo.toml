@@ -27,6 +27,9 @@ sha2 ="*"
 regex="*"
 openssl = "*"
 openssl-sys = "*"
+sqlite = "*"
+simple_logger = "*"
+log = "*"
 
 [features]
 # by default Tauri runs in production mode

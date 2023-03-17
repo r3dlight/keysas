@@ -224,7 +224,7 @@ pub fn generate_cert_from_request<T: HasPrivate>(req: &X509ReqRef,
     
     // Verify the request
     if !req.verify(&pub_key)? {
-        println!("Wrong request signature");
+        log::error!("Wrong request signature");
         return Err(ErrorStack::get());
     }
 

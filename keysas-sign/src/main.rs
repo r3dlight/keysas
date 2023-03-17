@@ -30,16 +30,17 @@ const USB_CERT_PATH: &str = "/etc/keysas/usb-ca-cert.pem";
 
 /// Store command arguments
 struct Config {
-    generate:  bool,
-    load:      bool,
-    org_name:  String,
-    org_unit:  String,
-    country:   String,
-    cert_type: String,
-    cert:      String
+    generate:  bool,   // True for the generate command
+    load:      bool,   // True for the load command
+    name:  String, // Organisation name to put in the certificate request
+    cert_type: String, // Certificate type being loaded
+    cert:      String  // Certificate value
 }
 
 /// Parse command arguments
+/// The tool does only two function:
+///   - Generate a new file signing key
+///   - Load certificate for the USB CA or its own file signing certificate
 fn command_args() -> Config {
     // Start clap CLI definition
     let matches = Command::new("keysas-sign")
@@ -71,24 +72,10 @@ fn command_args() -> Config {
             .conflicts_with("generate")
     )
     .arg(
-        Arg::new("orgname")
-            .long("orgname")
-            .value_name("orgname")
-            .help("Organisation name for the station certificate")
-            .default_value("")
-    )
-    .arg(
-        Arg::new("orgunit")
-            .long("orgunit")
-            .value_name("orgunit")
-            .help("Organisation unit name for the station certificate")
-            .default_value("")
-    )
-    .arg(
-        Arg::new("country")
-            .long("country")
-            .value_name("country")
-            .help("Country name for the station certificate")
+        Arg::new("name")
+            .long("name")
+            .value_name("name")
+            .help("Name for the station certificate")
             .default_value("")
     )
     .arg(
@@ -110,9 +97,7 @@ fn command_args() -> Config {
     Config {
         generate:  matches.get_flag("generate"),
         load:      matches.get_flag("load"),
-        org_name:  matches.get_one::<String>("orgname").unwrap().to_string(),
-        org_unit:  matches.get_one::<String>("orgunit").unwrap().to_string(),
-        country:   matches.get_one::<String>("country").unwrap().to_string(),
+        name:  matches.get_one::<String>("orgname").unwrap().to_string(),
         cert_type: matches.get_one::<String>("certtype").unwrap().to_string(),
         cert:      matches.get_one::<String>("cert").unwrap().to_string()
     }
@@ -138,9 +123,7 @@ fn generate_signing_keypair(config: &Config) -> Result<Vec<u8>, Box<dyn Error>>{
 
     // Set subject name
     let mut name_builder = X509NameBuilder::new()?;
-    name_builder.append_entry_by_nid(Nid::ORGANIZATIONNAME, &config.org_name)?;
-    name_builder.append_entry_by_nid(Nid::ORGANIZATIONALUNITNAME, &config.org_unit)?;
-    name_builder.append_entry_by_nid(Nid::COUNTRYNAME, &config.country)?;
+    name_builder.append_entry_by_nid(Nid::COMMONNAME, &config.name)?;
     let name = name_builder.build();
     builder.set_subject_name(name.as_ref())?;
 
@@ -188,7 +171,7 @@ fn main() -> Result<()> {
             }
         };
 
-        println!("{:?}", req);
+        println!("{req:?}");
     } else if config.load {
         match save_certificate(&config.cert_type, &config.cert) {
             Ok(_) => println!("OK"),

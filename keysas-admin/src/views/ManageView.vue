@@ -4,9 +4,9 @@
   <div class="box">
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
-      <li class="list-group-item list-group-item transparent" v-for="(device, key) in keys" :key="key">
+      <li class="list-group-item list-group-item transparent" v-for="device in stations">
         <button class="btn btn-outline-dark btn-lg shadow">
-          {{ device }}
+          {{ device.name }}
         </button>
         <i class="bi bi-arrow-right">
         </i> &nbsp;
@@ -14,28 +14,28 @@
           <button class="btn btn-outline-warning btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           reboot_status = undefined;
           ShowRebootKeysas = true;
-          rebootKeysas(device)">
+          rebootKeysas(device.name)">
             <span class="bi bi-arrow-counterclockwise">Reboot</span>
           </button>
           <button class="btn btn-outline-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           shutdown_status = undefined;
           ShowShutdownKeysas = true;
-          shutdownKeysas(device)">
+          shutdownKeysas(device.name)">
             <span class="bi bi-arrow-down-circle-fill"> Shutdown</span>
           </button>
           <button class="btn btn-outline-info btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           export_ssh_status = undefined;
           ShowExportSSH = true;
-          AddSSHPubKey(device)">
+          AddSSHPubKey(device.name)">
             <span class="bi bi-send"> Export SSH pubkey</span>
           </button>
           <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device);
@@ -45,8 +45,10 @@
           </button>
           <button class="btn btn-outline-secondary btn-lg shadow" @click="hide = !hide; ShowActionButtons = true;
           flush();
-          getKeysasIP(device);
-          this.current_keysas = device">
+          this.current_keysas = device.name;
+          this.current_ip = device.ip;
+          getKeysasIP(device.name);
+          this.current_keysas = device.name">
             <span class="bi bi-arrows-expand"> More...</span>
           </button>
         </div>
@@ -213,6 +215,8 @@
 </template>
 
 <script>
+"use strict";
+
 //import '@coreui/coreui/dist/css/coreui.min.css'
 import NavBar from '../components/NavBar.vue'
 import GenKeypair from '../components/GenKeypair.vue'
@@ -225,9 +229,9 @@ import RebootKeysas from '../components/RebootKeysas.vue'
 import ShutdownKeysas from '../components/ShutdownKeysas.vue'
 import ExportSSH from '../components/ExportSSH.vue'
 
-import { getKeys, loadStore, removeKey, getData, getStatus } from '../store/store.js'
 import { reboot, shutdown, addsshpukey, update, init, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
 import { confirm } from '@tauri-apps/api/dialog';
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'ManageView',
@@ -248,7 +252,7 @@ export default {
   },
   data() {
     return {
-      keys: '',
+      stations: '',
       db: [],
       hide: true,
       current_keysas: '',
@@ -280,11 +284,21 @@ export default {
       confirmed: false,
     }
   },
-  async mounted() {
-    this.keys = await getKeys();
+  mounted() {
+    invoke('list_stations')
+      .then((list) => {
+        console.log(list);
+        this.stations = JSON.parse(list);
+      })
+      .catch((error) => console.error(error));
   },
-  async onUpdated() {
-    this.keys = await getKeys();
+  onUpdated() {
+    invoke('list_stations')
+      .then((list) => {
+        console.log(list);
+        this.stations = JSON.parse(list);
+      })
+      .catch((error) => console.error(error));
   },
   methods: {
     flush() {
@@ -305,13 +319,15 @@ export default {
       this.passwordError = '';
       this.confirmed = false;
     },
-    async displayKeysasList() {
-      await loadStore();
-      this.keys = await getKeys();
+    displayKeysasList() {
+      invoke('list_stations')
+        .then((list) => {
+          console.log(list);
+          this.stations = JSON.parse(list);
+        })
+        .catch((error) => console.error(error));
     },
     async removeKeysas(keysas) {
-      //TODO: Remove the Session storage key
-      await loadStore();
       this.confirmed = await confirm('Please confirm', { title: 'Remove this Keysas ?', type: 'warning' });
       if (this.confirmed == true) {
         await removeKey(keysas);
@@ -319,15 +335,10 @@ export default {
         this.confirmed = false;
       }
     },
-    async getKeysasIP(keysas) {
-      await loadStore();
-      let KeysasData = await getData(keysas);
-      //console.log(KeysasData[0]);
-      //console.log(ip);
-      let ip = JSON.stringify(KeysasData[0]);
-      ip = await JSON.parse(ip).ip;
-      //console.log(ip);
-      this.current_ip = ip;
+    getKeysasIP(keysas) {
+      invoke('get_station_ip', {name: keysas})
+        .then((ip) => this.current_ip = ip)
+        .catch((error) => console.error(error));
     },
     async rebootKeysas(device) {
       await this.getKeysasIP(device);
@@ -383,12 +394,17 @@ export default {
       await this.getKeysasIP(device);
       this.revoke_usb_status = await revoke_USB(this.current_ip);
     },
+    /**
+     * Called when the initialization form is submited
+     */
     async onSubmitInit() {
-      await this.getKeysasIP(device);
+      await this.getKeysasIP(this.current_keysas);
       this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
       var password = prompt("Enter PKI password");
       if (this.confirmed == true) {
-        this.update_status = await init(device, this.current_ip, password);
+        //TODO 
+        this.update_status = await init(this.current_ip, this.current_keysas,
+                                          password);
         this.confirmed = false;
         this.ShowGenKeypair = true;
       } else {
@@ -416,16 +432,18 @@ export default {
       this.ShowRevDevice = true;
       await this.RevokeUSB(this.current_keysas);
     },
-    async isalive() {
+    isalive() {
       this.polling = setInterval(() => {
-        getStatus(this.keys);
         this.statusButton(this.current_keysas);
       }, 20000);
     },
     statusButton(device) {
-      let res = sessionStorage.getItem(device);
-      //console.log("statusButton: ", device, res);
-      this.KeysasAlive = res;
+      invoke('is_alive', {name: device})
+        .then((status) => this.KeysasAlive = status)
+        .catch((error) => {
+          console.error(error);
+          this.KeysasAlive = false;
+        })
     }
   },
   beforeUnmount() {

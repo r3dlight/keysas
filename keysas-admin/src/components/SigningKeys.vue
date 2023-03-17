@@ -100,9 +100,11 @@
 </template>
 
 <script>
+"use strict";
 
-import {getRootKeyPath, getPKIFolder, getPKIDir, loadPKI, generateFromRootKey, generatePKI} from "../utils/utils";
+import {getRootKeyPath, getPKIFolder, getPKIDir} from "../utils/utils";
 
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'SigningKeys',
@@ -148,16 +150,18 @@ export default {
     },
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
-      this.keysError = '';
-      this.keysError = await generatePKI(this.orgName,
-                                          this.orgUnit,
-                                          this.country,
-                                          this.validity,
-                                          this.sigAlgo,
-                                          this.adminPwd,
-                                          this.pkiDir) ?
-                                '' : 'Failed to generate PKI in directory';
-      console.log("keysError:", this.keysError);
+      invoke('generate_pki_in_dir', {
+            orgName: orgName,
+            orgUnit: orgUnit,
+            country: country,
+            validity: validity,
+            sigAlgo: sigAlgo,
+            adminPwd: adminPwd,
+            pkiDir: pkiDir
+
+        })
+        .then((res) => console.log(res))
+        .catch((error) => console.error(error));
     },
     ShowTwoSec() {
       this.show=true;

@@ -16,6 +16,8 @@
 </template>
 
 <script>
+"use strict";
+
 import NavBar from '../components/NavBar.vue'
 import AddForm from '../components/AddForm.vue'
 import DisplayKeysas from '../components/DisplayKeysas.vue'

@@ -4,7 +4,6 @@ use std::net::TcpStream;
 use ssh_rs::LocalSession;
 use ssh_rs::algorithm;
 use ssh_rs::ssh;
-use ssh_rs::SessionConnector;
 use ssh_rs::SshResult;
 
 const TIMEOUT: u64 = 60 * 1000;
