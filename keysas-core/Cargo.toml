@@ -26,6 +26,8 @@ syscallz = "0.16"
 time = "0.3"
 oqs = "0.7"
 base64 = "0.21"
+ed25519-dalek = "1.0"
+rand = "0.8"
 
 [[bin]]
 name = "keysas-in"
