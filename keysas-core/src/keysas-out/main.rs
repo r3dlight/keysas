@@ -472,9 +472,9 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
                 }
             };
             let ec_signature = match opt_ec_signature {
-                Some(signature) => String::from_utf8(signature.as_ref().to_vec())?,
+                Some(signature) => general_purpose::STANDARD.encode(signature.as_ref()),
                 None => {
-                    log::error!("Cannot get base64 encoded signature from bytes.");
+                    log::error!("Cannot get base64 encoded EC signature from bytes.");
                     String::new()
                 }
             };
