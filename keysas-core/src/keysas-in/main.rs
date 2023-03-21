@@ -8,7 +8,6 @@
  * for building the keysas-in binary.
  */
 #![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
 #![feature(tcp_quickack)]
 #![forbid(unsafe_code)]
 #![warn(unused_extern_crates)]

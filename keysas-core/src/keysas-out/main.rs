@@ -9,7 +9,6 @@
  */
 
 #![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
 #![feature(tcp_quickack)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -331,6 +330,7 @@ fn pq_sign(
     // Check that secret key is on disk
     if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
         let sig_sk_bytes = std::fs::read(secret_pq_key).context("Unable to read secret file")?;
+        //TODO: Handle that error if file contains a bad key
         let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes)
             .context("Cannot get secret pq key from bytes")?;
         let sig_sk = tmp_sig_sk.to_owned();
