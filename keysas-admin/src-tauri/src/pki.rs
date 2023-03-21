@@ -17,7 +17,7 @@ use oqs::sig::Sig;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
 use pkcs8::pkcs5::pbes2;
-use rand::rngs::OsRng;
+use rand_dl::rngs::OsRng;
 use x509_cert::der::Decode;
 use x509_cert::der::Encode;
 use x509_cert::der::EncodePem;
@@ -36,7 +36,7 @@ use std::error::Error;
 use std::time::Duration;
 use x509_cert::certificate::*;
 use ed25519_dalek::Keypair;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use hex_literal::hex;
 use std::io::Write;
 
@@ -123,7 +123,7 @@ pub struct HybridKeyPair {
     pq_cert: Certificate
 }
 
-enum KEY_TYPE {
+enum KeyType {
     CLASSIC,
     PQ
 }
@@ -157,6 +157,13 @@ pub fn validate_input_cert_fields<'a>(org_name: &'a String, org_unit: &'a String
     })
 }
 
+fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
+    if !Path::new(path).is_dir() {
+        fs::create_dir(path)?;
+    }
+    Ok(())
+}
+
 /// Create the PKI directory hierachy as follows
 /// pki_dir
 /// |-- CA
@@ -171,13 +178,13 @@ pub fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
         return Err(anyhow!("Invalid PKI directory path"));
     }
 
-    fs::create_dir(pki_dir.to_owned() + "/CA")?;
-    fs::create_dir(pki_dir.to_owned() + "/CA/root")?;
-    fs::create_dir(pki_dir.to_owned() + "/CA/st")?;
-    fs::create_dir(pki_dir.to_owned() + "/CA/usb")?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/root"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/st"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/usb"))?;
 
-    fs::create_dir(pki_dir.to_owned() + "/CRL")?;
-    fs::create_dir(pki_dir.to_owned() + "/CERT")?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CRL"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CERT"))?;
 
     Ok(())
 }
@@ -185,23 +192,21 @@ pub fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
 fn construct_tbs_certificate(infos:  &CertificateFields, pub_value: &[u8],
                                 algo_oid: &ObjectIdentifier) -> Result<TbsCertificate, anyhow::Error> {
     let dur = Duration::new((infos.validity*60*60*24).into(), 0);
-
-    let issuer_name = RdnSequence::encode_from_string("test")?;
-    let subject_name = RdnSequence::encode_from_string("test")?;
-
-    let pub_key = BitString::from_bytes(pub_value)?;
+    let issuer_name = RdnSequence::default();
+    let subject_name = RdnSequence::default();
+    let pub_key = BitString::from_bytes(pub_value)
+        .with_context(|| "Failed get public key raw value")?;
     let pub_key_info = SubjectPublicKeyInfo {
         algorithm: AlgorithmIdentifier { oid: *algo_oid, parameters: None },
         subject_public_key: pub_key,
     };
-
     let tbs = TbsCertificate {
         version: Version::V3,
-        serial_number: SerialNumber::new(&[1])?,
+        serial_number: SerialNumber::new(&[1]).with_context(|| "Failed to generate serial number")?,
         signature: AlgorithmIdentifier{oid: *algo_oid, parameters: None},
-        issuer: RdnSequence::from_der(&issuer_name)?,
-        validity: Validity::from_now(dur)?,
-        subject: RdnSequence::from_der(&subject_name)?,
+        issuer: issuer_name,
+        validity: Validity::from_now(dur).with_context(|| "Failed to generate validity date")?,
+        subject: subject_name,
         subject_public_key_info: pub_key_info,
         issuer_unique_id: None,
         subject_unique_id: None,
@@ -219,22 +224,28 @@ pub fn generate_root_ed25519(infos:  &CertificateFields)
     // Create the root CA Ed25519 key pair
     let mut csprng = OsRng{};
     let keypair = Keypair::generate(&mut csprng);
-    let ed25519_oid = ObjectIdentifier::new("1.3.101.112")?;
-
-    let tbs = construct_tbs_certificate(infos, 
+    let ed25519_oid = ObjectIdentifier::new("1.3.101.112")
+                                            .with_context(|| "Failed to generate OID")?;
+   
+    let tbs = match construct_tbs_certificate(infos, 
                                 &keypair.public.to_bytes(),
-                            &ed25519_oid)?;
-    let content = tbs.to_der()?;
-
+                            &ed25519_oid) {
+        Ok(tbs) => tbs,
+        Err(e) => {
+            return Err(anyhow!("Failed to construct TBS certificate: {e}"));
+        }
+    };
+    
+    let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
     let mut prehashed = Sha512::new();
     prehashed.update(content);
-    let sig = keypair.sign_prehashed(prehashed, None)?;
-
-    let ed25519_oid = ObjectIdentifier::new("1.3.101.112")?;
+    let sig = keypair.sign_prehashed(prehashed, None)
+                            .with_context(|| "Failed to sign certificate content")?;
+    
     let cert = Certificate {
         tbs_certificate: tbs,
         signature_algorithm: AlgorithmIdentifier{oid: ed25519_oid, parameters: None},
-        signature: BitString::from_bytes(&sig.to_bytes())?,
+        signature: BitString::from_bytes(&sig.to_bytes()).with_context(|| "Failed to convert signature to bytes")?,
     };
 
     Ok((keypair, cert))
@@ -269,10 +280,12 @@ pub fn generate_root(infos: &CertificateFields, pki_dir: &String, pwd: &String)
     -> Result<HybridKeyPair, anyhow::Error> {
 
     // Generate root ED25519 key and certificate
-    let (kp_ed, cert_ed) = generate_root_ed25519(&infos)?;
+    let (kp_ed, cert_ed) = generate_root_ed25519(&infos)
+        .with_context(|| "ED25519 generation failed")?;
 
     // Generate root Dilithium key and certificate
-    let (sk_dl, pk_dl, cert_dl) = generate_root_dilithium(&infos)?;
+    let (sk_dl, pk_dl, cert_dl) = generate_root_dilithium(&infos)
+        .context("Dilithium generation failed")?;
 
     // Construct hybrid key pair
     let hk = HybridKeyPair {
@@ -287,23 +300,25 @@ pub fn generate_root(infos: &CertificateFields, pki_dir: &String, pwd: &String)
     store_keypair(
         &hk.classic.secret.to_bytes(),
         &hk.classic.public.to_bytes(),
-        KEY_TYPE::CLASSIC,
+        KeyType::CLASSIC,
         pwd,
-        &(pki_dir.to_owned() + "/CA/root-priv-cl.p8"))?;
+        &(pki_dir.to_owned() + "/CA/root-priv-cl.p8")).context("ED25519 storing failed")?;
     
     store_keypair(
         hk.pq_priv.as_ref(),
         hk.pq_pub.as_ref(),
-        KEY_TYPE::PQ,
+        KeyType::PQ,
         pwd,
-        &(pki_dir.to_owned() + "/CA/root-priv-pq.p8"))?;
+        &(pki_dir.to_owned() + "/CA/root-priv-pq.p8")).context("Dilithium storing failed")?;
 
     // Save certificate pair to disk
     let mut out_cl = File::create(pki_dir.to_owned() + "/CA/root-cert-cl.pem")?;
-    write!(out_cl, "{}", hk.classic_cert.to_pem(LineEnding::LF)?)?;
+    write!(out_cl, "{}", hk.classic_cert.to_pem(LineEnding::LF)
+        .context("ED25519 certificate to pem failed")?)?;
 
     let mut out_pq = File::create(pki_dir.to_owned() + "/CA/root-cert-pq.pem")?;
-    write!(out_pq, "{}", hk.pq_cert.to_pem(LineEnding::LF)?)?;
+    write!(out_pq, "{}", hk.pq_cert.to_pem(LineEnding::LF)
+        .context("Dilithium certificate to pem failed")?)?;
 
     Ok(hk)
 }
@@ -364,7 +379,7 @@ pub fn generate_cert_from_request<T: HasPrivate>(req: &X509ReqRef,
 }
 
 /// Store a keypair in a PKCS8 file with a password
-fn store_keypair(prk: &[u8], pbk: &[u8], kind: KEY_TYPE, pwd: &String, path: &String) -> Result<(), anyhow::Error> {
+fn store_keypair(prk: &[u8], pbk: &[u8], kind: KeyType, pwd: &String, path: &String) -> Result<(), anyhow::Error> {
     let params = match pbes2::Parameters::pbkdf2_sha256_aes256cbc(
         2048, 
         &hex!("79d982e70df91a88"),
@@ -377,21 +392,27 @@ fn store_keypair(prk: &[u8], pbk: &[u8], kind: KEY_TYPE, pwd: &String, path: &St
     };
 
     let (label, oid) = match kind {
-        KEY_TYPE::CLASSIC => {
+        KeyType::CLASSIC => {
             ("ED25519", ObjectIdentifier::new("1.3.101.112")?)
         },
-        KEY_TYPE::PQ => {
+        KeyType::PQ => {
             ("Dilithium5", ObjectIdentifier::new("1.3.6.1.4.1.2.267.3")?)
         }
     };
 
     let pk_info = PrivateKeyInfo {
-        algorithm: pkcs8::AlgorithmIdentifier{oid: oid, parameters: None},
+        algorithm: pkcs8::AlgorithmIdentifierRef{oid: oid, parameters: None},
         private_key: prk,
         public_key: Some(pbk) 
     };
 
-    let pk_encrypted = pk_info.encrypt_with_params(params, pwd)?;
+    let pk_encrypted = match pk_info.encrypt_with_params(params, pwd) {
+        Ok(pk) => pk,
+        Err(e) => {
+            log::error!("Failed to encrypt private key: {e}");
+            return Err(anyhow!("Failed to encrypt private key"));
+        }
+    };
 
     pk_encrypted.write_pem_file(path, label, LineEnding::LF)?;
 
