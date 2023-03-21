@@ -295,7 +295,13 @@ fn ec_sign(
     // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
     if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
         let secret_key_bytes = fs::read(secret_key)?;
-        let secret_key = SecretKey::from_bytes(&secret_key_bytes)?;
+        let secret_key = match SecretKey::from_bytes(&secret_key_bytes) {
+            Ok(sk) => sk,
+            Err(e) => {
+                log::error!("Not able to parse ED25519 sk from bytes: {e}");
+                return Ok(None);
+            }
+        };
         // Get the pub key back
         let public_key: PublicKey = (&secret_key).into();
         // Get some random numbers
@@ -330,9 +336,14 @@ fn pq_sign(
     // Check that secret key is on disk
     if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
         let sig_sk_bytes = std::fs::read(secret_pq_key).context("Unable to read secret file")?;
-        //TODO: Handle that error if file contains a bad key
-        let tmp_sig_sk = oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes)
-            .context("Cannot get secret pq key from bytes")?;
+        // Handle the error if file contains a bad key
+        let tmp_sig_sk = match oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes) {
+            Some(tmp_sig_sk) => tmp_sig_sk,
+            None => {
+                log::error!("Cannot parse secret pq key from bytes.");
+                return Ok(None);
+            }
+        };
         let sig_sk = tmp_sig_sk.to_owned();
         // Concat both digest and previously created EC signature
         let concat = format!("{}-{}-{}", file_digest, meta_digest, ec_signature);
