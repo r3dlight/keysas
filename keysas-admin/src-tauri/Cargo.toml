@@ -1,8 +1,8 @@
 [package]
 name = "keysas-admin"
 version = "0.1.2"
-description = "Keysas stations managmenet application"
-authors = ["Stephane N"]
+description = "Keysas stations administration application"
+authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
 repository = ""
 default-run = "keysas-admin"
@@ -30,6 +30,13 @@ openssl-sys = "*"
 sqlite = "*"
 simple_logger = "*"
 log = "*"
+pkcs8 = {version = "*", features = ["encryption", "pem"] }
+x509-cert = "*"
+arbitrary = "*"
+ed25519-dalek = "1"
+rand = "0.7.0"
+oqs = "*"
+hex-literal = "*"
 
 [features]
 # by default Tauri runs in production mode

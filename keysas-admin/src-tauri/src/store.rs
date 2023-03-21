@@ -15,12 +15,14 @@ use anyhow::anyhow;
 use sqlite::Connection;
 use serde::Serialize;
 
+use crate::pki::CertificateFields;
+
 static STORE_HANDLE: Mutex<Option<Connection>> = Mutex::new(None);
 
 const CREATE_QUERY: &str = "
     CREATE TABLE IF NOT EXISTS ssh_table (name TEXT, path TEXT);
     CREATE TABLE IF NOT EXISTS station_table (name TEXT, ip TEXT);
-    CREATE TABLE IF NOT EXISTS ca_table (key TEXT, value TEXT);
+    CREATE TABLE IF NOT EXISTS ca_table (param TEXT, value TEXT);
 ";
 
 const GET_PUBLIC_QUERY: &str = "SELECT * FROM ssh_table WHERE name='public';";
@@ -260,6 +262,34 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
                     })?;
                     log::debug!("Found: {:?}", result);
                     return Ok(result);
+                },
+                None => {
+                    return Err(anyhow!("Store is not initialized"));
+                }
+            }
+        }
+    }
+}
+
+/// Save the PKI configuration infos
+/// Returns Ok or an Error
+pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(), anyhow::Error> {
+    match STORE_HANDLE.lock() {
+        Err(e) => {
+            return Err(anyhow!("Failed to get database lock: {e}"));
+        },
+        Ok(hdl) => {
+            match hdl.as_ref() {
+                Some(connection) => {
+                    let query = format!("REPLACE INTO ca_table (param, value) \
+                                        VALUES ('directory', '{}'), ('org_name', '{}'), \
+                                        ('org_unit', '{}'), ('country', '{}'), \
+                                        ('validity', '{}');",
+                        pki_dir, &infos.org_name, &infos.org_unit,
+                        &infos.country, &infos.validity);
+                    log::debug!("Query: {}", query);
+                    connection.execute(query)?;
+                    return Ok(());
                 },
                 None => {
                     return Err(anyhow!("Store is not initialized"));

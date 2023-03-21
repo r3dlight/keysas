@@ -33,7 +33,6 @@ use std::path::Path;
 use async_std::task;
 use nom::bytes::complete::take_until;
 use nom::IResult;
-use openssl::pkey::Id;
 use openssl::x509::X509Req;
 use sha2::{Digest, Sha256};
 use std::io::Read;
@@ -50,12 +49,16 @@ use crate::ssh_wrapper::*;
 mod store;
 use crate::store::*;
 
-use openssl::pkey::PKey;
-
 // TODO: place constant paths in constants
 
 fn main() -> Result<()> {
+    // Initiliaze the logger
     simple_logger::init()?;
+
+    // Initialize liboqs
+    oqs::init();
+
+    // Initialize Tauri
     task::block_on(init_tauri())?;
     Ok(())
 }
@@ -724,51 +727,37 @@ fn validate_rootkey(root_key: String) -> bool {
 /// Return a result containing an error message if any
 #[command]
 fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
-                                validity: String, sig_algo: String, admin_pwd: String,
+                                validity: String, admin_pwd: String,
                                 pki_dir: String) -> Result<String, String> {
     // Validate user inputs
     let infos = match validate_input_cert_fields(&org_name, &org_unit, 
-                                            &country, &validity, &sig_algo) {
+                                            &country, &validity) {
         Ok(i) => i,
         Err(_) => {
             log::error!("Failed to validate user input");
             return Err(String::from("Invalid user input"));
         }
     };
-    // Test if the directory is valid
-    if Path::new(&pki_dir.trim()).is_dir()
-    {
-        // Create the root CA key pair
-        let root_key = match infos.sig_algo {
-            Id::ED448 => {
-                match PKey::generate_ed448() {
-                    Ok(k) => k,
-                    Err(e) => {
-                        log::error!("Failed to generate root CA private key: {e}");
-                        return Err(String::from("Backend error"));
-                    }
-                }
-            },
-            _ => {
-                match PKey::generate_ed25519() {
-                    Ok(k) => k,
-                    Err(e) => {
-                        log::error!("Failed to generate root CA private key: {e}");
-                        return Err(String::from("Backend error"));
-                    }
-                }
-            }
-        };
+    // Validate pki_dir path and create directory hierachy
+    if let Err(e) = create_pki_dir(&pki_dir) {
+        log::error!("Failed to create PKI directory: {e}");
+        return Err(String::from("Invalid PKI directory path"));
+    }
+    // Save PKI configuration
+    if let Err(e) = set_pki_config(&pki_dir, &infos) {
+        log::error!("Failed to save PKI configuration: {e}");
+        return Err(String::from("Store error"));
+    }
 
-        // Generate root certificate
-        let root_cert = match generate_root_cert(root_key.as_ref(), &infos) {
-            Ok(c) => c,
-            Err(e) => {
-                log::error!("Failed to generate root certificate: {e}");
-                return Err(String::from("Backend error"));
-            }
-        };
+    if let Err(e) = generate_root(&infos, &pki_dir, &admin_pwd) {
+        log::error!("Failed to generate PKI root keys: {e}");
+        return Err(String::from("PKI error"));
+    }
+        
 
+        // Save root keys in PKCS12 format
+
+        /*
         // Create Keysas station CA key pair
         let (st_key, st_cert) = match generate_signed_keypair(root_key.as_ref(), &infos) {
             Ok(p) => p,
@@ -823,9 +812,7 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
             log::error!("Failed to store root key: {e}");
             return Err(String::from("Backend error"));
         }
+        */
 
-        Ok(String::from("PKI created"))
-    } else {
-        Err(String::from("Backend error"))
-    }
+    Ok(String::from("PKI created"))
 }

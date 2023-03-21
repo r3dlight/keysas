@@ -151,13 +151,13 @@ export default {
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
       invoke('generate_pki_in_dir', {
-            orgName: orgName,
-            orgUnit: orgUnit,
-            country: country,
-            validity: validity,
-            sigAlgo: sigAlgo,
-            adminPwd: adminPwd,
-            pkiDir: pkiDir
+            orgName: this.orgName,
+            orgUnit: this.orgUnit,
+            country: this.country,
+            validity: this.validity,
+            sigAlgo: this.sigAlgo,
+            adminPwd: this.adminPwd,
+            pkiDir: this.pkiDir
 
         })
         .then((res) => console.log(res))
