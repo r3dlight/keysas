@@ -33,7 +33,6 @@ use std::path::Path;
 use async_std::task;
 use nom::bytes::complete::take_until;
 use nom::IResult;
-use openssl::x509::X509Req;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tauri::command;
@@ -226,6 +225,7 @@ fn list_stations() -> Result<String, String> {
 async fn init_keysas(ip: String, name: String,
                         ca_pwd: String, st_ca_file: String, usb_ca_file: String,
                     ) -> bool {
+    /*
     let private_key = match get_ssh() {
         Ok((_, private)) => private,
         Err(e) => {
@@ -355,6 +355,7 @@ async fn init_keysas(ip: String, name: String,
     }
 
     session.close();
+    */
 
     true
 }
@@ -749,70 +750,34 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
         return Err(String::from("Store error"));
     }
 
-    if let Err(e) = generate_root(&infos, &pki_dir, &admin_pwd) {
-        log::error!("Failed to generate PKI root keys: {e}");
-        return Err(String::from("PKI error"));
-    }
-        
-
-        // Save root keys in PKCS12 format
-
-        /*
-        // Create Keysas station CA key pair
-        let (st_key, st_cert) = match generate_signed_keypair(root_key.as_ref(), &infos) {
-            Ok(p) => p,
-            Err(e) => {
-                log::error!("Failed to generate Station signing key pair: {e}");
-                return Err(String::from("Backend error"));
-            }
-        };
-
-        // Create the USB signing key pair
-        let (usb_key, usb_cert) = match generate_signed_keypair(root_key.as_ref(), &infos) {
-            Ok(p) => p,
-            Err(e) => {
-                log::error!("Failed to generate USB key pair: {e}");
-                return Err(String::from("Backend error"));
-            }
-        };
-
-        // Store the PKI in PKCS#12 files
-        let base_path = match pki_dir.ends_with("/") {
-            true => pki_dir,
-            false => {
-                format!("{}{}", &pki_dir, "/")
-            }
-        };
-        let root_path = format!("{}{}", &base_path, "root.pk12");
-        if let Err(e) = store_pkcs12(&admin_pwd, 
-                                                        &String::from("Root CA"),
-                                                        root_key.as_ref(),
-                                                        root_cert.as_ref(),
-                                                        &root_path) {
-            log::error!("Failed to store root key: {e}");
-            return Err(String::from("Backend error"));
+    // Generate root key and save them in PKCS12 format
+    let root_keys = match generate_root(&infos, &pki_dir, &admin_pwd) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate PKI root keys: {e}");
+            return Err(String::from("PKI error"));
         }
-
-        let usb_path = format!("{}{}", &base_path, "usb.pk12");
-        if let Err(e) = store_pkcs12(&admin_pwd, 
-                                                        &String::from("USB"),
-                                                        usb_key.as_ref(),
-                                                        usb_cert.as_ref(),
-                                                        &usb_path) {
-            log::error!("Failed to store root key: {e}");
-            return Err(String::from("Backend error"));
+    };
+    
+    // Generate keysas station intermediate CA key pair
+    let st_ca_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate intermediate CA for station: {e}");
+            return Err(String::from("PKI error"));
         }
+    };
 
-        let st_path = format!("{}{}", &base_path, "st.pk12");
-        if let Err(e) = store_pkcs12(&admin_pwd, 
-                                                        &String::from("Station CA"),
-                                                        st_key.as_ref(),
-                                                        st_cert.as_ref(),
-                                                        &st_path) {
-            log::error!("Failed to store root key: {e}");
-            return Err(String::from("Backend error"));
+    // Save keys to directory
+
+    // Generate USB signing key pair
+    let usb_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate USB signing key pair: {e}");
+            return Err(String::from("PKI error"));
         }
-        */
+    };
 
     Ok(String::from("PKI created"))
 }

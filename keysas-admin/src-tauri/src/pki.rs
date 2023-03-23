@@ -1,28 +1,20 @@
 use ed25519_dalek::Digest;
 use ed25519_dalek::Sha512;
-use openssl::error::ErrorStack;
-use openssl::hash::MessageDigest;
-use openssl::pkcs12::Pkcs12;
-use openssl::pkey::HasPrivate;
-use openssl::pkey::PKey;
-use openssl::pkey::PKeyRef;
-use openssl::pkey::Private;
-use openssl::x509::X509;
-use openssl::x509::X509Builder;
-use openssl::x509::X509ReqRef;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
+use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
 use rand_dl::rngs::OsRng;
-use x509_cert::der::Decode;
 use x509_cert::der::Encode;
 use x509_cert::der::EncodePem;
 use x509_cert::der::asn1::BitString;
 use x509_cert::name::RdnSequence;
+use x509_cert::request::CertReq;
+use x509_cert::request::CertReqInfo;
 use x509_cert::serial_number::SerialNumber;
 use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
@@ -30,9 +22,7 @@ use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 use std::fs;
 use std::fs::File;
-use std::fs::read;
 use std::path::Path;
-use std::error::Error;
 use std::time::Duration;
 use x509_cert::certificate::*;
 use ed25519_dalek::Keypair;
@@ -127,6 +117,9 @@ enum KeyType {
     CLASSIC,
     PQ
 }
+
+const DILITHIUM5_OID: &str = "1.3.6.1.4.1.2.267.7.8.7";
+const ED25519_OID: &str = "1.3.101.112";
 
 /// Validate user input and construct a certificate fields structure that can be used
 /// to build the certificates of the PKI.
@@ -224,7 +217,7 @@ pub fn generate_root_ed25519(infos:  &CertificateFields)
     // Create the root CA Ed25519 key pair
     let mut csprng = OsRng{};
     let keypair = Keypair::generate(&mut csprng);
-    let ed25519_oid = ObjectIdentifier::new("1.3.101.112")
+    let ed25519_oid = ObjectIdentifier::new(ED25519_OID)
                                             .with_context(|| "Failed to generate OID")?;
    
     let tbs = match construct_tbs_certificate(infos, 
@@ -253,12 +246,12 @@ pub fn generate_root_ed25519(infos:  &CertificateFields)
 
 pub fn generate_root_dilithium(infos:  &CertificateFields)
     -> Result<(SecretKey, PublicKey, Certificate), anyhow::Error> {
-    // Create the root CA Dilithiul key pair
+    // Create the root CA Dilithium key pair
     let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
     let (pk, sk) = pq_scheme.keypair()?;
 
     // OID value for dilithium-sha512 from IBM's networking OID range
-    let dilithium5_oid = ObjectIdentifier::new("1.3.6.1.4.1.2.267.3")?;
+    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
     let tbs = construct_tbs_certificate(infos, 
                                 &pk.clone().into_vec(),
                             &dilithium5_oid)?;
@@ -278,7 +271,6 @@ pub fn generate_root_dilithium(infos:  &CertificateFields)
 /// Generate PKI root keys
 pub fn generate_root(infos: &CertificateFields, pki_dir: &String, pwd: &String)
     -> Result<HybridKeyPair, anyhow::Error> {
-
     // Generate root ED25519 key and certificate
     let (kp_ed, cert_ed) = generate_root_ed25519(&infos)
         .with_context(|| "ED25519 generation failed")?;
@@ -323,59 +315,196 @@ pub fn generate_root(infos: &CertificateFields, pki_dir: &String, pwd: &String)
     Ok(hk)
 }
 
-/*
-/// Generate a certification request for a public key
-pub fn generate_cert_request<T: HasPublic + HasPrivate>(key: &PKeyRef<T>,
-                                                        infos: &CertificateFields)
-                                            -> Result<X509Req, ErrorStack>{
-    let mut builder = X509ReqBuilder::new()?;
-    
-    // Set version
-    builder.set_version(2)?;
+pub fn generate_signed_keypair(ca_keys: &HybridKeyPair,
+                                subject_infos: &CertificateFields,
+                                pki_infos: &CertificateFields)
+    -> Result<HybridKeyPair, anyhow::Error> {
+    // Create the subject name for the certificate
+    let subject = RdnSequence::default();
 
-    // Set subject name
-    let mut name_builder = X509NameBuilder::new()?;
-    name_builder.append_entry_by_nid(Nid::ORGANIZATIONNAME, &infos.org_name)?;
-    name_builder.append_entry_by_nid(Nid::ORGANIZATIONALUNITNAME, &infos.org_unit)?;
-    name_builder.append_entry_by_nid(Nid::COUNTRYNAME, &infos.country)?;
-    let name = name_builder.build();
-    builder.set_subject_name(name.as_ref())?;
+    // Generate ED25519 key and certificate
+    // Create the ED25519 keypair
+    let mut csprng = OsRng{};
+    let kp_ed = Keypair::generate(&mut csprng);
+    // Construct a CSR for the ED25519 key
+    let csr_ed = generate_csr_ed25519(&kp_ed, &subject)?;
+    // Generate a certificate from the CSR
+    let cert_ed = generate_cert_from_csr(ca_keys, &csr_ed, pki_infos)?;
 
-    // Set public key
-    let raw_pub = key.raw_public_key()?;
-    let pub_key = PKey::public_key_from_raw_bytes(&raw_pub, key.id())?;
-    builder.set_pubkey(pub_key.as_ref())?;
+    // Generate Dilithium key and certificate
+    // Create the Dilithium key pair
+    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let (pk_dl, sk_dl) = pq_scheme.keypair()?;
+    // Construct a CSR for the Dilithium key
+    let csr_dl = generate_csr_dilithium5(&pk_dl, &sk_dl, &subject)?;
+    // Generate a certificate from the CSR
+    let cert_dl = generate_cert_from_csr(ca_keys, &csr_dl, pki_infos)?;
 
-    // Set request
-    builder.sign(key, MessageDigest::null())?;
 
-    Ok(builder.build())
+    // Construct hybrid key pair
+    Ok(HybridKeyPair {
+        classic: kp_ed,
+        classic_cert: cert_ed,
+        pq_priv: sk_dl,
+        pq_pub: pk_dl,
+        pq_cert: cert_dl,
+    })
 }
-*/
 
-/// Generate a certificate from a request
-pub fn generate_cert_from_request<T: HasPrivate>(req: &X509ReqRef,
-                                                root_key: &PKeyRef<T>)
-                                            -> Result<X509, ErrorStack>{
-    // Get the public key
-    let pub_key = req.public_key()?;
-    
-    // Verify the request
-    if !req.verify(&pub_key)? {
-        log::error!("Wrong request signature");
-        return Err(ErrorStack::get());
+fn generate_cert_from_csr(ca_keys: &HybridKeyPair, csr: &CertReq, pki_info: &CertificateFields)
+    -> Result<Certificate, anyhow::Error> {
+    // Extract and validate info in the CSR
+    //TODO: validate CSR authenticity
+
+    let subject = csr.info.subject.clone();
+    //TODO: validate subject
+
+    let pub_key = match csr.info.public_key.subject_public_key.as_bytes() {
+        Some(k) => {
+            //TODO: validate key
+            k
+        },
+        None => {
+            return Err(anyhow!("Invalid public key in CSR"));
+        }
+    };
+
+    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+    let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+
+    // Build the certificate
+    if let Ok(oid) = 
+        csr.info.public_key.algorithm.assert_algorithm_oid(ed25519_oid) {
+        // Build the certificate
+        let tbs = construct_tbs_certificate(pki_info, pub_key, &oid)?;
+            
+        let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
+        let mut prehashed = Sha512::new();
+        prehashed.update(content);
+        let signature = ca_keys.classic.sign_prehashed(prehashed, None)
+                                .with_context(|| "Failed to sign certificate content")?;
+
+        let cert = Certificate {
+            tbs_certificate: tbs,
+            signature_algorithm: AlgorithmIdentifier{oid: dilithium5_oid, parameters: None},
+            signature: BitString::from_bytes(&signature.to_bytes())?,
+        };
+
+        Ok(cert)
+    } else if let Ok(oid) =
+        csr.info.public_key.algorithm.assert_algorithm_oid(dilithium5_oid) {
+        let tbs = construct_tbs_certificate(pki_info, pub_key, &oid)?;
+        let content = tbs.to_der()?;
+
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let signature = pq_scheme.sign(&content, &ca_keys.pq_priv)?;
+
+        let cert = Certificate {
+            tbs_certificate: tbs,
+            signature_algorithm: AlgorithmIdentifier{oid: dilithium5_oid, parameters: None},
+            signature: BitString::from_bytes(&signature.into_vec())?,
+        };
+
+        Ok(cert)
+    } else {
+        return Err(anyhow!("Invalid algorithm OID"));
     }
+}
 
-        //let rd = match BigNum::new_secure()
-    let mut builder = X509Builder::new()?;
+fn generate_csr_ed25519(keypair: &Keypair, subject: &RdnSequence)
+    -> Result<CertReq, anyhow::Error> {
+    let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
-    builder.set_version(2)?;
+    let pub_key = BitString::from_bytes(&keypair.public.to_bytes())
+        .with_context(|| "Failed get public key raw value")?;
 
-    builder.set_pubkey(&pub_key)?;
+    let info = CertReqInfo {
+        version: x509_cert::request::Version::V1,
+        subject: subject.to_owned(),
+        public_key: SubjectPublicKeyInfo { 
+            algorithm: AlgorithmIdentifier {
+                oid: ed25519_oid,
+                parameters: None
+            },
+            subject_public_key: pub_key },
+        attributes: SetOfVec::new()
+    };
 
-    builder.sign(root_key, MessageDigest::null())?;
+    let content = info.to_der().with_context(|| "Failed to convert to DER")?;
+    let mut prehashed = Sha512::new();
+    prehashed.update(content);
+    let signature = keypair.sign_prehashed(prehashed, None)
+        .with_context(|| "Failed to sign certificate content")?;
+    
+    let csr = CertReq {
+        info: info,
+        algorithm: AlgorithmIdentifier {
+            oid: ed25519_oid,
+            parameters: None
+        },
+        signature: BitString::from_bytes(&signature.to_bytes())?
+    };
 
-    Ok(builder.build())
+    Ok(csr)
+}
+
+fn generate_csr_dilithium5(pk: &PublicKey, sk: &SecretKey, subject: &RdnSequence)
+    -> Result<CertReq, anyhow::Error> {
+    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+
+    let pub_key = BitString::from_bytes(&pk.clone().into_vec())
+        .with_context(|| "Failed get public key raw value")?;
+
+    let info = CertReqInfo {
+        version: x509_cert::request::Version::V1,
+        subject: subject.to_owned(),
+        public_key: SubjectPublicKeyInfo { 
+            algorithm: AlgorithmIdentifier {
+                oid: dilithium5_oid,
+                parameters: None
+            },
+            subject_public_key: pub_key },
+        attributes: SetOfVec::new()
+    };
+
+    let content = info.to_der().with_context(|| "Failed to convert to DER")?;
+    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let signature = pq_scheme.sign(&content, sk)?;
+    
+    let csr = CertReq {
+        info: info,
+        algorithm: AlgorithmIdentifier {
+            oid: dilithium5_oid,
+            parameters: None
+        },
+        signature: BitString::from_bytes(&signature.into_vec())?
+    };
+
+    Ok(csr)
+}
+
+pub fn generate_cert_requests(keys: &HybridKeyPair, info: &CertificateFields)
+    -> Result<String, anyhow::Error> {
+/*
+    
+    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+    
+    let info = CertReqInfo {
+        version: x509_cert::request::Version::V1,
+        subject: RdnSequence::default(),
+        public_key: SubjectPublicKeyInfo { algorithm: (), subject_public_key: () },
+        attributes: ()
+    };
+
+    let csr = CertReq {
+        info: info,
+        algorithm: AlgorithmIdentifier { oid: (), parameters: () },
+        signature: ()
+    };
+
+    csr.to_pem(LineEnding::LF)
+    */
+    Ok(String::from("TODO"))
 }
 
 /// Store a keypair in a PKCS8 file with a password
@@ -393,10 +522,10 @@ fn store_keypair(prk: &[u8], pbk: &[u8], kind: KeyType, pwd: &String, path: &Str
 
     let (label, oid) = match kind {
         KeyType::CLASSIC => {
-            ("ED25519", ObjectIdentifier::new("1.3.101.112")?)
+            ("ED25519", ObjectIdentifier::new(ED25519_OID)?)
         },
         KeyType::PQ => {
-            ("Dilithium5", ObjectIdentifier::new("1.3.6.1.4.1.2.267.3")?)
+            ("Dilithium5", ObjectIdentifier::new(DILITHIUM5_OID)?)
         }
     };
 
@@ -418,47 +547,3 @@ fn store_keypair(prk: &[u8], pbk: &[u8], kind: KeyType, pwd: &String, path: &Str
 
     Ok(())
 }
-
-/*
-/// Store a key and its certificate in a PKCS#12 file
-pub fn store_pkcs12<T: HasPrivate>(pass: &String, name: &String,
-                                key: &PKeyRef<T>, cert: &X509Ref,
-                                path: &String)
-                                -> Result<(), Box<dyn Error>> {
-    let builder = Pkcs12::builder();
-    //builder.key_algorithm(Nid::AES_256_GCM);
-    //builder.cert_algorithm(Nid::AES_256_GCM);
-    let pk = builder.build(pass, name, key, cert)?;
-    let der = pk.to_der()?;
-    let mut out = File::create(path)?;
-    out.write_all(&der)?;
-    Ok(())
-}
-*/
-
-/// Load a key and a certificate from a PKCS#12 file
-pub fn load_pkcs12(path: &String, pass: &String)
-                -> Result<(PKey<Private>, X509), Box<dyn Error>> {
-    let der = read(Path::new(path))?;
-    let pk12 = Pkcs12::from_der(&der)?;
-    let parsed = pk12.parse(pass)?;
-    Ok((parsed.pkey, parsed.cert))
-}
-
-/*
-/// Generate a private key and the corresponding certificate signed with the root key
-pub fn generate_signed_keypair<T: HasPrivate>(root_key: &PKeyRef<T>,
-                                                infos: &CertificateFields)
-                            -> Result<(PKey<Private>, X509), ErrorStack> {
-    // Generate private key
-    let key =  PKey::generate_ed25519()?;
-
-    // Generate certification request
-    let req = generate_cert_request(key.as_ref(), infos)?;
-
-    // Generate certificate
-    let cert = generate_cert_from_request(&req, root_key)?;
-
-    Ok((key, cert))
-}
-*/
