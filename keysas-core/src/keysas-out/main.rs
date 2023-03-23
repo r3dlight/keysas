@@ -40,7 +40,7 @@ use landlock::{
 use log::{error, info, warn};
 use nix::unistd;
 use oqs::sig::Signature;
-use rand::rngs::OsRng;
+use pkcs8::EncryptedPrivateKeyInfo;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs;
@@ -295,23 +295,39 @@ fn ec_sign(
     // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
     if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
         let secret_key_bytes = fs::read(secret_key)?;
-        let secret_key = match SecretKey::from_bytes(&secret_key_bytes) {
-            Ok(sk) => sk,
+        let pkcs8_enc_private_key =
+            match EncryptedPrivateKeyInfo::try_from(secret_key_bytes.as_ref()) {
+                Ok(pkcs8_enc_private_key) => pkcs8_enc_private_key,
+                Err(e) => {
+                    log::error!("Cannot instantiate EncryptedPrivateKeyInfo from secret_key: {e}");
+                    return Ok(None);
+                }
+            };
+
+        let pkcs8_private_key = match pkcs8_enc_private_key.decrypt("Keysas007") {
+            Ok(pkcs8_private_key) => pkcs8_private_key,
             Err(e) => {
-                log::error!("Not able to parse ED25519 sk from bytes: {e}");
+                log::error!("Cannot decrypt SecretDocument from EncryptedPrivateKeyInfo: {e}");
+                return Ok(None);
+            }
+        };
+        let private_key_bytes = pkcs8_private_key.to_bytes();
+        let secret_key = match SecretKey::from_bytes(&private_key_bytes) {
+            Ok(secret_key) => secret_key,
+            Err(e) => {
+                log::error!("Cannot create a dalek secret_key from bytes: {e}");
                 return Ok(None);
             }
         };
         // Get the pub key back
         let public_key: PublicKey = (&secret_key).into();
-        // Get some random numbers
-        let mut _csprng = OsRng {};
+
         // Rebuild the keypair struct
         let keypair = Keypair {
             public: public_key,
             secret: secret_key,
         };
-        // Prepare the String to sign ans sign it
+        // Prepare the String to sign and sign it
         let concat = format!("{}-{}", file_digest, meta_digest);
         let signature = keypair.sign(concat.as_bytes());
         Ok(Some(signature))
@@ -327,23 +343,36 @@ fn pq_sign(
     ec_signature: String,
     secret_pq_key: &str,
 ) -> Result<Option<Signature>> {
-    // Important: initialize liboqs
-    oqs::init();
-    // Choosing Dilithium Level 5
-    let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5)
-        .context("Unable to create new signature scheme")?;
-
     // Check that secret key is on disk
     if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
-        let sig_sk_bytes = std::fs::read(secret_pq_key).context("Unable to read secret file")?;
-        // Handle the error if file contains a bad key
-        let tmp_sig_sk = match oqs::sig::Sig::secret_key_from_bytes(&scheme, &sig_sk_bytes) {
-            Some(tmp_sig_sk) => tmp_sig_sk,
-            None => {
-                log::error!("Cannot parse secret pq key from bytes.");
+        // Choosing Dilithium Level 5
+        let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5)
+            .context("Unable to create new signature scheme")?;
+        let sig_sk_bytes = std::fs::read(secret_pq_key).context("Unable to read secret pq file")?;
+        let pkcs8_enc_private_key = match EncryptedPrivateKeyInfo::try_from(sig_sk_bytes.as_ref()) {
+            Ok(pkcs8_enc_private_key) => pkcs8_enc_private_key,
+            Err(e) => {
+                log::error!("Cannot instantiate EncryptedPrivateKeyInfo from secret_key: {e}");
                 return Ok(None);
             }
         };
+
+        let pkcs8_private_key = match pkcs8_enc_private_key.decrypt("Keysas007") {
+            Ok(pkcs8_private_key) => pkcs8_private_key,
+            Err(e) => {
+                log::error!("Cannot decrypt SecretDocument from EncryptedPrivateKeyInfo: {e}");
+                return Ok(None);
+            }
+        };
+        // Handle the error if file contains a bad key
+        let tmp_sig_sk =
+            match oqs::sig::Sig::secret_key_from_bytes(&scheme, pkcs8_private_key.as_bytes()) {
+                Some(tmp_sig_sk) => tmp_sig_sk,
+                None => {
+                    log::error!("Cannot parse secret pq key from bytes.");
+                    return Ok(None);
+                }
+            };
         let sig_sk = tmp_sig_sk.to_owned();
         // Concat both digest and previously created EC signature
         let concat = format!("{}-{}-{}", file_digest, meta_digest, ec_signature);
@@ -614,6 +643,9 @@ fn main() -> Result<()> {
     // Allocate buffers for input messages
     let mut ancillary_buffer_in = [0; 128];
     let mut ancillary_in = SocketAncillary::new(&mut ancillary_buffer_in[..]);
+
+    // Important: initialize liboqs
+    oqs::init();
 
     // Main loop
     // 1. receive file descriptor and metadata from transit

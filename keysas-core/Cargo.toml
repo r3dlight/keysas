@@ -28,6 +28,7 @@ oqs = "0.7"
 base64 = "0.21"
 ed25519-dalek = "1.0"
 rand = "0.8"
+pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 
 [[bin]]
 name = "keysas-in"
