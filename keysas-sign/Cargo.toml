@@ -15,3 +15,9 @@ libc = "0.2"
 udev = "0.7"
 openssl = "*"
 openssl-sys = "*"
+oqs = "0.7"
+ed25519-dalek = "1.0"
+rand_dl = {package = "rand", version = "0.7"}
+pkcs8 = { version = "0.10", features = ["encryption", "pem"]}
+hex-literal = "*"
+x509-cert = "0.2"
