@@ -200,7 +200,7 @@ fn parse_args() -> Configuration {
             Arg::new("signing_pq_key")
                 .short('s')
                 .long("signing_pq_key")
-                .default_value("/etc/keysas/file-pq-sign.key")
+                .default_value("/etc/keysas/file-sign-pq-priv.pem")
                 .action(clap::ArgAction::Set)
                 .help("Path to secret post-quantum signing key"),
         )
@@ -216,7 +216,7 @@ fn parse_args() -> Configuration {
             Arg::new("signing_key")
                 .short('w')
                 .long("signing_key")
-                .default_value("/etc/keysas/file-sign.key")
+                .default_value("/etc/keysas/file-sign-priv.pem")
                 .action(clap::ArgAction::Set)
                 .help("Path to secret signing key"),
         )
