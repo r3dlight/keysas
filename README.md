@@ -15,7 +15,7 @@ Warning: This is only a work in progress for now.
 - Signatures
     - Trusted (Outgoing) USB device must be signed with Keysas-admin app
     - Each verified file signature is stored in the corresponding file report  
-    - Signatures are post quantum-proof (hybrid ed25519/Diltithium5 scheme)
+    - Signatures are post-quantum proof (hybrid ed25519/Diltithium5 scheme)
     - Keypairs are stored using PKCS#8 format
 
 # Keysas-core
@@ -38,7 +38,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Keysas-fido: Manage Yubikeys 5 enrollment
  - Keysas-backend: Create a websocket server to send different json values to the keysas-frontend
  - Keysas-frontend: VueJS3 Frontend for the final user
- - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS3)
+ - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS3). It also provides a PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
 
 ## Installation
 
