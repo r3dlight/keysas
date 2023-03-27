@@ -36,6 +36,7 @@ rand_dl = {package = "rand", version = "0.7"}
 rand_core = "0.6.4"
 oqs = "0.7"
 hex-literal = "0.3"
+keysas_lib = { path = "../../keysas_lib" }
 
 [features]
 # by default Tauri runs in production mode

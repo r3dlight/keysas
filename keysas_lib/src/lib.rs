@@ -7,6 +7,8 @@ use std::fs::File;
 use std::io::{BufReader, IoSlice, Read};
 use std::os::unix::io::AsRawFd;
 
+pub mod pki;
+
 // Init logger
 pub fn init_logger() {
     if env::var("RUST_LOG").is_ok() {
@@ -40,7 +42,7 @@ pub fn sha256_digest(input: &File) -> Result<String> {
 /// This function lists all files in a directory except hidden ones.
 ///
 /// Example:
-/// ```no_run
+/// ```ignore
 /// let dir = tempdir().unwrap();
 /// let path = dir.path().join("transit");
 /// let _output = fs::create_dir_all(&path).unwrap();

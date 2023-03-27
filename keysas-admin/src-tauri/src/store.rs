@@ -15,7 +15,7 @@ use anyhow::anyhow;
 use sqlite::Connection;
 use serde::Serialize;
 
-use crate::pki::CertificateFields;
+use keysas_lib::pki::*;
 
 static STORE_HANDLE: Mutex<Option<Connection>> = Mutex::new(None);
 

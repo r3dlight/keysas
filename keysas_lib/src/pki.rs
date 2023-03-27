@@ -4,10 +4,14 @@ use oqs::sig::Algorithm;
 use oqs::sig::PublicKey;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
+use pkcs8::DecodePrivateKey;
+use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
+use pkcs8::SecretDocument;
 use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
+use pkcs8::pkcs5::scrypt::scrypt;
 use rand_dl::rngs::OsRng;
 use x509_cert::der::Encode;
 use x509_cert::der::EncodePem;
@@ -113,7 +117,7 @@ pub struct HybridKeyPair {
     pq_cert: Certificate
 }
 
-enum KeyType {
+pub enum KeyType {
     CLASSIC,
     PQ
 }
@@ -509,23 +513,23 @@ pub fn generate_cert_requests(keys: &HybridKeyPair, info: &CertificateFields)
 
 /// Store a keypair in a PKCS8 file with a password
 fn store_keypair(prk: &[u8], pbk: &[u8], kind: KeyType, pwd: &String, path: &String) -> Result<(), anyhow::Error> {
-    let params = match pbes2::Parameters::pbkdf2_sha256_aes256cbc(
-        2048, 
+    let params = match pbes2::Parameters::scrypt_aes256cbc(
+        pkcs8::pkcs5::scrypt::Params::recommended(),
         &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
-    ) {
+        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),)
+    {
         Ok(p) => p,
         Err(e) => {
-            return Err(anyhow!("Failed to generate pkcs5 parameters: {e}"));
+            return Err(anyhow!("Failed to generate scrypt parameter: {e}"));
         }
     };
 
     let (label, oid) = match kind {
         KeyType::CLASSIC => {
-            ("ED25519", ObjectIdentifier::new(ED25519_OID)?)
+            ("ENCRYPTED PRIVATE KEY", ObjectIdentifier::new(ED25519_OID)?)
         },
         KeyType::PQ => {
-            ("Dilithium5", ObjectIdentifier::new(DILITHIUM5_OID)?)
+            ("ENCRYPTED PRIVATE KEY", ObjectIdentifier::new(DILITHIUM5_OID)?)
         }
     };
 
@@ -545,5 +549,45 @@ fn store_keypair(prk: &[u8], pbk: &[u8], kind: KeyType, pwd: &String, path: &Str
 
     pk_encrypted.write_pem_file(path, label, LineEnding::LF)?;
 
+    // Test to load saved keys
+    let (s_kind, s_prk, s_pbk) = match load_keypair(path, pwd) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Failed to load back key: {e}");
+            return Err(anyhow!("Failed to load back key: {e}"));
+        }
+    };
+
+    log::debug!("PRK: {:?}", prk);
+    log::debug!("Saved PRK: {:?}", s_prk);
+
     Ok(())
+}
+
+fn load_keypair(path: &String, pwd: &String) 
+    -> Result<(KeyType, Vec<u8>, Vec<u8>), anyhow::Error> {
+    // Load the pkcs8 from file
+    let cipher = fs::read_to_string(path)?;
+    // Parse the pkcs8 file
+    let secret_doc = match SecretDocument::from_pkcs8_pem(&cipher) {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(anyhow!("Failed to parse PEM to PKCS8"));
+        }
+    };
+
+    let enc_pk = match EncryptedPrivateKeyInfo::try_from(secret_doc.as_bytes()) {
+        Ok(ep) => ep,
+        Err(e) => {
+            return Err(anyhow!("Failed to parse EncryptedPrivateKeyInfo"));
+        }
+    };
+    let pk = match enc_pk.decrypt(pwd) {
+        Ok(p) => p,
+        Err(e) => {
+            return Err(anyhow!("Failed to decrypt document"));
+        }
+    };
+    log::debug!("Hello");
+    return Err(anyhow!("Todo"));
 }

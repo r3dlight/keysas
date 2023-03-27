@@ -41,12 +41,12 @@ use tauri_plugin_store::PluginBuilder;
 use std::io::BufReader;
 
 mod errors;
-mod pki;
-use crate::pki::*;
 mod ssh_wrapper;
 use crate::ssh_wrapper::*;
 mod store;
 use crate::store::*;
+
+use keysas_lib::pki::*;
 
 // TODO: place constant paths in constants
 
