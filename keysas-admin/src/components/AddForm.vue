@@ -18,7 +18,10 @@
 </template>
 
 <script>
-import { setData } from '../store/store.js'
+"use strict";
+
+import { invoke } from "@tauri-apps/api";
+
 export default {
   name: 'AddForm',
   props: {
@@ -44,10 +47,13 @@ export default {
       let ipv4_regex = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}$/gm;
       this.ipError = ipv4_regex.test(this.ip) ?
         '' : "Invalid IP format"
-      console.log("Device added:", this.name, this.ip);
       if (!this.nameError && !this.ipError) {
         console.log('setData called');
-        setData({ key: this.name, val: [{ "name": this.name, "ip": this.ip }] });
+        await invoke('save_station', {
+            name: this.name,
+            ip: this.ip,
+        });
+        console.log("Device added:", this.name, this.ip);
         this.ShowTwoSec();
       }
       else {

@@ -4,9 +4,9 @@
   <div class="box">
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
-      <li class="list-group-item list-group-item transparent" v-for="(device, key) in keys" :key="key">
+      <li class="list-group-item list-group-item transparent" v-for="device in stations">
         <button class="btn btn-outline-dark btn-lg shadow">
-          {{ device }}
+          {{ device.name }}
         </button>
         <i class="bi bi-arrow-right">
         </i> &nbsp;
@@ -14,28 +14,28 @@
           <button class="btn btn-outline-warning btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           reboot_status = undefined;
           ShowRebootKeysas = true;
-          rebootKeysas(device)">
+          rebootKeysas(device.name)">
             <span class="bi bi-arrow-counterclockwise">Reboot</span>
           </button>
           <button class="btn btn-outline-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           shutdown_status = undefined;
           ShowShutdownKeysas = true;
-          shutdownKeysas(device)">
+          shutdownKeysas(device.name)">
             <span class="bi bi-arrow-down-circle-fill"> Shutdown</span>
           </button>
           <button class="btn btn-outline-info btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
-          this.current_keysas = device;
+          this.current_keysas = device.name;
           export_ssh_status = undefined;
           ShowExportSSH = true;
-          AddSSHPubKey(device)">
+          AddSSHPubKey(device.name)">
             <span class="bi bi-send"> Export SSH pubkey</span>
           </button>
           <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device);
@@ -45,8 +45,10 @@
           </button>
           <button class="btn btn-outline-secondary btn-lg shadow" @click="hide = !hide; ShowActionButtons = true;
           flush();
-          getKeysasIP(device);
-          this.current_keysas = device">
+          this.current_keysas = device.name;
+          this.current_ip = device.ip;
+          getKeysasIP(device.name);
+          this.current_keysas = device.name">
             <span class="bi bi-arrows-expand"> More...</span>
           </button>
         </div>
@@ -81,9 +83,13 @@
         <li class="list-group-item list-group-item transparent">
           <div class="btn-group" role="group" aria-label="Basic outlined example">
             <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
+            ShowPasswordInit = !ShowPasswordInit">
+              <span class="bi bi-magic"> Initialize</span>
+            </button>
+            <!-- <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
             ShowPasswordGenerateKeypair = !ShowPasswordGenerateKeypair">
               <span class="bi bi-magic"> Generate a signing keypair</span>
-            </button>
+            </button> -->
             <button class="send btn btn-lg btn-outline-success shadow" @click="flush();
             ShowPasswordSign = !ShowPasswordSign;
             ">
@@ -112,7 +118,7 @@
         </li>
       </ul>
     </div>
-    <div v-if="ShowPasswordGenerateKeypair" class="add-form">
+    <div v-if="ShowPasswordInit" class="add-form">
       <div class="container">
         <div class="row">
           <div class="col-sm">
@@ -120,10 +126,8 @@
               <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
               <br>
               <span class="tip-text">We need to create a dedicated keypair on this Keysas station to be able to sign
-                output USB keys.
-                This can be easily done here, simply choose a password to protect the private key that will be remotly
-                generated on the current Keysas station.
-                Once done, you will be able to sign your output keys.
+                output files.
+                No need to create a password to protect this key pair but need for the PKI password
               </span>
               <br><br>
               <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
@@ -132,8 +136,8 @@
             </div>
           </div>
           <div class="col-sm">
-            <form class="add-form password" @submit.prevent="onSubmit">
-              <label type="text">New password:</label>
+            <form class="add-form password" @submit.prevent="onSubmitInit">
+              <label type="text">TODO remove:</label>
               <input type="password" required v-model="password" placeholder="8 characters minimum" id="password" />
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
@@ -203,9 +207,16 @@
     <ShutdownKeysas v-if="ShowShutdownKeysas" :shutdownStatus="shutdown_status"></ShutdownKeysas>
     <ExportSSH v-if="ShowExportSSH" :exportSSHStatus="export_ssh_status"></ExportSSH>
   </div>
+  <div style="display:none" id="pwdpopup">
+    <div>Enter PKI password:</div>
+    <input id="pass" type="password"/>
+    <button onclick="done()">OK</button>
+  </div>
 </template>
 
 <script>
+"use strict";
+
 //import '@coreui/coreui/dist/css/coreui.min.css'
 import NavBar from '../components/NavBar.vue'
 import GenKeypair from '../components/GenKeypair.vue'
@@ -218,9 +229,9 @@ import RebootKeysas from '../components/RebootKeysas.vue'
 import ShutdownKeysas from '../components/ShutdownKeysas.vue'
 import ExportSSH from '../components/ExportSSH.vue'
 
-import { getKeys, loadStore, removeKey, getData, getStatus } from '../store/store.js'
-import { reboot, shutdown, addsshpukey, update, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
+import { reboot, shutdown, addsshpukey, update, init, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
 import { confirm } from '@tauri-apps/api/dialog';
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'ManageView',
@@ -241,7 +252,7 @@ export default {
   },
   data() {
     return {
-      keys: '',
+      stations: '',
       db: [],
       hide: true,
       current_keysas: '',
@@ -257,7 +268,7 @@ export default {
       ShowShutdownKeysas: false,
       ShowExportSSH: false,
       ShowActionButtons: true,
-      ShowPasswordGenerateKeypair: false,
+      ShowPasswordInit: false,
       ShowPasswordSign: false,
       reboot_status: undefined,
       update_status: undefined,
@@ -273,11 +284,21 @@ export default {
       confirmed: false,
     }
   },
-  async mounted() {
-    this.keys = await getKeys();
+  mounted() {
+    invoke('list_stations')
+      .then((list) => {
+        console.log(list);
+        this.stations = JSON.parse(list);
+      })
+      .catch((error) => console.error(error));
   },
-  async onUpdated() {
-    this.keys = await getKeys();
+  onUpdated() {
+    invoke('list_stations')
+      .then((list) => {
+        console.log(list);
+        this.stations = JSON.parse(list);
+      })
+      .catch((error) => console.error(error));
   },
   methods: {
     flush() {
@@ -298,13 +319,15 @@ export default {
       this.passwordError = '';
       this.confirmed = false;
     },
-    async displayKeysasList() {
-      await loadStore();
-      this.keys = await getKeys();
+    displayKeysasList() {
+      invoke('list_stations')
+        .then((list) => {
+          console.log(list);
+          this.stations = JSON.parse(list);
+        })
+        .catch((error) => console.error(error));
     },
     async removeKeysas(keysas) {
-      //TODO: Remove the Session storage key
-      await loadStore();
       this.confirmed = await confirm('Please confirm', { title: 'Remove this Keysas ?', type: 'warning' });
       if (this.confirmed == true) {
         await removeKey(keysas);
@@ -312,15 +335,10 @@ export default {
         this.confirmed = false;
       }
     },
-    async getKeysasIP(keysas) {
-      await loadStore();
-      let KeysasData = await getData(keysas);
-      //console.log(KeysasData[0]);
-      //console.log(ip);
-      let ip = JSON.stringify(KeysasData[0]);
-      ip = await JSON.parse(ip).ip;
-      //console.log(ip);
-      this.current_ip = ip;
+    getKeysasIP(keysas) {
+      invoke('get_station_ip', {name: keysas})
+        .then((ip) => this.current_ip = ip)
+        .catch((error) => console.error(error));
     },
     async rebootKeysas(device) {
       await this.getKeysasIP(device);
@@ -376,20 +394,21 @@ export default {
       await this.getKeysasIP(device);
       this.revoke_usb_status = await revoke_USB(this.current_ip);
     },
-    async onSubmit() {
-      this.create_keypair_status = undefined;
-      console.log('Form submitted (Keygen password)');
-      this.passwordError = this.password.length > 7 ?
-        '' : "Password must be at least 8 chars long"
-      //console.log("Password is:", this.password);
-      if (!this.passwordError) {
+    /**
+     * Called when the initialization form is submited
+     */
+    async onSubmitInit() {
+      await this.getKeysasIP(this.current_keysas);
+      this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
+      var password = prompt("Enter PKI password");
+      if (this.confirmed == true) {
+        //TODO 
+        this.update_status = await init(this.current_ip, this.current_keysas,
+                                          password);
+        this.confirmed = false;
         this.ShowGenKeypair = true;
-        await this.CreateKeypair(this.current_keysas, this.password);
-        this.password = undefined;
-        console.log("create_keypair_status: " + this.create_keypair_status);
-      }
-      else {
-        console.log('CreateKeypair not called!')
+      } else {
+        this.ShowUpdateKeysas = false;
       }
     },
     async onSubmitSign() {
@@ -413,16 +432,18 @@ export default {
       this.ShowRevDevice = true;
       await this.RevokeUSB(this.current_keysas);
     },
-    async isalive() {
+    isalive() {
       this.polling = setInterval(() => {
-        getStatus(this.keys);
         this.statusButton(this.current_keysas);
       }, 20000);
     },
     statusButton(device) {
-      let res = sessionStorage.getItem(device);
-      //console.log("statusButton: ", device, res);
-      this.KeysasAlive = res;
+      invoke('is_alive', {name: device})
+        .then((status) => this.KeysasAlive = status)
+        .catch((error) => {
+          console.error(error);
+          this.KeysasAlive = false;
+        })
     }
   },
   beforeUnmount() {

@@ -10,7 +10,8 @@
 </template>
 
 <script>
-import { getKeys, loadStore } from '../store/store.js'
+"use strict";
+
 import 'animate.css';
 
 export default {

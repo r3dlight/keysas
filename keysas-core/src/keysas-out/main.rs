@@ -25,6 +25,7 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #[warn(unused_imports)]
+
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -82,6 +83,7 @@ struct FileData {
     fd: i32,
     md: FileMetadata,
 }
+
 #[derive(Serialize, Deserialize, Clone)]
 struct MetaData {
     name: String,
@@ -584,6 +586,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
             let mut path = PathBuf::new();
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
+
             let output = match File::options().write(true).create(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -612,6 +615,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
         }
         drop(file);
     }
+
     Ok(())
 }
 
@@ -625,6 +629,7 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
+
     landlock_sandbox(&config.sas_out)?;
 
     // Open socket with keysas-transit
@@ -643,6 +648,7 @@ fn main() -> Result<()> {
     // Allocate buffers for input messages
     let mut ancillary_buffer_in = [0; 128];
     let mut ancillary_in = SocketAncillary::new(&mut ancillary_buffer_in[..]);
+
 
     // Important: initialize liboqs
     oqs::init();
@@ -668,6 +674,7 @@ fn main() -> Result<()> {
         let files = parse_messages(ancillary_in.messages(), &buf_in);
 
         // Output file
+
         output_files(files, &config)?;
     }
 }
