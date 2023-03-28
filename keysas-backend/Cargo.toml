@@ -30,13 +30,13 @@ kv = "0.24"
 yubico_manager = "0.9"
 walkdir = "2.3"
 landlock = "0.2" 
-flexi_logger = "0.24"
+flexi_logger = "0.25"
 
 [dev-dependencies]
 criterion = "0.4"
 env_logger = "0.10"
 input_buffer = "0.5"
-socket2 = "0.4"
+socket2 = "0.5"
 rand = "0.8"
 
 

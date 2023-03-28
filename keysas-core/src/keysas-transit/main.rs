@@ -9,7 +9,6 @@
  */
 
 #![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
 #![feature(tcp_quickack)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -25,10 +24,10 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
+#![allow(clippy::forget_ref)]
 
 use anyhow::Result;
 use bincode::Options;
-use clamav_tcp;
 use clamav_tcp::scan;
 use clamav_tcp::version;
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -44,6 +43,7 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
+use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -67,6 +67,8 @@ use serde_derive::Deserialize;
 struct InputMetadata {
     filename: String,
     digest: String,
+    timestamp: String,
+    is_corrupted: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -75,11 +77,15 @@ struct FileMetadata {
     digest: String,
     is_digest_ok: bool,
     is_toobig: bool,
+    size: u64,
     is_type_allowed: bool,
     av_pass: bool,
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
+    timestamp: String,
+    is_corrupted: bool,
+    file_type: String,
 }
 
 #[derive(Debug)]
@@ -99,26 +105,18 @@ struct Configuration {
     rule_path: String,         // Path to yara rules
     yara_timeout: i32,         // Timeout for yara
     yara_rules: Option<Rules>, // Yara rules
+    type_off: bool,
 }
 
-fn landlock_sandbox(
-    socket_in: &String,
-    socket_out: &String,
-    rule_path: &String,
-) -> Result<(), RulesetError> {
+fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, socket_in, rule_path],
+            &[CONFIG_DIRECTORY, rule_path],
             AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(
-            &[socket_out, "/run/keysas"],
-            AccessFs::from_all(abi),
         ))?
         .restrict_self()?;
     match status.ruleset {
@@ -218,6 +216,20 @@ fn parse_args() -> Configuration {
                  .value_parser(clap::value_parser!(i32))
                  .help("Sets a custom timeout for libyara scans"),
          )
+         .arg(
+            Arg::new("type_off")
+                .short('m')
+                .long("type_off")
+                .action(clap::ArgAction::SetTrue)
+                .help("Disable the magic number check"),
+        )
+         .arg(
+            Arg::new("version")
+                .short('v')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print the version and exit"),
+        )
           .get_matches();
 
     // Unwrap should not panic with default values
@@ -236,6 +248,7 @@ fn parse_args() -> Configuration {
         rule_path: matches.get_one::<String>("rules_path").unwrap().to_string(),
         yara_timeout: *matches.get_one::<i32>("yara_timeout").unwrap(),
         yara_rules: None,
+        type_off: matches.get_flag("type_off"),
     }
 }
 
@@ -274,11 +287,15 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             digest: meta.digest,
                             is_digest_ok: false,
                             is_toobig: true,
+                            size: 0,
                             is_type_allowed: false,
                             av_pass: false,
                             av_report: Vec::new(),
                             yara_pass: false,
                             yara_report: String::new(),
+                            timestamp: meta.timestamp,
+                            is_corrupted: meta.is_corrupted,
+                            file_type: "Unknown".into(),
                         },
                     })
                 }
@@ -292,13 +309,19 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
-    match get(&buf) {
+fn check_is_extension_allowed(buf: &[u8], conf: &Configuration) -> bool {
+    match get(buf) {
         Some(info) => conf.magic_list.contains(&info.extension().to_string()),
         None => false,
     }
 }
-
+/// This function returns true if the file type is in the list provided
+fn get_extension(buf: Vec<u8>) -> String {
+    match get(&buf) {
+        Some(info) => info.to_string(),
+        None => "".into(),
+    }
+}
 /// This function check each file given in the input vector.
 /// Checks are made against the provided configuration.
 /// Checks performed are:
@@ -311,95 +334,148 @@ fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        let nfd = nix::unistd::dup2(f.fd, 15).unwrap();
-        let mut file = unsafe { File::from_raw_fd(nfd) };
-        // Synchronize the file before calculating the SHA256 hash
-        file.sync_all().unwrap();
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-        // Check digest
-        match sha256_digest(&file) {
-            Ok(d) => {
-                f.md.is_digest_ok = f.md.digest.eq(&d);
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to calculate digest for file {}, error {e}.",
-                    f.md.filename
-                );
-            }
-        }
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check size
-        match &file.metadata() {
-            Ok(meta) => {
-                f.md.is_toobig = meta.len().gt(&conf.max_size);
-            }
-            Err(e) => {
-                warn!("Failed to get metadata of file {} error {e}", f.md.filename);
-            }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check anti-virus
-        match scan(clam_addr.clone(), &mut file, None) {
-            Ok(result) => {
-                f.md.av_pass = !result.is_infected;
-                f.md.av_report = result.detected_infections;
-            }
-            Err(e) => {
-                error!("Failed to run clam on file {e}");
-                f.md.av_pass = false;
-            }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check yara rules
-        match &conf.yara_rules {
-            Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
-                Ok(results) => match results.is_empty() {
-                    true => {
-                        f.md.yara_pass = true;
+        match nix::unistd::dup2(f.fd, 500) {
+            Ok(nfd) => {
+                let mut file = unsafe { File::from_raw_fd(nfd) };
+                // Synchronize the file before calculating the SHA256 hash
+                file.sync_all().unwrap();
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
                     }
-                    false => {
-                        for result in results {
-                            f.md.yara_report.push_str(result.identifier);
-                        }
-                        f.md.yara_pass = false;
-                        warn!("Yara rules matched");
-                    }
-                },
-                Err(e) => {
-                    error!("Yara cannot scan file {} error {e}", f.md.filename);
                 }
-            },
-            None => {
-                error!("Yara rules not present");
-                f.md.yara_pass = false;
+                // Check digest
+                match sha256_digest(&file) {
+                    Ok(d) => {
+                        f.md.is_digest_ok = f.md.digest.eq(&d);
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to calculate digest for file {}, error {e}.",
+                            f.md.filename
+                        );
+                    }
+                }
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+
+                // Check size
+                match &file.metadata() {
+                    Ok(meta) => {
+                        f.md.is_toobig = meta.len().gt(&conf.max_size);
+                        f.md.size = meta.len();
+                    }
+                    Err(e) => {
+                        warn!("Failed to get metadata of file {} error {e}", f.md.filename);
+                    }
+                }
+
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check anti-virus
+                match scan(clam_addr.clone(), &mut file, None) {
+                    Ok(result) => {
+                        f.md.av_pass = !result.is_infected;
+                        f.md.av_report = result.detected_infections;
+                    }
+                    Err(e) => {
+                        error!("Failed to run clam on file {e}");
+                        f.md.av_pass = false;
+                    }
+                }
+
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check yara rules
+                match &conf.yara_rules {
+                    Some(rules) => match rules.scan_fd(&file, conf.yara_timeout) {
+                        Ok(results) => match results.is_empty() {
+                            true => {
+                                f.md.yara_pass = true;
+                            }
+                            false => {
+                                for result in results {
+                                    f.md.yara_report.push_str(result.identifier);
+                                }
+                                f.md.yara_pass = false;
+                                warn!("Yara rules matched");
+                            }
+                        },
+                        Err(e) => {
+                            error!("Yara cannot scan file {} error {e}", f.md.filename);
+                        }
+                    },
+                    None => {
+                        error!("Yara rules not present");
+                        f.md.yara_pass = false;
+                    }
+                }
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check the magic number
+                // Read only 1Mo of the file to be faster and do not read large files
+                let reader = BufReader::new(file);
+                let limited_reader = &mut reader.take(1024 * 1024);
+                let mut buffer = Vec::new();
+                match limited_reader.read_to_end(&mut buffer) {
+                    Ok(_) => {
+                        if !conf.type_off {
+                            f.md.is_type_allowed = check_is_extension_allowed(&buffer, conf);
+                            f.md.file_type = get_extension(buffer);
+                        } else {
+                            f.md.is_type_allowed = true;
+                            f.md.file_type = get_extension(buffer);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                        f.md.is_type_allowed = false;
+                        f.md.file_type = "Unknow".into();
+                    }
+                }
             }
-        }
-
-        // Position the cursor at the beginning of the file
-        unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet).unwrap();
-
-        // Check the magic number
-        // Read only 1Mo of the file to be faster and do not read large files
-        let reader = BufReader::new(file);
-        let limited_reader = &mut reader.take(1024 * 1024);
-        let mut buffer = Vec::new();
-        match limited_reader.read_to_end(&mut buffer) {
-            Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
             Err(e) => {
-                error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
-                f.md.is_type_allowed = false;
+                error!("Cannot duplicate file descriptor for analysing: {e:?}, killing myself.");
+                process::exit(1);
             }
-        }
+        };
+        log::info!(
+            "Report for {}: digest_ok: {}, type_allowed: {}, yara_pass: {}, av_pass: {}, too_big: {}",
+            f.md.filename,
+            f.md.is_digest_ok,
+            f.md.is_type_allowed,
+            f.md.yara_pass,
+            f.md.av_pass,
+            f.md.is_toobig
+        );
+        mem::forget(f);
     }
 }
 
@@ -421,31 +497,11 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
         let mut ancillary = SocketAncillary::new(&mut ancillary_buffer);
         ancillary.add_fds(&[file.fd][..]);
         match stream.send_vectored_with_ancillary(&bufs[..], &mut ancillary) {
-            Ok(_) => info!("File sent !"),
+            Ok(_) => info!("File {} sent to Keysas-out.", file.md.filename),
             Err(e) => error!("Failed to send file {e}."),
         }
     }
 }
-
-/// This function returns a client to clamd
-/*fn get_clamd_client(clamav_ip: &str, clamav_port: u16) -> Option<ClamClient> {
-    match ClamClient::new_with_timeout(clamav_ip, clamav_port, 5) {
-        Ok(client) => match client.version() {
-            Ok(version) => {
-                info!("Clamd version {:?}", version);
-                Some(client)
-            }
-            Err(e) => {
-                error!("Clamd is not responding {e}");
-                None
-            }
-        },
-        Err(e) => {
-            error!("Failed to contact clamd {e}");
-            None
-        }
-    }
-}*/
 
 fn main() -> Result<()> {
     // TODO activate seccomp
@@ -457,7 +513,7 @@ fn main() -> Result<()> {
     init_logger();
 
     // landlock init
-    landlock_sandbox(&config.socket_in, &config.socket_out, &config.rule_path)?;
+    landlock_sandbox(&config.rule_path)?;
 
     // Initilize clamd client
     // Test if ClamAV IP is valid

@@ -58,6 +58,7 @@ fn main() -> Result<()> {
     oqs::init();
 
     // Initialize Tauri
+
     task::block_on(init_tauri())?;
     Ok(())
 }
@@ -80,7 +81,6 @@ fn sha256_digest(password: &str) -> Result<String> {
     };
     Ok(format!("{:x}", digest))
 }
-
 
 static STORE_PATH: &str = ".keysas.dat";
 
@@ -356,7 +356,6 @@ async fn init_keysas(ip: String, name: String,
 
     session.close();
     */
-
     true
 }
 
@@ -614,7 +613,6 @@ async fn sign_key(ip: String, password: String) -> bool {
             return false;
         }
     }
-    
     true
 }
 
