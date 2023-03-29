@@ -24,7 +24,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#[warn(unused_imports)]
+#![warn(unused_imports)]
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -32,7 +32,7 @@ use ed25519_dalek::Signature as ECSignature;
 use ed25519_dalek::{Keypair, Signer};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
-use keysas_lib::pki::{KeysasClassicKey, KeysasKey, KeysasPQKey};
+use keysas_lib::pki::{KeysasKey, KeysasPQKey};
 use keysas_lib::sha256_digest;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
@@ -294,21 +294,17 @@ fn ec_sign(
 ) -> Result<Option<ECSignature>> {
     // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
     if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
-        let ed_loaded =
-            match KeysasClassicKey::load_keys(&secret_key.to_owned(), &"Keysas007".to_string()) {
+        let keypair_loaded =
+            match Keypair::load_keys(&secret_key.to_owned(), &"Keysas007".to_string()) {
                 Ok(ed) => ed,
                 Err(e) => {
                     log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
                     return Ok(None);
                 }
             };
-        let keypair = Keypair {
-            public: ed_loaded.public_key,
-            secret: ed_loaded.private_key,
-        };
         // Prepare the String to sign and sign it
         let concat = format!("{}-{}", file_digest, meta_digest);
-        let signature = keypair.sign(concat.as_bytes());
+        let signature = keypair_loaded.sign(concat.as_bytes());
         Ok(Some(signature))
     } else {
         log::warn!("No EC signature was created.");

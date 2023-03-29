@@ -1,5 +1,29 @@
-//use anyhow::Ok;
-use anyhow::{anyhow, Context};
+// SPDX-License-Identifier: GPL-3.0-only
+/*
+ * The "keysas-out".
+ *
+ * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ *
+ * This file contains various funtions
+ * for building the keysas-out binary.
+ */
+
+ #![warn(unused_extern_crates)]
+ #![forbid(non_shorthand_field_patterns)]
+ #![warn(dead_code)]
+ #![warn(missing_debug_implementations)]
+ #![warn(missing_copy_implementations)]
+ #![warn(trivial_casts)]
+ #![warn(trivial_numeric_casts)]
+ #![warn(unused_extern_crates)]
+ #![warn(unused_import_braces)]
+ #![warn(unused_qualifications)]
+ #![warn(variant_size_differences)]
+ #![forbid(private_in_public)]
+ #![warn(overflowing_literals)]
+ #![warn(deprecated)]
+ #![warn(unused_imports)]
+ use anyhow::{anyhow, Context};
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
 use ed25519_dalek::Sha512;
@@ -102,6 +126,7 @@ use x509_cert::time::Validity;
 //
 
 /// Structure containing informations to build the certificate
+#[derive(Debug)]
 pub struct CertificateFields {
     pub org_name: String,
     pub org_unit: String,
@@ -109,6 +134,7 @@ pub struct CertificateFields {
     pub validity: u32,
 }
 
+#[derive(Debug)]
 pub struct HybridKeyPair {
     classic: Keypair,
     classic_cert: Certificate,
@@ -116,20 +142,16 @@ pub struct HybridKeyPair {
     pq_pub: PublicKey,
     pq_cert: Certificate,
 }
-
+#[derive(Debug)]
 pub enum KeyType {
     CLASSIC,
     PQ,
 }
 
-pub struct KeysasClassicKey {
-    pub private_key: ed25519_dalek::SecretKey,
-    pub public_key: ed25519_dalek::PublicKey,
-}
-
+#[derive(Debug)]
 pub struct KeysasPQKey {
-    pub private_key: oqs::sig::SecretKey,
-    pub public_key: oqs::sig::PublicKey,
+    pub private_key: SecretKey,
+    pub public_key: PublicKey,
 }
 
 const DILITHIUM5_OID: &str = "1.3.6.1.4.1.2.267.7.8.7";
@@ -652,8 +674,9 @@ pub trait KeysasKey<T> {
     //fn save_keys(&self, path: &String) -> Result<()>;
 }
 
-impl KeysasKey<KeysasClassicKey> for KeysasClassicKey {
-    fn load_keys(path: &String, pwd: &String) -> Result<KeysasClassicKey, anyhow::Error> {
+// Implementing new methods on top of dalek Keypair
+impl KeysasKey<Keypair> for Keypair {
+    fn load_keys(path: &String, pwd: &String) -> Result<Keypair, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
 
@@ -677,13 +700,13 @@ impl KeysasKey<KeysasClassicKey> for KeysasClassicKey {
                 ));
             }
         };
-        // ed25519 is 32 bytes long
+        // ed25519 is only 32 bytes long
         if decoded_pk.private_key.len() == 32 {
             match ed25519_dalek::SecretKey::from_bytes(decoded_pk.private_key) {
                 Ok(secret_key) => {
-                    return Ok(KeysasClassicKey {
-                        public_key: (&(secret_key)).into(),
-                        private_key: secret_key,
+                    return Ok(Keypair {
+                        public: (&(secret_key)).into(),
+                        secret: secret_key,
                     });
                 }
                 Err(e) => {
