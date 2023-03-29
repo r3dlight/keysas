@@ -399,7 +399,7 @@ pub fn generate_signed_keypair(
     let mut csprng = OsRng {};
     let kp_ed = Keypair::generate(&mut csprng);
     // Construct a CSR for the ED25519 key
-    let csr_ed = generate_csr_ed25519(&kp_ed, &subject)?;
+    let csr_ed = kp_ed.generate_csr(&subject)?;
     // Generate a certificate from the CSR
     let cert_ed = generate_cert_from_csr(ca_keys, &csr_ed, pki_infos)?;
 
@@ -407,8 +407,12 @@ pub fn generate_signed_keypair(
     // Create the Dilithium key pair
     let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
     let (pk_dl, sk_dl) = pq_scheme.keypair()?;
+    let kp_pq = KeysasPQKey {
+        private_key: sk_dl,
+        public_key: pk_dl
+    };
     // Construct a CSR for the Dilithium key
-    let csr_dl = generate_csr_dilithium5(&pk_dl, &sk_dl, &subject)?;
+    let csr_dl = kp_pq.generate_csr(&subject)?;
     // Generate a certificate from the CSR
     let cert_dl = generate_cert_from_csr(ca_keys, &csr_dl, pki_infos)?;
 
@@ -416,8 +420,8 @@ pub fn generate_signed_keypair(
     Ok(HybridKeyPair {
         classic: kp_ed,
         classic_cert: cert_ed,
-        pq_priv: sk_dl,
-        pq_pub: pk_dl,
+        pq_priv: kp_pq.private_key,
+        pq_pub: kp_pq.public_key,
         pq_cert: cert_dl,
     })
 }
@@ -501,6 +505,7 @@ fn generate_cert_from_csr(
     }
 }
 
+/*
 fn generate_csr_ed25519(
     keypair: &Keypair,
     subject: &RdnSequence,
@@ -585,8 +590,6 @@ pub fn generate_cert_requests(
     keys: &HybridKeyPair,
     info: &CertificateFields,
 ) -> Result<String, anyhow::Error> {
-    /*
-
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
     let info = CertReqInfo {
@@ -603,9 +606,9 @@ pub fn generate_cert_requests(
     };
 
     csr.to_pem(LineEnding::LF)
-    */
     Ok(String::from("TODO"))
 }
+*/
 
 /// Store a keypair in a PKCS8 file with a password
 fn store_keypair(
@@ -672,6 +675,7 @@ fn store_keypair(
 pub trait KeysasKey<T> {
     fn load_keys(path: &String, pwd: &String) -> Result<T, anyhow::Error>;
     //fn save_keys(&self, path: &String) -> Result<()>;
+    fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
@@ -718,6 +722,44 @@ impl KeysasKey<Keypair> for Keypair {
         } else {
             return Err(anyhow!("Key is not 32 bytes long"));
         }
+    }
+
+    fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
+        let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+
+        let pub_key = BitString::from_bytes(&self.public.to_bytes())
+            .with_context(|| "Failed get public key raw value")?;
+
+        let info = CertReqInfo {
+            version: x509_cert::request::Version::V1,
+            subject: subject.to_owned(),
+            public_key: SubjectPublicKeyInfo {
+                algorithm: AlgorithmIdentifier {
+                    oid: ed25519_oid,
+                    parameters: None,
+                },
+                subject_public_key: pub_key,
+            },
+            attributes: SetOfVec::new(),
+        };
+
+        let content = info.to_der().with_context(|| "Failed to convert to DER")?;
+        let mut prehashed = Sha512::new();
+        prehashed.update(content);
+        let signature = self
+            .sign_prehashed(prehashed, None)
+            .with_context(|| "Failed to sign certificate content")?;
+
+        let csr = CertReq {
+            info: info,
+            algorithm: AlgorithmIdentifier {
+                oid: ed25519_oid,
+                parameters: None,
+            },
+            signature: BitString::from_bytes(&signature.to_bytes())?,
+        };
+
+        Ok(csr)
     }
 }
 
@@ -780,5 +822,40 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             }
             None => return Err(anyhow!("No PQC public key found in pkcs#8 format")),
         };
+    }
+
+    fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
+        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+
+        let pub_key = BitString::from_bytes(&self.public_key.clone().into_vec())
+            .with_context(|| "Failed get public key raw value")?;
+    
+        let info = CertReqInfo {
+            version: x509_cert::request::Version::V1,
+            subject: subject.to_owned(),
+            public_key: SubjectPublicKeyInfo {
+                algorithm: AlgorithmIdentifier {
+                    oid: dilithium5_oid,
+                    parameters: None,
+                },
+                subject_public_key: pub_key,
+            },
+            attributes: SetOfVec::new(),
+        };
+    
+        let content = info.to_der().with_context(|| "Failed to convert to DER")?;
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let signature = pq_scheme.sign(&content, &self.private_key)?;
+    
+        let csr = CertReq {
+            info: info,
+            algorithm: AlgorithmIdentifier {
+                oid: dilithium5_oid,
+                parameters: None,
+            },
+            signature: BitString::from_bytes(&signature.into_vec())?,
+        };
+    
+        Ok(csr)
     }
 }
