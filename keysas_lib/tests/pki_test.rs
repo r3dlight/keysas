@@ -226,7 +226,7 @@ fn test_generate_csr_dilithium5() {
     let (pk, sk) = pq_scheme.keypair().unwrap();
     let keypair = KeysasPQKey {
         private_key: sk,
-        public_key: pk
+        public_key: pk.clone()
     };
 
     // Generate a CSR
@@ -234,11 +234,13 @@ fn test_generate_csr_dilithium5() {
     let csr = keypair.generate_csr(&subject).unwrap();
 
     // Test the CSR signature
-    let info = csr.info.to_der().unwrap();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
-    let signature = pq_scheme.sign(&info, &keypair.private_key).unwrap();
-
-    assert_eq!(csr.signature, BitString::from_bytes(&signature.into_vec()).unwrap());
+    match pq_scheme.verify(
+        &csr.info.to_der().unwrap(),
+        pq_scheme.signature_from_bytes(csr.signature.as_bytes().unwrap()).unwrap(),
+        &keypair.public_key) {
+        Ok(_) => assert!(true),
+        Err(e) => assert!(false, "{}", e)
+    }
 
     // Test CSR signing algorithm
     let dilithium5_oid = ObjectIdentifier::new("1.3.6.1.4.1.2.267.7.8.7").unwrap();
