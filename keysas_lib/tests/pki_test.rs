@@ -1,9 +1,22 @@
+use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
+use ed25519_dalek::Sha512;
 use hex_literal::hex;
+use keysas_lib::pki::KeysasKey;
+use keysas_lib::pki::KeysasPQKey;
+use oqs::sig::Algorithm;
+use oqs::sig::Sig;
+use pkcs8::der::Any;
+use pkcs8::der::Encode;
+use pkcs8::der::asn1::BitString;
+use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::PrivateKeyInfo;
+use pkcs8::pkcs5::scrypt::Params;
+use pkcs8::spki::AlgorithmIdentifier;
 use rand_dl::rngs::OsRng;
+use x509_cert::name::RdnSequence;
 #[cfg(test)]
 use std::fs::read;
 use tempdir::TempDir;
@@ -165,62 +178,89 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
 }
 
 #[test]
-fn test_pkcs8_create_and_decrypt_with_public_pem() {
+fn test_generate_csr_ed25519() {
     // Create a random keypair
     let mut csprng = OsRng {};
     let keypair = Keypair::generate(&mut csprng);
 
-    println!("Test PEM - Private key: {:?}", &keypair.secret.to_bytes());
-    println!("Test PEM - Public key: {:?}", &keypair.public.to_bytes());
+    // Generate a CSR
+    let subject = RdnSequence::default();
+    let csr = keypair.generate_csr(&subject).unwrap();
 
-    // Store the key as DER in PKCS8
-    let dir = TempDir::new("Test_DER").unwrap();
-    let path = dir.path().join("priv.der");
+    // Test the CSR signature
+    let info = csr.info.to_der().unwrap();
+    let mut prehashed = Sha512::new();
+    prehashed.update(info);
+    let signature = keypair.sign_prehashed(prehashed, None).unwrap();
 
-    let params = pbes2::Parameters::scrypt_aes256cbc(
-        pkcs8::pkcs5::scrypt::Params::recommended(),
-        &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
-    )
-    .unwrap();
+    assert_eq!(csr.signature, BitString::from_bytes(&signature.to_bytes()).unwrap());
 
-    let oid = ObjectIdentifier::new("1.3.101.112").unwrap();
+    // Test CSR signing algorithm
+    let ed25519_oid = ObjectIdentifier::new("1.3.101.112").unwrap();
+    let ref_algo: AlgorithmIdentifier<Any> = AlgorithmIdentifier {
+        oid: ed25519_oid,
+        parameters: None
+    };
+    assert_eq!(csr.algorithm, ref_algo);
 
-    let pub_value = keypair.public.to_bytes();
-    let pk_info = PrivateKeyInfo {
-        algorithm: pkcs8::AlgorithmIdentifierRef {
-            oid: oid,
-            parameters: None,
-        },
-        private_key: &keypair.secret.to_bytes(),
-        public_key: Some(&pub_value),
+    // Test CSR Version number
+    assert_eq!(csr.info.version, x509_cert::request::Version::V1);
+
+    // Test CSR subject name
+    assert_eq!(csr.info.subject, subject);
+
+    // Test CSR public key value
+    assert_eq!(csr.info.public_key.subject_public_key, BitString::from_bytes(&keypair.public.to_bytes()).unwrap());
+    assert_eq!(csr.info.public_key.algorithm, ref_algo);
+
+    // Test CSR attributes
+    // The CSR must not contain any attribute
+    assert_eq!(csr.info.attributes.len(), 0);
+}
+
+#[test]
+fn test_generate_csr_dilithium5() {
+    // Create the root CA Dilithium key pair
+    oqs::init();
+    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+    let (pk, sk) = pq_scheme.keypair().unwrap();
+    let keypair = KeysasPQKey {
+        private_key: sk,
+        public_key: pk.clone()
     };
 
-    let pk_encrypted = pk_info.encrypt_with_params(params, PASSWORD).unwrap();
+    // Generate a CSR
+    let subject = RdnSequence::default();
+    let csr = keypair.generate_csr(&subject).unwrap();
 
-    // Standard label to be recognized by Openssl
-    pk_encrypted
-        .write_pem_file(&path, "ENCRYPTED PRIVATE KEY", pkcs8::LineEnding::LF)
-        .unwrap();
+    // Test the CSR signature
+    match pq_scheme.verify(
+        &csr.info.to_der().unwrap(),
+        pq_scheme.signature_from_bytes(csr.signature.as_bytes().unwrap()).unwrap(),
+        &keypair.public_key) {
+        Ok(_) => assert!(true),
+        Err(e) => assert!(false, "{}", e)
+    }
 
-    // Load key from file
-    let cipher = read(&path).unwrap();
+    // Test CSR signing algorithm
+    let dilithium5_oid = ObjectIdentifier::new("1.3.6.1.4.1.2.267.7.8.7").unwrap();
+    let ref_algo: AlgorithmIdentifier<Any> = AlgorithmIdentifier {
+        oid: dilithium5_oid,
+        parameters: None
+    };
+    assert_eq!(csr.algorithm, ref_algo);
 
-    let enc_pk = EncryptedPrivateKeyInfo::try_from(cipher.as_slice()).unwrap();
+    // Test CSR Version number
+    assert_eq!(csr.info.version, x509_cert::request::Version::V1);
 
-    let sd = enc_pk.decrypt(PASSWORD).unwrap();
-    println!(
-        "Test PEM - Secret document - length: {:?}, content: {:?}",
-        sd.len(),
-        sd.as_bytes()
-    );
+    // Test CSR subject name
+    assert_eq!(csr.info.subject, subject);
 
-    let pk: PrivateKeyInfo = sd.decode_msg().unwrap();
-    println!("Test PEM - Private key - content: {:?}", pk.private_key);
-    println!("Test PEM - Public key - content: {:?}", pk.public_key);
+    // Test CSR public key value
+    assert_eq!(csr.info.public_key.subject_public_key, BitString::from_bytes(&keypair.public_key.clone().into_vec()).unwrap());
+    assert_eq!(csr.info.public_key.algorithm, ref_algo);
 
-    assert_eq!(pk.private_key, keypair.secret.to_bytes());
-    assert_eq!(pk.public_key.unwrap(), keypair.public.to_bytes());
-
-    dir.close().unwrap();
+    // Test CSR attributes
+    // The CSR must not contain any attribute
+    assert_eq!(csr.info.attributes.len(), 0);
 }
