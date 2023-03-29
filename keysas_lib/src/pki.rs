@@ -34,8 +34,6 @@ use oqs::sig::SecretKey;
 use oqs::sig::Sig;
 use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
-use pkcs8::pkcs5::scrypt::scrypt;
-use pkcs8::DecodePrivateKey;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
@@ -504,111 +502,6 @@ fn generate_cert_from_csr(
         return Err(anyhow!("Invalid algorithm OID"));
     }
 }
-
-/*
-fn generate_csr_ed25519(
-    keypair: &Keypair,
-    subject: &RdnSequence,
-) -> Result<CertReq, anyhow::Error> {
-    let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
-
-    let pub_key = BitString::from_bytes(&keypair.public.to_bytes())
-        .with_context(|| "Failed get public key raw value")?;
-
-    let info = CertReqInfo {
-        version: x509_cert::request::Version::V1,
-        subject: subject.to_owned(),
-        public_key: SubjectPublicKeyInfo {
-            algorithm: AlgorithmIdentifier {
-                oid: ed25519_oid,
-                parameters: None,
-            },
-            subject_public_key: pub_key,
-        },
-        attributes: SetOfVec::new(),
-    };
-
-    let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-    let mut prehashed = Sha512::new();
-    prehashed.update(content);
-    let signature = keypair
-        .sign_prehashed(prehashed, None)
-        .with_context(|| "Failed to sign certificate content")?;
-
-    let csr = CertReq {
-        info: info,
-        algorithm: AlgorithmIdentifier {
-            oid: ed25519_oid,
-            parameters: None,
-        },
-        signature: BitString::from_bytes(&signature.to_bytes())?,
-    };
-
-    Ok(csr)
-}
-
-fn generate_csr_dilithium5(
-    pk: &PublicKey,
-    sk: &SecretKey,
-    subject: &RdnSequence,
-) -> Result<CertReq, anyhow::Error> {
-    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
-
-    let pub_key = BitString::from_bytes(&pk.clone().into_vec())
-        .with_context(|| "Failed get public key raw value")?;
-
-    let info = CertReqInfo {
-        version: x509_cert::request::Version::V1,
-        subject: subject.to_owned(),
-        public_key: SubjectPublicKeyInfo {
-            algorithm: AlgorithmIdentifier {
-                oid: dilithium5_oid,
-                parameters: None,
-            },
-            subject_public_key: pub_key,
-        },
-        attributes: SetOfVec::new(),
-    };
-
-    let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-    let signature = pq_scheme.sign(&content, sk)?;
-
-    let csr = CertReq {
-        info: info,
-        algorithm: AlgorithmIdentifier {
-            oid: dilithium5_oid,
-            parameters: None,
-        },
-        signature: BitString::from_bytes(&signature.into_vec())?,
-    };
-
-    Ok(csr)
-}
-
-pub fn generate_cert_requests(
-    keys: &HybridKeyPair,
-    info: &CertificateFields,
-) -> Result<String, anyhow::Error> {
-    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
-
-    let info = CertReqInfo {
-        version: x509_cert::request::Version::V1,
-        subject: RdnSequence::default(),
-        public_key: SubjectPublicKeyInfo { algorithm: (), subject_public_key: () },
-        attributes: ()
-    };
-
-    let csr = CertReq {
-        info: info,
-        algorithm: AlgorithmIdentifier { oid: (), parameters: () },
-        signature: ()
-    };
-
-    csr.to_pem(LineEnding::LF)
-    Ok(String::from("TODO"))
-}
-*/
 
 /// Store a keypair in a PKCS8 file with a password
 fn store_keypair(
