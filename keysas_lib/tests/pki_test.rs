@@ -264,3 +264,48 @@ fn test_generate_csr_dilithium5() {
     // The CSR must not contain any attribute
     assert_eq!(csr.info.attributes.len(), 0);
 }
+
+#[test]
+fn test_save_and_load_ed25519() {
+    // Create a random keypair
+    let mut csprng = OsRng {};
+    let keypair = Keypair::generate(&mut csprng);
+
+    // Store the key as DER in PKCS8
+    let dir = TempDir::new("Test_SaveLoad_ed25519").unwrap();
+    let path = dir.path().join("priv.der");
+
+    // Save the keypair
+    keypair.save_keys(&path, &String::from("Test")).unwrap();
+
+    // Load the keypair
+    let loaded = Keypair::load_keys(&path, &String::from("Test")).unwrap();
+
+    assert_eq!(loaded.secret.to_bytes(), keypair.secret.to_bytes());
+    assert_eq!(loaded.public.to_bytes(), keypair.public.to_bytes());
+}
+
+#[test]
+fn test_save_and_load_dilithium5() {
+    // Create the root CA Dilithium key pair
+    oqs::init();
+    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+    let (pk, sk) = pq_scheme.keypair().unwrap();
+    let keypair = KeysasPQKey {
+        private_key: sk,
+        public_key: pk.clone()
+    };
+
+    // Store the key as DER in PKCS8
+    let dir = TempDir::new("Test_SaveLoad_dilithium5").unwrap();
+    let path = dir.path().join("priv.der");
+
+    // Save the keypair
+    keypair.save_keys(&path, &String::from("Test")).unwrap();
+
+    // Load the keypair
+    let loaded = KeysasPQKey::load_keys(&path, &String::from("Test")).unwrap();
+
+    assert_eq!(loaded.private_key.into_vec(), keypair.private_key.into_vec());
+    assert_eq!(loaded.public_key.into_vec(), keypair.public_key.into_vec());
+}

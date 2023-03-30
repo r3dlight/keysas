@@ -37,6 +37,7 @@ use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
+use rand_dl::RngCore;
 use rand_dl::rngs::OsRng;
 use std::fs;
 use std::fs::File;
@@ -133,23 +134,22 @@ pub struct CertificateFields {
 }
 
 #[derive(Debug)]
+pub struct KeysasPQKey {
+    pub private_key: SecretKey,
+    pub public_key: PublicKey,
+}
+
+#[derive(Debug)]
 pub struct HybridKeyPair {
     classic: Keypair,
     classic_cert: Certificate,
-    pq_priv: SecretKey,
-    pq_pub: PublicKey,
+    pq: KeysasPQKey,
     pq_cert: Certificate,
 }
 #[derive(Debug)]
 pub enum KeyType {
     CLASSIC,
     PQ,
-}
-
-#[derive(Debug)]
-pub struct KeysasPQKey {
-    pub private_key: SecretKey,
-    pub public_key: PublicKey,
 }
 
 const DILITHIUM5_OID: &str = "1.3.6.1.4.1.2.267.7.8.7";
@@ -338,29 +338,23 @@ pub fn generate_root(
     let hk = HybridKeyPair {
         classic: kp_ed,
         classic_cert: cert_ed,
-        pq_priv: sk_dl,
-        pq_pub: pk_dl,
+        pq: KeysasPQKey {
+            private_key: sk_dl,
+            public_key: pk_dl
+        },
         pq_cert: cert_dl,
     };
 
     // Save hybrid key pair to disk
-    store_keypair(
-        &hk.classic.secret.to_bytes(),
-        &hk.classic.public.to_bytes(),
-        KeyType::CLASSIC,
-        pwd,
-        &(pki_dir.to_owned() + "/CA/root-priv-cl.p8"),
-    )
-    .context("ED25519 storing failed")?;
+    hk.classic.save_keys(
+        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-cl.p8")),
+        pwd)
+        .context("ED25519 storing failed")?;
 
-    store_keypair(
-        hk.pq_priv.as_ref(),
-        hk.pq_pub.as_ref(),
-        KeyType::PQ,
-        pwd,
-        &(pki_dir.to_owned() + "/CA/root-priv-pq.p8"),
-    )
-    .context("Dilithium storing failed")?;
+    hk.pq.save_keys(
+        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-pq.p8")),
+        pwd)
+        .context("Dilithium storing failed")?;
 
     // Save certificate pair to disk
     let mut out_cl = File::create(pki_dir.to_owned() + "/CA/root-cert-cl.pem")?;
@@ -418,8 +412,10 @@ pub fn generate_signed_keypair(
     Ok(HybridKeyPair {
         classic: kp_ed,
         classic_cert: cert_ed,
-        pq_priv: kp_pq.private_key,
-        pq_pub: kp_pq.public_key,
+        pq: KeysasPQKey {
+            private_key: kp_pq.private_key,
+            public_key: kp_pq.public_key
+        },
         pq_cert: cert_dl,
     })
 }
@@ -486,7 +482,7 @@ fn generate_cert_from_csr(
         let content = tbs.to_der()?;
 
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let signature = pq_scheme.sign(&content, &ca_keys.pq_priv)?;
+        let signature = pq_scheme.sign(&content, &ca_keys.pq.private_key)?;
 
         let cert = Certificate {
             tbs_certificate: tbs,
@@ -507,27 +503,24 @@ fn generate_cert_from_csr(
 fn store_keypair(
     prk: &[u8],
     pbk: &[u8],
-    kind: KeyType,
+    oid: ObjectIdentifier,
     pwd: &String,
-    path: &String,
+    path: &Path,
 ) -> Result<(), anyhow::Error> {
+    //Initialize key wrap function parameters
+    let mut salt = [0u8; 16];
+    OsRng.fill_bytes(&mut salt);
+    let mut iv = [0u8; 16];
+    OsRng.fill_bytes(&mut iv);
     let params = match pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
-        &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+        &salt,
+        &iv,
     ) {
         Ok(p) => p,
         Err(e) => {
             return Err(anyhow!("Failed to generate scrypt parameter: {e}"));
         }
-    };
-
-    let (label, oid) = match kind {
-        KeyType::CLASSIC => ("ENCRYPTED PRIVATE KEY", ObjectIdentifier::new(ED25519_OID)?),
-        KeyType::PQ => (
-            "ENCRYPTED PRIVATE KEY",
-            ObjectIdentifier::new(DILITHIUM5_OID)?,
-        ),
     };
 
     let pk_info = PrivateKeyInfo {
@@ -547,33 +540,20 @@ fn store_keypair(
         }
     };
 
-    pk_encrypted.write_pem_file(path, label, LineEnding::LF)?;
-
-    // Test to load saved keys
-
-    // match test_key.load_keys(path, pwd) {
-    //     Ok(r) => r,
-    //     Err(e) => {
-    //         log::error!("Failed to load back key: {e}");
-    //         return Err(anyhow!("Failed to load back key: {e}"));
-    //     }
-    // };
-
-    // log::debug!("PRK: {:?}", prk);
-    // log::debug!("Saved PRK: {:?}", s_prk);
+    pk_encrypted.write_der_file(path)?;
 
     Ok(())
 }
 
 pub trait KeysasKey<T> {
-    fn load_keys(path: &String, pwd: &String) -> Result<T, anyhow::Error>;
-    //fn save_keys(&self, path: &String) -> Result<()>;
+    fn load_keys(path: &Path, pwd: &String) -> Result<T, anyhow::Error>;
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error>;
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
 impl KeysasKey<Keypair> for Keypair {
-    fn load_keys(path: &String, pwd: &String) -> Result<Keypair, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &String) -> Result<Keypair, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
 
@@ -617,6 +597,18 @@ impl KeysasKey<Keypair> for Keypair {
         }
     }
 
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
+        let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+
+        store_keypair(
+            self.secret.as_bytes(),
+            self.public.as_bytes(), 
+            ed25519_oid,
+            pwd,
+            path
+        )
+    }
+
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
@@ -657,7 +649,7 @@ impl KeysasKey<Keypair> for Keypair {
 }
 
 impl KeysasKey<KeysasPQKey> for KeysasPQKey {
-    fn load_keys(path: &String, pwd: &String) -> Result<KeysasPQKey, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &String) -> Result<KeysasPQKey, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {
@@ -715,6 +707,18 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             }
             None => return Err(anyhow!("No PQC public key found in pkcs#8 format")),
         };
+    }
+
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
+        let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+
+        store_keypair(
+            &self.private_key.clone().into_vec(),
+            &self.public_key.clone().into_vec(), 
+            ed25519_oid,
+            pwd,
+            path
+        )
     }
 
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
