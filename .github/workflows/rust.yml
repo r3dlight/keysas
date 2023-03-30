@@ -24,7 +24,7 @@ jobs:
     - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
     - run: |
         sudo apt-get update -yq
-        sudo apt -y install libyara-dev libyara8 wget make lsb-release software-properties-common libseccomp-dev pkg-config git bash libudev-dev
+        sudo apt -y install libyara-dev libyara8 wget make lsb-release software-properties-common libseccomp-dev pkg-config git bash libudev-dev cmake
     - run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
     - name: Build
       run: cargo build --verbose

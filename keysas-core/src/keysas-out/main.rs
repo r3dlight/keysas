@@ -9,7 +9,6 @@
  */
 
 #![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
 #![feature(tcp_quickack)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -25,11 +24,15 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#[warn(unused_imports)]
-use anyhow::Result;
+#![warn(unused_imports)]
+use anyhow::{Context, Result};
+use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::Signature as ECSignature;
+use ed25519_dalek::{Keypair, Signer};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
+use keysas_lib::pki::{KeysasKey, KeysasPQKey};
 use keysas_lib::sha256_digest;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
@@ -37,6 +40,7 @@ use landlock::{
 };
 use log::{error, info, warn};
 use nix::unistd;
+use oqs::sig::Signature;
 use sha2::Digest;
 use sha2::Sha256;
 use std::fs::File;
@@ -46,9 +50,11 @@ use std::io::{BufWriter, IoSliceMut, Write};
 use std::os::fd::FromRawFd;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{AncillaryData, Messages, SocketAddr, SocketAncillary, UnixStream};
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str;
+use time::OffsetDateTime;
 
 #[macro_use]
 extern crate serde_derive;
@@ -59,39 +65,15 @@ struct FileMetadata {
     digest: String,
     is_digest_ok: bool,
     is_toobig: bool,
+    size: u64,
     is_type_allowed: bool,
     av_pass: bool,
     av_report: Vec<String>,
     yara_pass: bool,
-    yara_report: String,
+    yara_report: String, // this should be a vec
     timestamp: String,
-}
-
-impl FileMetadata {
-    fn compute_sha256(&self) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(self.filename.as_bytes());
-        hasher.update(self.digest.as_bytes());
-        hasher.update(if self.is_digest_ok { "true" } else { "false" }.as_bytes());
-        hasher.update(if self.is_toobig { "true" } else { "false" }.as_bytes());
-        hasher.update(
-            if self.is_type_allowed {
-                "true"
-            } else {
-                "false"
-            }
-            .as_bytes(),
-        );
-        hasher.update(if self.av_pass { "true" } else { "false" }.as_bytes());
-        for report in &self.av_report {
-            hasher.update(report.as_bytes());
-        }
-        hasher.update(if self.yara_pass { "true" } else { "false" }.as_bytes());
-        hasher.update(self.yara_report.as_bytes());
-
-        let result = hasher.finalize();
-        format!("{result:x}")
-    }
+    is_corrupted: bool,
+    file_type: String,
 }
 
 #[derive(Debug)]
@@ -100,10 +82,37 @@ struct FileData {
     md: FileMetadata,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
+struct MetaData {
+    name: String,
+    date: String,
+    file_type: String,
+    is_valid: bool,
+    report: FileReport,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Bd {
+    file_digest: String,
+    metadata_digest: String,
+    station_certificate: String,
+    file_signature: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 struct Report {
-    md: FileMetadata,
-    md_digest: String,
+    metadata: MetaData,
+    binding: Bd,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct FileReport {
+    yara: String,
+    av: Vec<String>,
+    type_allowed: bool,
+    size: u64,
+    corrupted: bool,
+    toobig: bool,
 }
 
 /// Daemon configuration arguments
@@ -111,6 +120,10 @@ struct Configuration {
     socket_out: String, // Path for the socket with keysas-transit
     sas_out: String,    // Path to output directory
     yara_clean: bool,
+    signing_pq_cert: String,
+    signing_pq_key: String,
+    signing_cert: String,
+    signing_key: String,
 }
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -176,6 +189,38 @@ fn parse_args() -> Configuration {
                 .help("Remove the file if a Yara rule matched"),
         )
         .arg(
+            Arg::new("signing_pq_cert")
+                .short('p')
+                .long("signing_pq_cert")
+                .default_value("/etc/keysas/file-pq-sign.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to post-quantum signing PEM certificat (must be imported and signed)"),
+        )
+        .arg(
+            Arg::new("signing_pq_key")
+                .short('s')
+                .long("signing_pq_key")
+                .default_value("/etc/keysas/file-sign-pq-priv.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to secret post-quantum signing key"),
+        )
+        .arg(
+            Arg::new("signing_cert")
+                .short('z')
+                .long("signing_cert")
+                .default_value("/etc/keysas/file-sign.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to signing PEM certificat (must be imported and signed)"),
+        )
+        .arg(
+            Arg::new("signing_key")
+                .short('w')
+                .long("signing_key")
+                .default_value("/etc/keysas/file-sign-priv.pem")
+                .action(clap::ArgAction::Set)
+                .help("Path to secret signing key"),
+        )
+        .arg(
             Arg::new("version")
                 .short('v')
                 .long("version")
@@ -189,6 +234,22 @@ fn parse_args() -> Configuration {
         socket_out: matches.get_one::<String>("socket_out").unwrap().to_string(),
         sas_out: matches.get_one::<String>("sas_out").unwrap().to_string(),
         yara_clean: matches.get_flag("yara_clean"),
+        signing_pq_cert: matches
+            .get_one::<String>("signing_pq_cert")
+            .unwrap()
+            .to_string(),
+        signing_pq_key: matches
+            .get_one::<String>("signing_pq_key")
+            .unwrap()
+            .to_string(),
+        signing_cert: matches
+            .get_one::<String>("signing_cert")
+            .unwrap()
+            .to_string(),
+        signing_key: matches
+            .get_one::<String>("signing_key")
+            .unwrap()
+            .to_string(),
     }
 }
 
@@ -226,9 +287,64 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
         .collect()
 }
 
+fn ec_sign(
+    file_digest: &String,
+    meta_digest: &String,
+    secret_key: &str,
+) -> Result<Option<ECSignature>> {
+    // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
+    if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
+        let keypair_loaded = match Keypair::load_keys(Path::new(secret_key), "Keysas007") {
+            Ok(ed) => ed,
+            Err(e) => {
+                log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
+                return Ok(None);
+            }
+        };
+        // Prepare the String to sign and sign it
+        let concat = format!("{}-{}", file_digest, meta_digest);
+        let signature = keypair_loaded.sign(concat.as_bytes());
+        Ok(Some(signature))
+    } else {
+        log::warn!("No EC signature was created.");
+        Ok(None)
+    }
+}
+
+fn pq_sign(
+    file_digest: &String,
+    meta_digest: &String,
+    ec_signature: String,
+    secret_pq_key: &str,
+) -> Result<Option<Signature>> {
+    // Check that secret key is on disk
+    if Path::new(secret_pq_key).exists() && Path::new(secret_pq_key).is_file() {
+        // Choosing Dilithium Level 5
+        let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5)
+            .context("Unable to create new signature scheme")?;
+        let pq_loaded = match KeysasPQKey::load_keys(Path::new(secret_pq_key), "Keysas007") {
+            Ok(ed) => ed,
+            Err(e) => {
+                log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
+                return Ok(None);
+            }
+        };
+        // Concat both digest and previously created EC signature
+        let concat = format!("{}-{}-{}", file_digest, meta_digest, ec_signature);
+        // Get the final signature
+        let signature = scheme
+            .sign(concat.as_bytes(), &pq_loaded.private_key)
+            .context("Unable to create signature")?;
+        Ok(Some(signature))
+    } else {
+        log::warn!("No PQ signature was created.");
+        Ok(None)
+    }
+}
+
 /// This function output files and report received from transit
 /// The function first check the digest of the file received
-fn output_files(files: Vec<FileData>, conf: &Configuration) {
+fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
         // Position the cursor at the beginning of the file
@@ -279,12 +395,118 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
                 process::exit(1);
             }
         };
+        let timestamp = format!(
+            "{}-{}-{}_{}-{}-{}-{}",
+            OffsetDateTime::now_utc().day(),
+            OffsetDateTime::now_utc().month(),
+            OffsetDateTime::now_utc().year(),
+            OffsetDateTime::now_utc().hour(),
+            OffsetDateTime::now_utc().minute(),
+            OffsetDateTime::now_utc().second(),
+            OffsetDateTime::now_utc().nanosecond()
+        );
 
-        let struct_report = Report {
-            md: f.md.clone(),
-            md_digest: f.md.compute_sha256(),
+        let new_file_report = FileReport {
+            yara: f.md.yara_report.clone(),
+            av: f.md.av_report.clone(),
+            type_allowed: f.md.is_type_allowed,
+            size: f.md.size,
+            corrupted: f.md.is_corrupted,
+            toobig: f.md.is_toobig,
         };
-        let json_report = match serde_json::to_string_pretty(&struct_report) {
+
+        let mut cert_file = Vec::new();
+        // Get data from pem cert located in /etc/keysas
+        if Path::new(&conf.signing_pq_cert).exists() && Path::new(&conf.signing_pq_cert).is_file() {
+            cert_file = match std::fs::read(&conf.signing_pq_cert) {
+                Ok(cert_file) => cert_file,
+                Err(e) => {
+                    error!("Cannot read certificate: {e}");
+                    continue;
+                }
+            };
+        }
+
+        let new_metadata = MetaData {
+            name: f.md.filename.clone(),
+            date: timestamp,
+            file_type: f.md.file_type.clone(),
+            is_valid: f.md.av_pass
+                && f.md.yara_pass
+                && !f.md.is_toobig
+                && !f.md.is_corrupted
+                && f.md.is_digest_ok
+                && f.md.is_type_allowed,
+            report: new_file_report,
+        };
+        let json_string = serde_json::to_string_pretty(&new_metadata)?;
+        let mut hasher = Sha256::new();
+        hasher.update(json_string.as_bytes());
+        let result = hasher.finalize();
+        let meta_digest = format!("{result:x}");
+        match unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                process::exit(1);
+            }
+        }
+        //Check that file is safe and that private keys exist and that pem certs have been generated
+        let mut signature = String::new();
+        if Path::new(&conf.signing_pq_key).is_file()
+            && new_metadata.is_valid
+            && Path::new(&conf.signing_pq_cert).is_file()
+            && Path::new(&conf.signing_key).is_file()
+            && Path::new(&conf.signing_cert).is_file()
+        {
+            let opt_ec_signature = match ec_sign(&f.md.digest, &meta_digest, &conf.signing_key) {
+                Ok(signature) => signature,
+                Err(e) => {
+                    error!("Secret signing key is present but unable to sign (EC) on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            };
+            let ec_signature = match opt_ec_signature {
+                Some(signature) => general_purpose::STANDARD.encode(signature.as_ref()),
+                None => {
+                    log::error!("Cannot get base64 encoded EC signature from bytes.");
+                    String::new()
+                }
+            };
+
+            let opt_pq_signature = match pq_sign(
+                &f.md.digest,
+                &meta_digest,
+                ec_signature,
+                &conf.signing_pq_key,
+            ) {
+                Ok(signature) => signature,
+                Err(e) => {
+                    error!("Secret signing key is present but unable to sign (PQ) on file descriptor: {e:?}, killing myself.");
+                    process::exit(1);
+                }
+            };
+            signature = match opt_pq_signature {
+                Some(signature) => general_purpose::STANDARD.encode(signature.as_ref()),
+                None => {
+                    log::error!("Cannot get base64 encoded signature from bytes.");
+                    String::new()
+                }
+            };
+        }
+
+        let new_bd = Bd {
+            file_digest: general_purpose::STANDARD.encode(f.md.digest.clone()),
+            metadata_digest: general_purpose::STANDARD.encode(meta_digest),
+            station_certificate: String::from_utf8(cert_file)?,
+            file_signature: signature,
+        };
+        let new_report = Report {
+            metadata: new_metadata,
+            binding: new_bd,
+        };
+
+        let json_report = match serde_json::to_string_pretty(&new_report) {
             Ok(j) => j,
             Err(e) => {
                 error!("Cannot serialize MetaData struct to json for writing report: {e:?}, killing myself.");
@@ -308,6 +530,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             && !f.md.is_toobig
             && f.md.is_type_allowed
             && f.md.av_pass
+            && !f.md.is_corrupted
+
             && (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
         {
             // Output file
@@ -316,6 +540,7 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
             let mut path = PathBuf::new();
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
+
             let output = match File::options().write(true).create(true).open(path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -344,6 +569,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) {
         }
         drop(file);
     }
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -356,6 +583,7 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
+
     landlock_sandbox(&config.sas_out)?;
 
     // Open socket with keysas-transit
@@ -374,6 +602,9 @@ fn main() -> Result<()> {
     // Allocate buffers for input messages
     let mut ancillary_buffer_in = [0; 128];
     let mut ancillary_in = SocketAncillary::new(&mut ancillary_buffer_in[..]);
+
+    // Important: initialize liboqs
+    oqs::init();
 
     // Main loop
     // 1. receive file descriptor and metadata from transit
@@ -396,6 +627,7 @@ fn main() -> Result<()> {
         let files = parse_messages(ancillary_in.messages(), &buf_in);
 
         // Output file
-        output_files(files, &config);
+
+        output_files(files, &config)?;
     }
 }

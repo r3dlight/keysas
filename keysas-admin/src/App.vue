@@ -50,7 +50,7 @@ export default {
     href: '/about'
   },
   {
-    name: 'SSH configuration',
+    name: 'Admin configuration',
     icon: { text: 'config' , class: 'bi bi-wrench-adjustable' },
     href: '/config'
   },

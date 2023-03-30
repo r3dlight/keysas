@@ -2,15 +2,25 @@
   <NavBar />
   <div class="container">
     <div class="row">
-      <h2>Add or change your SSH configuration</h2>
+      <h2>Administration console configuration</h2>
       <br>
     </div>
     <div class="row">
+      <h3>SSH configuration</h3>
       <div class="col-sm">
         <SSHKeys />
       </div>
       <div class="col-sm">
         <DisplaySSHConfig />
+      </div>
+    </div>
+    <div class="row">
+      <h3>PKI configuration</h3>
+      <div class="box">
+        <SigningKeys />
+      </div>
+      <div class="box">
+        <DisplaySigningConfig />
       </div>
     </div>
   </div>
@@ -20,6 +30,8 @@
 import NavBar from '../components/NavBar.vue'
 import SSHKeys from '../components/SSHKeys.vue'
 import DisplaySSHConfig from '../components/DisplaySSHConfig.vue'
+import SigningKeys from '../components/SigningKeys.vue'
+import DisplaySigningConfig from '../components/DisplaySigningConfig.vue'
 
 
 export default {
@@ -28,6 +40,8 @@ export default {
     NavBar,
     SSHKeys,
     DisplaySSHConfig,
+    SigningKeys,
+    DisplaySigningConfig
   },
   computed: {
   },

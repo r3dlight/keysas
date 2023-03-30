@@ -29,29 +29,36 @@
 )]
 
 use crate::errors::*;
-use async_std::path::Path;
+use std::path::Path;
 use async_std::task;
 use nom::bytes::complete::take_until;
 use nom::IResult;
 use sha2::{Digest, Sha256};
-use ssh_rs::algorithm;
-use ssh_rs::ssh;
-use ssh_rs::SessionConnector;
-use ssh_rs::SshResult;
 use std::io::Read;
-use std::net::TcpStream;
 use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 use tauri_plugin_store::PluginBuilder;
-
 use std::io::BufReader;
-mod errors;
 
-const TIMEOUT: u64 = 60 * 1000;
-const USER: &str = "keysas";
-const PASSWORD: &str = "Changeme007";
+mod errors;
+mod ssh_wrapper;
+use crate::ssh_wrapper::*;
+mod store;
+use crate::store::*;
+
+use keysas_lib::pki::*;
+
+// TODO: place constant paths in constants
 
 fn main() -> Result<()> {
+    // Initiliaze the logger
+    simple_logger::init()?;
+
+    // Initialize liboqs
+    oqs::init();
+
+    // Initialize Tauri
+
     task::block_on(init_tauri())?;
     Ok(())
 }
@@ -75,43 +82,7 @@ fn sha256_digest(password: &str) -> Result<String> {
     Ok(format!("{:x}", digest))
 }
 
-/// Create SSH connexion with password
-fn connect_pwd(ip: &String) -> SshResult<SessionConnector<TcpStream>> {
-    let host = format!("{}{}", ip.trim(), ":22");
-    ssh::create_session_without_default()
-        .username(USER)
-        .password(PASSWORD)
-        .add_kex_algorithms(algorithm::Kex::Curve25519Sha256)
-        .add_kex_algorithms(algorithm::Kex::EcdhSha2Nistrp256)
-        .add_pubkey_algorithms(algorithm::PubKey::SshEd25519)
-        .add_pubkey_algorithms(algorithm::PubKey::RsaSha2_512)
-        .add_pubkey_algorithms(algorithm::PubKey::RsaSha2_256)
-        .add_enc_algorithms(algorithm::Enc::Chacha20Poly1305Openssh)
-        .add_compress_algorithms(algorithm::Compress::None)
-        .add_mac_algortihms(algorithm::Mac::HmacSha2_512)
-        .add_mac_algortihms(algorithm::Mac::HmacSha2_256)
-        .timeout(TIMEOUT.into())
-        .connect(host)
-}
-
-/// Create SSH connexion with RSA or ECC key
-fn connect_key(ip: &String, private_key: &String) -> SshResult<SessionConnector<TcpStream>> {
-    let host = format!("{}{}", ip.trim(), ":22");
-    ssh::create_session_without_default()
-        .username(USER)
-        .private_key_path(private_key.trim())
-        .add_kex_algorithms(algorithm::Kex::Curve25519Sha256)
-        .add_kex_algorithms(algorithm::Kex::EcdhSha2Nistrp256)
-        .add_pubkey_algorithms(algorithm::PubKey::SshEd25519)
-        .add_pubkey_algorithms(algorithm::PubKey::RsaSha2_512)
-        .add_pubkey_algorithms(algorithm::PubKey::RsaSha2_256)
-        .add_enc_algorithms(algorithm::Enc::Chacha20Poly1305Openssh)
-        .add_compress_algorithms(algorithm::Compress::None)
-        .add_mac_algortihms(algorithm::Mac::HmacSha2_512)
-        .add_mac_algortihms(algorithm::Mac::HmacSha2_256)
-        .timeout(TIMEOUT.into())
-        .connect(host)
-}
+static STORE_PATH: &str = ".keysas.dat";
 
 async fn init_tauri() -> Result<()> {
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -123,6 +94,12 @@ async fn init_tauri() -> Result<()> {
         .add_submenu(submenu);
     tauri::Builder::default()
         .plugin(PluginBuilder::default().build())
+        .setup(|_app| {
+            if let Err(e) = init_store(STORE_PATH) {
+                return Err(e.into());
+            }
+            Ok(())
+        })
         .menu(menu)
         .on_menu_event(|event| match event.menu_item_id() {
             "quit" => {
@@ -133,319 +110,509 @@ async fn init_tauri() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             reboot,
             update,
+            init_keysas,
             shutdown,
             export_sshpubkey,
             is_alive,
-            generate_keypair,
             sign_key,
             revoke_key,
             validate_privatekey,
+            validate_rootkey,
+            generate_pki_in_dir,
+            save_sshkeys,
+            get_sshkeys,
+            save_station,
+            get_station_ip,
+            list_stations,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
 }
 
+/// This command saves the path to the public and private SSH keys
+/// If a path already exists it is replaced
+/// The returned value is a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
 #[command]
-async fn update(ip: String, private_key: String) -> bool {
-    let host = format!("{}{}", ip.trim(), ":22");
-    println!("Rust will try updating host: {}", host);
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            let mut session = session.run_local();
-            match session.open_exec() {
-                            Ok(exec) => {
-                                match exec.send_command("sudo /usr/bin/apt update && sudo /usr/bin/apt -y dist-upgrade && sudo /bin/systemctl reboot ") {
-                                    Ok(_) => {
-                                        println!("Trying to update and rebooting...");
-                                        session.close();
-                                    },
-                                    Err(why) => {
-                                        println!("Error while updating: {:?}", why);
-                                        return false;
-                                    }
-                                }
-                            }
-                            Err(why) => {
-                                println!("Cannot create session.exec.open_exec(): {:?}.", why);
-                                return false;
-                            }
-                        }
-        }
-        Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
-            return false;
-        }
-    }
-
-    true
-}
-
-#[command]
-async fn reboot(ip: String, private_key: String) -> bool {
-    let host = format!("{}{}", ip.trim(), ":22");
-    println!("Rust will try rebooting host: {}", host);
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => match exec.send_command("sudo /bin/systemctl reboot") {
-                    Ok(_) => {
-                        println!("Keysas station is rebooting !");
-                        session.close();
-                    }
-                    Err(why) => {
-                        println!("Rust error on open_exec: {:?}", why);
-                        return false;
-                    }
-                },
-                Err(why) => {
-                    println!("Cannot create session.exec.open_exec(): {:?}.", why);
-                    return false;
-                }
-            }
-        }
-        Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
-            return false;
-        }
-    }
-
-    true
-}
-
-#[command]
-async fn shutdown(ip: String, private_key: String) -> bool {
-    let host = format!("{}{}", ip.trim(), ":22");
-    println!("Rust will try halting host: {}", host);
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => match exec.send_command("sudo /bin/systemctl poweroff") {
-                    Ok(_) => {
-                        println!("Keysas station is shutting down.");
-                        session.close();
-                    }
-                    Err(why) => {
-                        println!("Rust error on open_exec: {:?}", why);
-                        return false;
-                    }
-                },
-                Err(why) => {
-                    println!("Cannot create session.exec.open_exec(): {:?}.", why);
-                    return false;
-                }
-            }
-        }
-        Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
-            return false;
-        }
-    }
-
-    true
-}
-
-#[command]
-async fn export_sshpubkey(ip: String, public_key: String) -> bool {
-    println!("Exporting public SSH key to {:?}", ip);
-    match connect_pwd(&ip) {
-        Ok(session) => {
-            println!("Adding SSH pubkey to host: {:?}", ip);
-            let mut session = session.run_local();
-            match session.open_scp() {
-                Ok(scp) => {
-                    match scp.upload(public_key.trim(), "/home/keysas/.ssh/authorized_keys") {
-                        Ok(_) => {
-                            println!("authorized_keys successfully s-copied !");
-                            // Once the SSH has been copied, disable password authentication
-                            match session.open_exec() {
-                                Ok(exec) => match exec.send_command("sudo /usr/bin/sed -i \'s/.*PasswordAuthentication.*/PasswordAuthentication no/\' /etc/ssh/sshd_config && sudo /bin/systemctl restart sshd") {
-                                    Ok(res) => {
-                                        println!("Command output: {}", String::from_utf8(res).unwrap());
-                                        println!("Password authentication has been disabled.");
-                                        session.close();
-                                        return true;
-                                    },
-                                    Err(why) => {
-                                        println!("Rust error on open_exec: {:?}", why);
-                                        session.close();
-                                        return false;
-                                    }
-                                },
-                                Err(why) => {
-                                    println!("Cannot create session.exec.open_exec(): {:?}.", why);
-                                    session.close();
-                                    return false;
-                                }
-                            }
-                        }
-                        Err(why) => {
-                            println!(
-                                "Error while scp authorized_keys to remote Keysas station: {:?}",
-                                why
-                            );
-                            session.close();
-                            return false;
-                        }
-                    }
-                }
-                Err(why) => {
-                    println!("Cannot create new channel.open_scp(): {:?}", why);
-                    session.close();
-                    return false;
-                }
-            }
-        }
-        Err(_) => {
-            println! {"Keysas station not reachable."};
-            return false;
+async fn save_sshkeys(public: String, private: String) -> bool {
+    match set_ssh(&public, &private) {
+        Ok(_) => true,
+        Err(e) => {
+            log::error!("Failed to save ssh keys: {e}");
+            false
         }
     }
 }
 
+/// This functions get the path to the public and private SSH keys
+/// The first returned value is a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
 #[command]
-async fn is_alive(ip: String, private_key: String) -> bool {
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => match exec.send_command("/bin/systemctl status keysas") {
-                    Ok(_) => (println!("Keysas is alive."), session.close()),
-                    Err(why) => {
-                        println!("Cannot execute command status: {:?}", why);
-                        return false;
-                    }
-                },
-                Err(why) => {
-                    println!("Error on open_exec: {:?}", why);
-                    return false;
+fn get_sshkeys() -> Result<(String, String), String> {
+    match get_ssh() {
+        Ok((public, private)) => {
+            return Ok((public, private));
+        },
+        Err(e) => {
+            log::error!("Failed to get ssh keys: {e}");
+            return Err(String::from("Store error"));
+        }
+    }
+}
+
+/// This function saves a station configuration in the database
+/// If a station already exists with the same name, it is replaced
+/// The returned value contains a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
+#[command]
+async fn save_station(name: String, ip: String) -> bool {
+    match set_station(&name, &ip) {
+        Ok(_) => true,
+        Err(e) => {
+            log::error!("Failed to save station: {e}");
+            false
+        }
+    }
+}
+
+/// This function returns the IP address of a station registered in the database
+/// The returned value contains a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
+#[command]
+fn get_station_ip(name: String) -> Result<String, String> {
+    match get_station_ip_by_name(&name) {
+        Ok(res) => {
+            return Ok(res);
+        },
+        Err(e) => {
+            log::error!("Failed to get station IP: {e}");
+            return Err(String::from("Store error"));
+        }
+    }
+}
+
+/// This functions returns a list of all the station name and IP address stored
+/// The list is a JSON of the form "[{name, ip}]"
+#[command]
+fn list_stations() -> Result<String, String> {
+    match get_station_list() {
+        Ok(res) => {
+            let result = match serde_json::to_string(&res) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!("Failed to serialize result: {e}");
+                    return Err(String::from("Invalid result"));
                 }
             };
+            log::debug!("Station list: {}", result);
+            return Ok(result);
+        },
+        Err(e) => {
+            log::error!("Failed to get station IP: {e}");
+            return Err(String::from("Store error"));
         }
-        Err(_) => {
-            println! {"Keysas {} is unreachable.", ip};
+    }
+}
+
+/// This function initialize the keys in the station by
+///  1. Generate a key pair for file signature on the station
+///  2. Set correct file attributes for the private key file
+///  3. Recover the public part of the key
+///  4. Generate a certificate for the public key
+///  5. Export the created certificate on the station
+///  6. Finally it loads the admin USB signing certificate on the station
+#[command]
+async fn init_keysas(ip: String, name: String,
+                        ca_pwd: String, st_ca_file: String, usb_ca_file: String,
+                    ) -> bool {
+    /*
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+    // Connect to the host
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(tu) => tu,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
             return false;
         }
     };
 
-    true
-}
-
-#[command]
-async fn generate_keypair(ip: String, private_key: String, password: String) -> bool {
-    let password = sha256_digest(&password.trim()).unwrap();
-    //println!("generate: Password digest is: {}", password);
-    let host = format!("{}{}", ip.trim(), ":22");
-    println!(
-        "Rust will try generating a signing keypair on host: {}",
-        host
-    );
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => {
-                    let command = format!("{}{}{}","sudo /usr/bin/keysas-sign --generate --password=", password, " && sudo /usr/bin/chmod 600 /etc/keysas/keysas.priv && sudo /usr/bin/chattr +i /etc/keysas/keysas.priv");
-                    match exec.send_command(&command) {
-                        Ok(_) => {
-                            println!("New signing keypair successfully generated.");
-                            session.close();
-                        }
-                        Err(why) => {
-                            println!("Error on open_exec: {:?}", why);
-                            return false;
-                        }
-                    }
-                }
-                Err(why) => {
-                    println!("Error while trying session.open_exec: {:?}", why);
+    //  1. Generate a key pair for file signature on the station
+    //  2. Set correct file attributes for the private key file
+    //  3. Recover the certification for the key
+    let command = format!("{}{}{}{}{}",
+                                "sudo /usr/bin/keysas-sign --generate",
+                                " --name ", name,
+                                " && sudo /usr/bin/chmod 600 /etc/keysas/file-sign-priv.pem",
+                                " && sudo /usr/bin/chattr +i /etc/keysas/file-sign-priv.pem");
+    let cert_req = match session_exec(&mut session, &command) {
+        Ok(res) => {
+            match X509Req::from_pem(&res) {
+                Ok(req) => req,
+                Err(e) => {
+                    log::error!("failed to convert command output: {:?}", e);
+                    session.close();
                     return false;
                 }
             }
-        }
+        },
         Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
-            return false;
-        }
-    }
-
-    true
-}
-
-#[command]
-async fn sign_key(ip: String, private_key: String, password: String) -> bool {
-    let password = sha256_digest(&password.trim()).unwrap();
-    //println!("sign: Password digest is: {}", password);
-    let host = format!("{}{}", ip.trim(), ":22");
-
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            println!("Watching for new USB storage on host: {}", &host);
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => {
-                    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
-                    match exec.send_command(&command) {
-                        Ok(stdout) => {
-                            // Replace password
-                            match String::from_utf8(stdout) {
-                                Ok(signme) => {
-                                    let signme = signme.trim();
-                                    let (command, _) = parser(&signme).unwrap();
-                                    let command =
-                                        command.replace("YourSecretPassWord", password.trim());
-                                    let command =
-                                        format!("{}{}{}", "sudo /usr/bin/", command, " --force");
-                                    println!("{}", command);
-                                    println!("Going to sign a new USB device on keysas: {}", host);
-                                    match session.open_exec() {
-                                        Ok(exec) => match exec.send_command(&command) {
-                                            Ok(_) => {
-                                                println!("USB storage successfully signed !");
-                                            }
-                                            Err(why) => {
-                                                println!(
-                                                    "Error while sign a USB storage: {:?}",
-                                                    why
-                                                );
-                                                return false;
-                                            }
-                                        },
-                                        Err(why) => {
-                                            println!(
-                                                "Error while trying session.open_exec: {:?}",
-                                                why
-                                            );
-                                            return false;
-                                        }
-                                    }
-                                }
-                                Err(why) => {
-                                    println!("Error parsing stdout to String: {:?}", why);
-                                    return false;
-                                }
-                            }
-                        }
-                        Err(why) => {
-                            println!("Rust error on session.open_exec: {:?}", why);
-                            return false;
-                        }
-                    }
-                }
-                Err(why) => {
-                    println!("Rust error on session.open_exec: {:?}", why);
-                    return false;
-                }
-            }
+            log::error!("Error on send_command: {:?}", why);
             session.close();
+            return false;
         }
+    };
+    // 4. Generate a certificate from the request
+    // Load PKI admin key
+    let (root_key, _root_cert) = match load_pkcs12(&st_ca_file, &ca_pwd) {
+        Ok(k) => k,
+        Err(e) => {
+            log::error!("Failed to load PKI private key: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    // Generate certificate
+    let cert = match generate_cert_from_request(&cert_req, &root_key) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to generate certificate from request: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    // 5. Export the created certificate on the station
+    let output = match cert.to_pem() {
+        Ok(o) => {
+            match String::from_utf8(o) {
+                Ok(out) => out,
+                Err(e) => {
+                    log::error!("Failed to convert certificate to string: {e}");
+                    session.close();
+                    return false;
+                }
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to convert certificate to PEM: {e}");
+            session.close();
+            return false;
+        }
+    };
+    
+    let command = format!("{}{}",
+            "sudo /usr/bin/keysas-sign --load --certtype file --cert ",
+            output);
+    if let Err(e) = session_exec(&mut session, &command) {
+        log::error!("Failed to load certificate on the station: {e}");
+        session.close();
+        return false;
+    }
+
+    // 6. Finally it loads the admin USB signing certificate
+    // Load USB CA cert
+    let (_usb_key, usb_cert) = match load_pkcs12(&usb_ca_file, &ca_pwd) {
+        Ok(k) => k,
+        Err(e) => {
+            log::error!("Failed to load USB CA certificate: {e}");
+            session.close();
+            return false;
+        }
+    };
+
+    let output = match usb_cert.to_pem() {
+        Ok(o) => {
+            match String::from_utf8(o) {
+                Ok(out) => out,
+                Err(e) => {
+                    log::error!("Failed to convert USB certificate to string: {e}");
+                    session.close();
+                    return false;
+                }
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to convert USB certificate to PEM: {e}");
+            session.close();
+            return false;
+        }
+    };
+    
+    let command = format!("{}{}",
+            "sudo /usr/bin/keysas-sign --load --certtype usb --cert ",
+            output);
+    if let Err(e) = session_exec(&mut session, &command) {
+        log::error!("Failed to load USB certificate on the station: {e}");
+        session.close();
+        return false;
+    }
+
+    session.close();
+    */
+    true
+}
+
+#[command]
+async fn update(ip: String) -> bool {
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+
+    let host = format!("{}{}", ip.trim(), ":22");
+    log::error!("Rust will try updating host: {}", host);
+
+    // Connect to the host
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+
+    match session_exec(&mut session, &String::from("sudo /usr/bin/apt update && sudo /usr/bin/apt -y dist-upgrade && sudo /bin/systemctl reboot ")) {
+        Ok(_) => {
+            log::info!("Trying to update and rebooting...");
+        },
         Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
+            log::error!("Error while updating: {:?}", why);
             return false;
         }
     }
-    println!("Password is: {}", password);
+    session.close();                    
+    true
+}
+
+#[command]
+async fn reboot(ip: String) -> bool {
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+    // Connect to the host
+    let host = format!("{}{}", ip.trim(), ":22");
+    log::info!("Rust will try rebooting host: {}", host);
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+
+    match session_exec(&mut session, &String::from("sudo /bin/systemctl reboot")) {
+        Ok(_) => {
+            log::info!("Keysas station is rebooting !");
+        },
+        Err(why) => {
+            log::error!("Rust error on open_exec: {:?}", why);
+            return false;
+        }
+    }
+    session.close();
+    true
+}
+
+#[command]
+async fn shutdown(ip: String) -> bool {
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+    // Connect to the host
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+    match session_exec(&mut session, &String::from("sudo /bin/systemctl poweroff")) {
+        Ok(_) => {
+            log::info!("Keysas station is shutting down.");
+            session.close();
+        },
+        Err(why) => {
+            log::error!("Rust error on open_exec: {:?}", why);
+            session.close();
+            return false;
+        }
+    }
+
+    true
+}
+
+#[command]
+async fn export_sshpubkey(ip: String) -> bool {
+    let public_key = match get_ssh() {
+        Ok((public, _)) => public,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+    log::info!("Exporting public SSH key to {:?}", ip);
+    // Connect to the host
+    let mut session = match connect_pwd(&ip) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+    
+    match session_upload(&mut session, &public_key.trim().to_string(),
+                            &String::from("/home/keysas/.ssh/authorized_keys")) {
+        Ok(_) => {
+            log::info!("authorized_keys successfully s-copied !");
+        },
+        Err(e) => {
+            log::error!("Rust error on upload: {:?}", e);
+            session.close();
+            return false;            
+        }
+    }
+    
+    // Once the SSH has been copied, disable password authentication
+    match session_exec(&mut session, &String::from("sudo /usr/bin/sed -i \'s/.*PasswordAuthentication.*/PasswordAuthentication no/\' /etc/ssh/sshd_config && sudo /bin/systemctl restart sshd")) {
+        Ok(res) => {
+            log::debug!("Command output: {}", String::from_utf8(res).unwrap());
+            log::info!("Password authentication has been disabled.");
+            session.close();
+            return true;
+        },
+        Err(e) => {
+            log::error!("Rust error on open_exec: {:?}", e);
+            session.close();
+            return false;
+        }
+    }
+}
+
+/// This command test if a given station is connected or not
+/// The function returns a boolean indicating the station status or an error
+#[command]
+fn is_alive(name: String) -> Result<bool, String> {
+    if name.chars().count() == 0 {
+        log::warn!("Name must not be empty");
+        return Ok(false);
+    }
+
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return Err(String::from("Store error"));
+        } 
+    };
+
+    let ip = match get_station_ip_by_name(&name) {
+        Ok(ip) => ip,
+        Err(e) => {
+            log::error!("Failed to get station ip: {e}");
+            return Err(String::from("Store error"));
+        }
+    };
+
+    // Connect to the host
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return Err(String::from("Store error"));
+        }
+    };
+    match session_exec(&mut session, &String::from("/bin/systemctl status keysas")) {
+        Ok(_) => {
+            log::info!("Keysas is alive.");
+        },
+        Err(why) => {
+            log::error!("Cannot execute command status: {:?}", why);
+            session.close();
+            return Err(String::from("Store error"));
+        }
+    }
+    session.close();
+    Ok(true)
+}
+
+#[command]
+async fn sign_key(ip: String, password: String) -> bool {
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+
+    let password = sha256_digest(&password.trim()).unwrap();
+    
+    // Connect to the host
+    let host = format!("{}{}", ip.trim(), ":22");
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+
+    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
+    let output = match session_exec(&mut session, &command) {
+        Ok(out) => out,
+        Err(e) => {
+            session.close();
+            log::error!("Failed to connect to station: {e}");
+            return false;
+        }
+    };
+
+    // Replace password
+    let command = match String::from_utf8(output) {
+        Ok(signme) => {
+            let signme = signme.trim();
+            let (command, _) = parser(&signme).unwrap();
+            let command = command.replace("YourSecretPassWord", password.trim());
+            let command = format!("{}{}{}", "sudo /usr/bin/", command, " --force");
+            log::debug!("{}", command);
+            command
+        },
+        Err(why) => {
+            log::error!("Rust error on session.open_exec: {:?}", why);
+            session.close();
+            return false;
+        }
+    };
+
+    log::debug!("Going to sign a new USB device on keysas: {}", host);
+    match session_exec(&mut session, &command) {
+        Ok(_) => {
+            log::info!("USB storage successfully signed !");
+        },
+        Err(why) => {
+            log::error!("Error while sign a USB storage: {:?}", why);
+            session.close();
+            return false;
+        }
+    }
     true
 }
 
@@ -458,83 +625,157 @@ fn parser_revoke(s: &str) -> IResult<&str, &str> {
 }
 
 #[command]
-async fn revoke_key(ip: String, private_key: String) -> bool {
+async fn revoke_key(ip: String) -> bool {
+    let private_key = match get_ssh() {
+        Ok((_, private)) => private,
+        Err(e) => {
+            log::error!("Failed to get private key: {e}");
+            return false;
+        } 
+    };
+    
+    // Connect to the host
     let host = format!("{}{}", ip.trim(), ":22");
-
-    match connect_key(&ip, &private_key) {
-        Ok(session) => {
-            println!("Watching for new USB storage on host: {}", &host);
-            let mut session = session.run_local();
-            match session.open_exec() {
-                Ok(exec) => {
-                    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
-                    match exec.send_command(&command) {
-                        Ok(stdout) => match String::from_utf8(stdout) {
-                            Ok(signme) => {
-                                let signme = signme.trim();
-                                let (command, _) = parser(&signme).unwrap();
-                                let (_, command) = parser_revoke(&command).unwrap();
-                                let command = format!(
+    let mut session = match connect_key(&ip, &private_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to open ssh connection with station: {e}");
+            return false;
+        }
+    };
+    
+    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
+    let stdout = match session_exec(&mut session, &command) {
+        Ok(stdout) => stdout,
+        Err(e) => {
+            log::error!("Error while revoking a USB storage: {:?}", e);
+            session.close();
+            return false;
+        }
+    };
+    
+    let command = match String::from_utf8(stdout) {
+        Ok(signme) => {
+            let signme = signme.trim();
+            let (command, _) = parser(&signme).unwrap();
+            let (_, command) = parser_revoke(&command).unwrap();
+            let command = format!(
                                     "{}{}{}",
                                     "sudo /usr/bin/",
                                     command.trim(),
                                     " --revoke"
                                 );
-                                println!("{}", command);
-                                println!("Going to revoke a USB device on keysas: {}", host);
-                                match session.open_exec() {
-                                    Ok(exec) => match exec.send_command(&command) {
-                                        Ok(_) => {
-                                            println!("USB storage successfully revoked !");
-                                        }
-                                        Err(why) => {
-                                            println!(
-                                                "Error while revoking a USB storage: {:?}",
-                                                why
-                                            );
-                                            return false;
-                                        }
-                                    },
-                                    Err(why) => {
-                                        println!("Error while trying session.open_exec: {:?}", why);
-                                        return false;
-                                    }
-                                }
-                            }
-                            Err(why) => {
-                                println!("Error parsing stdout to String: {:?}", why);
-                                return false;
-                            }
-                        },
-                        Err(why) => {
-                            println!("Error on session.send_command: {:?}", why);
-                            return false;
-                        }
-                    }
-                }
-                Err(why) => {
-                    println!("Error on session.open_exec: {:?}", why);
-                    return false;
-                }
-            }
+            log::debug!("{}", command);
+            command
+        },
+        Err(e) => {
+            log::error!("Error while revoking a USB storage: {:?}", e);
             session.close();
+            return false;
         }
-        Err(why) => {
-            println! {"Cannot create SSH session with USER and private_key: {:?}.", why};
+    };
+
+    log::debug!("Going to revoke a USB device on keysas: {}", host);
+    match session_exec(&mut session, &command) {
+        Ok(_) => {
+            log::info!("USB storage successfully revoked !");
+        },
+        Err(e) => {
+            log::error!("Error while revoking a USB storage: {:?}", e);
+            session.close();
             return false;
         }
     }
 
+    session.close();
     true
 }
 
 #[command]
-async fn validate_privatekey(public_key: String, private_key: String) -> bool {
-    if Path::new(&public_key.trim()).is_file().await
-        && Path::new(&private_key.trim()).is_file().await
+fn validate_privatekey(public_key: String, private_key: String) -> bool {
+    if Path::new(&public_key.trim()).is_file()
+        && Path::new(&private_key.trim()).is_file()
     {
         true
     } else {
         false
     }
+}
+
+#[command]
+fn validate_rootkey(root_key: String) -> bool {
+    if Path::new(&root_key.trim()).is_file()
+    {
+        true
+    } else {
+        false
+    }
+}
+
+/// Generate a new PKI in an empty directory
+/// 
+/// # Arguments
+/// * `org_name` - String containing the organisation name of the PKI
+/// * `org_unit` - String containing the organisational unit of the PKI
+/// * `country` - String containing the country name of the PKI
+/// * `validity` - String representation of the number of days of validity for PKI root keys
+/// * `admin_pwd` - String containing the PKI administrator password
+/// * `pki_dir` - String containing the path the PKI directory
+/// 
+/// # Return
+/// Return a result containing an error message if any
+#[command]
+fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
+                                validity: String, admin_pwd: String,
+                                pki_dir: String) -> Result<String, String> {
+    // Validate user inputs
+    let infos = match validate_input_cert_fields(&org_name, &org_unit, 
+                                            &country, &validity) {
+        Ok(i) => i,
+        Err(_) => {
+            log::error!("Failed to validate user input");
+            return Err(String::from("Invalid user input"));
+        }
+    };
+    // Validate pki_dir path and create directory hierachy
+    if let Err(e) = create_pki_dir(&pki_dir) {
+        log::error!("Failed to create PKI directory: {e}");
+        return Err(String::from("Invalid PKI directory path"));
+    }
+    // Save PKI configuration
+    if let Err(e) = set_pki_config(&pki_dir, &infos) {
+        log::error!("Failed to save PKI configuration: {e}");
+        return Err(String::from("Store error"));
+    }
+
+    // Generate root key and save them in PKCS12 format
+    let root_keys = match generate_root(&infos, &pki_dir, &admin_pwd) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate PKI root keys: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+    
+    // Generate keysas station intermediate CA key pair
+    let st_ca_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate intermediate CA for station: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+
+    // Save keys to directory
+
+    // Generate USB signing key pair
+    let usb_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+        Ok(kp) => kp,
+        Err(e) => {
+            log::error!("Failed to generate USB signing key pair: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+
+    Ok(String::from("PKI created"))
 }

@@ -9,7 +9,6 @@
  */
 
 #![feature(unix_socket_ancillary_data)]
-#![feature(unix_socket_abstract)]
 #![feature(tcp_quickack)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -69,6 +68,7 @@ struct InputMetadata {
     filename: String,
     digest: String,
     timestamp: String,
+    is_corrupted: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -77,12 +77,15 @@ struct FileMetadata {
     digest: String,
     is_digest_ok: bool,
     is_toobig: bool,
+    size: u64,
     is_type_allowed: bool,
     av_pass: bool,
     av_report: Vec<String>,
     yara_pass: bool,
     yara_report: String,
     timestamp: String,
+    is_corrupted: bool,
+    file_type: String,
 }
 
 #[derive(Debug)]
@@ -284,12 +287,15 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
                             digest: meta.digest,
                             is_digest_ok: false,
                             is_toobig: true,
+                            size: 0,
                             is_type_allowed: false,
                             av_pass: false,
                             av_report: Vec::new(),
                             yara_pass: false,
                             yara_report: String::new(),
                             timestamp: meta.timestamp,
+                            is_corrupted: meta.is_corrupted,
+                            file_type: "Unknown".into(),
                         },
                     })
                 }
@@ -303,13 +309,19 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 }
 
 /// This function returns true if the file type is in the list provided
-fn check_is_extension_allowed(buf: Vec<u8>, conf: &Configuration) -> bool {
-    match get(&buf) {
+fn check_is_extension_allowed(buf: &[u8], conf: &Configuration) -> bool {
+    match get(buf) {
         Some(info) => conf.magic_list.contains(&info.extension().to_string()),
         None => false,
     }
 }
-
+/// This function returns true if the file type is in the list provided
+fn get_extension(buf: Vec<u8>) -> String {
+    match get(&buf) {
+        Some(info) => info.to_string(),
+        None => "".into(),
+    }
+}
 /// This function check each file given in the input vector.
 /// Checks are made against the provided configuration.
 /// Checks performed are:
@@ -360,6 +372,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 match &file.metadata() {
                     Ok(meta) => {
                         f.md.is_toobig = meta.len().gt(&conf.max_size);
+                        f.md.size = meta.len();
                     }
                     Err(e) => {
                         warn!("Failed to get metadata of file {} error {e}", f.md.filename);
@@ -418,29 +431,34 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                         f.md.yara_pass = false;
                     }
                 }
-                if !conf.type_off {
-                    // Position the cursor at the beginning of the file
-                    match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
-                            process::exit(1);
+                // Position the cursor at the beginning of the file
+                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
+                        process::exit(1);
+                    }
+                }
+                // Check the magic number
+                // Read only 1Mo of the file to be faster and do not read large files
+                let reader = BufReader::new(file);
+                let limited_reader = &mut reader.take(1024 * 1024);
+                let mut buffer = Vec::new();
+                match limited_reader.read_to_end(&mut buffer) {
+                    Ok(_) => {
+                        if !conf.type_off {
+                            f.md.is_type_allowed = check_is_extension_allowed(&buffer, conf);
+                            f.md.file_type = get_extension(buffer);
+                        } else {
+                            f.md.is_type_allowed = true;
+                            f.md.file_type = get_extension(buffer);
                         }
                     }
-                    // Check the magic number
-                    // Read only 1Mo of the file to be faster and do not read large files
-                    let reader = BufReader::new(file);
-                    let limited_reader = &mut reader.take(1024 * 1024);
-                    let mut buffer = Vec::new();
-                    match limited_reader.read_to_end(&mut buffer) {
-                        Ok(_) => f.md.is_type_allowed = check_is_extension_allowed(buffer, conf),
-                        Err(e) => {
-                            error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
-                            f.md.is_type_allowed = false;
-                        }
+                    Err(e) => {
+                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                        f.md.is_type_allowed = false;
+                        f.md.file_type = "Unknow".into();
                     }
-                } else {
-                    f.md.is_type_allowed = true;
                 }
             }
             Err(e) => {

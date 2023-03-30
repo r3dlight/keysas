@@ -34,6 +34,9 @@
 </template>
 
 <script>
+"use strict";
+
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'DisplaySSHConfig',
@@ -47,17 +50,22 @@ export default {
     }
   },
   mounted() {
-    //this.getSSHKeys();
+    this.getSSHKeys();
   },
 
   methods: {
+    /**
+     * Fetch the path to the SSH keypair to display it
+     */
     getSSHKeys() {
-      let paths = localStorage.getItem('ssh');
-      //console.log("Path: "+ paths);
-      this.pubKey = JSON.parse(paths).pub;
-      this.privKey = JSON.parse(paths).priv;
-      console.log("Path: " + this.pubKey);
-      console.log("Path: " + this.privKey);
+      invoke('get_sshkeys')
+        .then((keys) => {
+          this.pubKey = keys[0];
+          this.privKey = keys[1];
+          console.log("Path: " + this.pubKey);
+          console.log("Path: " + this.privKey);
+        })
+        .catch((error) => console.error(error));
     }
   }
 }

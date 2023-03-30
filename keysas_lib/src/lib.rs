@@ -9,6 +9,8 @@ use std::io::{BufReader, IoSlice, Read};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
+pub mod pki;
+
 // Init logger
 pub fn init_logger() {
     if env::var("RUST_LOG").is_ok() {

@@ -15,7 +15,7 @@
     </div>
     <div class="List">
       <ul class="list-group-item">
-        <li class="list-group-item list-group-item-light" v-for="(device, key) in keys" :key="key">
+        <li class="list-group-item list-group-item-light" v-for="(device, key) in stations" :key="key">
           {{ device }}
           <br />
         </li>
@@ -29,7 +29,9 @@
 </template>
 
 <script>
-import { getKeys, loadStore } from '../store/store.js'
+"use strict";
+
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'DisplayKeysas',
@@ -38,31 +40,27 @@ export default {
   },
   data() {
     return {
-      keys: '',
+      stations: '',
       hide: true,
     }
   },
   async mounted() {
-    this.keys = await getKeys();
-
+    invoke('list_stations')
+      .then((list) => this.stations = list)
+      .catch((error) => console.error(error));
   },
 
   methods: {
     async displayKeysasList() {
-      loadStore();
-      this.keys = await getKeys();
-      console.log(this.keys);
+      invoke('list_stations')
+        .then((list) => this.stations = list)
+        .catch((error) => console.error(error));
     }
   },
     async getKeysasIP(keysas) {
-      await loadStore();
-      let KeysasData = await getData(keysas);
-      //console.log(KeysasData[0]);
-      //console.log(ip);
-      let ip = JSON.stringify(KeysasData[0]);
-      ip = await JSON.parse(ip).ip;
-      //console.log(ip);
-      return ip;
+      invoke('get_station_ip', {name: keysas})
+        .then((ip) => {return ip;})
+        .catch((error) => console.log(error));
     },
 }
 </script>
