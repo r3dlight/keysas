@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /*
- * The "keysas-out".
+ * The "keysas-lib".
  *
  * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
- * for building the keysas-out binary.
+ * for building the keysas_lib.
  */
 
  #![warn(unused_extern_crates)]
@@ -23,7 +23,7 @@
  #![warn(overflowing_literals)]
  #![warn(deprecated)]
  #![warn(unused_imports)]
- use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context};
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
 use ed25519_dalek::Sha512;
@@ -374,7 +374,7 @@ pub fn generate_root(
 
 pub fn generate_signed_keypair(
     ca_keys: &HybridKeyPair,
-    subject_infos: &CertificateFields,
+    _subject_infos: &CertificateFields,
     pki_infos: &CertificateFields,
 ) -> Result<HybridKeyPair, anyhow::Error> {
     // Create the subject name for the certificate
@@ -422,7 +422,7 @@ fn generate_cert_from_csr(
     // Extract and validate info in the CSR
     //TODO: validate CSR authenticity
 
-    let subject = csr.info.subject.clone();
+    let _subject = csr.info.subject.clone();
     //TODO: validate subject
 
     let pub_key = match csr.info.public_key.subject_public_key.as_bytes() {

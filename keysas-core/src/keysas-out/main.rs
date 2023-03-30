@@ -294,14 +294,13 @@ fn ec_sign(
 ) -> Result<Option<ECSignature>> {
     // First let's sign both digests with ed25519, signing_key must have been saved to_bytes()
     if Path::new(secret_key).exists() && Path::new(secret_key).is_file() {
-        let keypair_loaded =
-            match Keypair::load_keys(&secret_key.to_owned(), &"Keysas007".to_string()) {
-                Ok(ed) => ed,
-                Err(e) => {
-                    log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
-                    return Ok(None);
-                }
-            };
+        let keypair_loaded = match Keypair::load_keys(Path::new(secret_key), "Keysas007") {
+            Ok(ed) => ed,
+            Err(e) => {
+                log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
+                return Ok(None);
+            }
+        };
         // Prepare the String to sign and sign it
         let concat = format!("{}-{}", file_digest, meta_digest);
         let signature = keypair_loaded.sign(concat.as_bytes());
@@ -323,14 +322,13 @@ fn pq_sign(
         // Choosing Dilithium Level 5
         let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5)
             .context("Unable to create new signature scheme")?;
-        let pq_loaded =
-            match KeysasPQKey::load_keys(&secret_pq_key.to_owned(), &"Keysas007".to_string()) {
-                Ok(ed) => ed,
-                Err(e) => {
-                    log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
-                    return Ok(None);
-                }
-            };
+        let pq_loaded = match KeysasPQKey::load_keys(Path::new(secret_pq_key), "Keysas007") {
+            Ok(ed) => ed,
+            Err(e) => {
+                log::error!("load_keys: Cannot load ed25519 keys into struct: {e}");
+                return Ok(None);
+            }
+        };
         // Concat both digest and previously created EC signature
         let concat = format!("{}-{}-{}", file_digest, meta_digest, ec_signature);
         // Get the final signature
