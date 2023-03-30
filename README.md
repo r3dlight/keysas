@@ -1,5 +1,5 @@
 <div align="center">
-<img  src ="img/logo-keysas.png"  alt="Keysas"  width=300px/>
+<img  src ="img/logo-keysas-github.png"  alt="Keysas"  width=300px/>
 </div>
 
 # USB virus cleaning station (WIP)
@@ -12,11 +12,14 @@ Warning: This is only a work in progress for now.
     - Run anti-virus check (ClamAV)
     - Run Yara parsing
     - Run extensions and size checks
-- Signatures
+- Signatures (Files and USB keys)
     - Trusted (Outgoing) USB device must be signed with Keysas-admin app
     - Each verified file signature is stored in the corresponding file report  
     - Signatures are post-quantum proof (hybrid ed25519/Diltithium5 scheme)
-    - Keypairs are stored using PKCS#8 format
+    - Private keys are stored using PKCS#8 format (PKCS#11 will also be implemented)
+    - x509 certificates are signed by the internal PKI (using Keysas-admin)
+- Authentication
+    - Users can be authenticated using personal Yubikeys 5
 
 # Keysas-core
 ## Architecture
@@ -37,7 +40,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Keysas-sign: Command line utility to sign or verify the signature of a USB device
  - Keysas-fido: Manage Yubikeys 5 enrollment
  - Keysas-backend: Create a websocket server to send different json values to the keysas-frontend
- - Keysas-frontend: VueJS3 Frontend for the final user
+ - Keysas-frontend: Readonly VueJS3 Frontend for the final user
  - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS3). It also provides a PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
 
 ## Installation
@@ -47,7 +50,7 @@ On Debian stable:
 echo "deb http://deb.debian.org/debian bullseye-backports main contrib non-free" > /etc/apt/sources.list.d/backports.list
 apt-get update -yq
 apt -qy -t bullseye-backports install libyara-dev libyara9
-apt-get install -y wget make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev
+apt-get install -y wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev
 bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
 git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
