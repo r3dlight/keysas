@@ -37,6 +37,7 @@ use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
+use rand_dl::RngCore;
 use rand_dl::rngs::OsRng;
 use std::fs;
 use std::fs::File;
@@ -345,10 +346,14 @@ pub fn generate_root(
     };
 
     // Save hybrid key pair to disk
-    hk.classic.save_keys(&(pki_dir.to_owned() + "/CA/root-priv-cl.p8"), pwd)
+    hk.classic.save_keys(
+        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-cl.p8")),
+        pwd)
         .context("ED25519 storing failed")?;
 
-    hk.pq.save_keys(&(pki_dir.to_owned() + "/CA/root-priv-pq.p8"), pwd)
+    hk.pq.save_keys(
+        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-pq.p8")),
+        pwd)
         .context("Dilithium storing failed")?;
 
     // Save certificate pair to disk
@@ -500,12 +505,17 @@ fn store_keypair(
     pbk: &[u8],
     oid: ObjectIdentifier,
     pwd: &String,
-    path: &String,
+    path: &Path,
 ) -> Result<(), anyhow::Error> {
+    //Initialize key wrap function parameters
+    let mut salt = [0u8; 16];
+    OsRng.fill_bytes(&mut salt);
+    let mut iv = [0u8; 16];
+    OsRng.fill_bytes(&mut iv);
     let params = match pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
-        &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+        &salt,
+        &iv,
     ) {
         Ok(p) => p,
         Err(e) => {
@@ -530,20 +540,20 @@ fn store_keypair(
         }
     };
 
-    pk_encrypted.write_pem_file(path, "ENCRYPTED PRIVATE KEY", LineEnding::LF)?;
+    pk_encrypted.write_der_file(path)?;
 
     Ok(())
 }
 
 pub trait KeysasKey<T> {
-    fn load_keys(path: &String, pwd: &String) -> Result<T, anyhow::Error>;
-    fn save_keys(&self, path: &String, pwd: &String) -> Result<(), anyhow::Error>;
+    fn load_keys(path: &Path, pwd: &String) -> Result<T, anyhow::Error>;
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error>;
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
 impl KeysasKey<Keypair> for Keypair {
-    fn load_keys(path: &String, pwd: &String) -> Result<Keypair, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &String) -> Result<Keypair, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
 
@@ -587,7 +597,7 @@ impl KeysasKey<Keypair> for Keypair {
         }
     }
 
-    fn save_keys(&self, path: &String, pwd: &String) -> Result<(), anyhow::Error> {
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         store_keypair(
@@ -595,7 +605,8 @@ impl KeysasKey<Keypair> for Keypair {
             self.public.as_bytes(), 
             ed25519_oid,
             pwd,
-            path)
+            path
+        )
     }
 
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
@@ -638,7 +649,7 @@ impl KeysasKey<Keypair> for Keypair {
 }
 
 impl KeysasKey<KeysasPQKey> for KeysasPQKey {
-    fn load_keys(path: &String, pwd: &String) -> Result<KeysasPQKey, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &String) -> Result<KeysasPQKey, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {
@@ -698,7 +709,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         };
     }
 
-    fn save_keys(&self, path: &String, pwd: &String) -> Result<(), anyhow::Error> {
+    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         store_keypair(
@@ -706,7 +717,8 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             &self.public_key.clone().into_vec(), 
             ed25519_oid,
             pwd,
-            path)
+            path
+        )
     }
 
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
