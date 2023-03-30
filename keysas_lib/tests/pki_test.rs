@@ -9,18 +9,17 @@ use oqs::sig::Sig;
 use pkcs8::der::Any;
 use pkcs8::der::Encode;
 use pkcs8::der::asn1::BitString;
-use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::PrivateKeyInfo;
-use pkcs8::pkcs5::scrypt::Params;
 use pkcs8::spki::AlgorithmIdentifier;
 use rand_dl::rngs::OsRng;
+use tempfile::NamedTempFile;
 use x509_cert::name::RdnSequence;
-#[cfg(test)]
 use std::fs::read;
-use tempdir::TempDir;
 use x509_cert::spki::ObjectIdentifier;
+
+#[cfg(test)]
 
 const PASSWORD: &[u8] = b"hunter42";
 
@@ -58,8 +57,8 @@ fn test_pkcs8_create_and_decrypt_der() {
     );
 
     // Store the key as DER in PKCS8
-    let dir = TempDir::new("Test_DER").unwrap();
-    let path = dir.path().join("priv.der");
+    let file = NamedTempFile::new().unwrap();
+    let path = file.into_temp_path();
 
     let params = pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
@@ -102,8 +101,6 @@ fn test_pkcs8_create_and_decrypt_der() {
     );
 
     assert_eq!(pk.private_key, keypair.secret.to_bytes());
-
-    dir.close().unwrap();
 }
 
 #[test]
@@ -122,8 +119,8 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
     );
 
     // Store the key as DER in PKCS8
-    let dir = TempDir::new("Test_DER").unwrap();
-    let path = dir.path().join("priv.der");
+    let file = NamedTempFile::new().unwrap();
+    let path = file.into_temp_path();
 
     let params = pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
@@ -173,8 +170,6 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
 
     assert_eq!(pk.private_key, keypair.secret.to_bytes());
     assert_eq!(pk.public_key.unwrap(), keypair.public.to_bytes());
-
-    dir.close().unwrap();
 }
 
 #[test]
@@ -272,8 +267,8 @@ fn test_save_and_load_ed25519() {
     let keypair = Keypair::generate(&mut csprng);
 
     // Store the key as DER in PKCS8
-    let dir = TempDir::new("Test_SaveLoad_ed25519").unwrap();
-    let path = dir.path().join("priv.der");
+    let file = NamedTempFile::new().unwrap();
+    let path = file.into_temp_path();
 
     // Save the keypair
     keypair.save_keys(&path, &String::from("Test")).unwrap();
@@ -297,8 +292,8 @@ fn test_save_and_load_dilithium5() {
     };
 
     // Store the key as DER in PKCS8
-    let dir = TempDir::new("Test_SaveLoad_dilithium5").unwrap();
-    let path = dir.path().join("priv.der");
+    let file = NamedTempFile::new().unwrap();
+    let path = file.into_temp_path();
 
     // Save the keypair
     keypair.save_keys(&path, &String::from("Test")).unwrap();
