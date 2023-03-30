@@ -272,6 +272,7 @@ pub fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Construct a information field for a certificate
 fn construct_tbs_certificate(
     issuer_infos: &CertificateFields,
     subject_name: &RdnSequence,
@@ -492,6 +493,7 @@ pub fn generate_root(
     Ok(hk)
 }
 
+/// Generate a signed hybrid keypair (ED25519 and Dilithium5)
 pub fn generate_signed_keypair(
     ca_keys: &HybridKeyPair,
     subject_name: &RdnSequence,
@@ -532,6 +534,10 @@ pub fn generate_signed_keypair(
     })
 }
 
+/// Generate a X509 certificate from a CSR and a CA keypair
+/// is_app_cert is set to true if it is an application certificate, otherwise it
+///  is considered to be a CA certificate
+/// The certificate generated will always be for DigitalSignature
 fn generate_cert_from_csr(
     ca_keys: &HybridKeyPair,
     csr: &CertReq,
@@ -625,6 +631,7 @@ fn store_keypair(
     OsRng.fill_bytes(&mut salt);
     let mut iv = [0u8; 16];
     OsRng.fill_bytes(&mut iv);
+    // Use default parameters for scrypt
     let params = match pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
         &salt,
