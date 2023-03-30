@@ -128,13 +128,13 @@ use x509_cert::time::Validity;
 //
 
 /// Structure containing informations to build the certificate
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CertificateFields {
     pub org_name:    Option<String>,
     pub org_unit:    Option<String>,
     pub country:     Option<String>,
     pub common_name: Option<String>,
-    pub validity:    u32,
+    pub validity:    Option<u32>,
 }
 
 #[derive(Debug)]
@@ -161,36 +161,37 @@ impl CertificateFields {
     ///     - Test if country is 2 letters long, if less return error, if more shorten it to the first two letters
     ///     - Test if validity can be converted to u32, if not generate error
     ///     - Test if sigAlgo is either ed25519 or ed448, if not defaut to ed25519
-    fn validate_input_cert_fields<'a>(
-        org_name: &'a String,
-        org_unit: &'a String,
-        country: &'a String,
-        common_name: &'a String,
-        validity: &'a str,
+    pub fn from_fields<'a>(
+        org_name: Option<&'a str>,
+        org_unit: Option<&'a str>,
+        country: Option<&'a str>,
+        common_name: Option<&'a str>,
+        validity: Option<&'a str>,
     ) -> Result<CertificateFields, anyhow::Error> {
         // Test if country is 2 letters long
-        let cn = match country.len() {
-            0 | 1 => return Err(anyhow!("Failed to parse length field")),
-            2 => country.to_string(),
-            _ => country[..2].to_string(),
-        };
+        let cn = country.map(|name| 
+            match name.len() {
+                0|1 => return Err(anyhow!("Invalid country name")),
+                2 => Ok(name.to_string()),
+                _ => Ok(name[..2].to_string())
+            }
+        ).transpose()?;
+
         // Test if validity can be converted to u32
-        let val = match validity.parse::<u32>() {
-            Ok(v) => v,
-            Err(_) => return Err(anyhow!("Failed to parse validity field")),
-        };
+        let val = validity.map(|value| value.parse::<u32>())
+            .transpose()?;
 
         Ok(CertificateFields {
-            org_name: Some(org_name.to_string()),
-            org_unit: Some(org_unit.to_string()),
-            country: Some(cn),
-            common_name: Some(common_name.to_string()),
+            org_name: org_name.map(|name| name.to_string()),
+            org_unit:org_unit.map(|name| name.to_string()),
+            country: cn,
+            common_name: common_name.map(|name| name.to_string()),
             validity: val,
         })
     }
 
     /// Generate a distinghuished name from the input fields for the certificate
-    fn generate_dn(&self) -> Result<RdnSequence, anyhow::Error> {
+    pub fn generate_dn(&self) -> Result<RdnSequence, anyhow::Error> {
         let mut name = String::new();
 
         // Add country name
@@ -282,7 +283,10 @@ fn construct_tbs_certificate(
     is_app_cert: bool,
     ) -> Result<TbsCertificate, anyhow::Error> {
     // Convert input validity from days to seconds
-    let dur = Duration::new((issuer_infos.validity * 60 * 60 * 24).into(), 0);
+    let dur = match issuer_infos.validity {
+        Some(value) => Duration::new((value * 60 * 60 * 24).into(), 0),
+        None => {return Err(anyhow!("Invalid validity value"));}
+    };
 
     // Create Distinguished Names for issuer and subject
     let issuer_name = issuer_infos.generate_dn()?;

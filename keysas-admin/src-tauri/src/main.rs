@@ -729,8 +729,12 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
                                 validity: String, admin_pwd: String,
                                 pki_dir: String) -> Result<String, String> {
     // Validate user inputs
-    let infos = match validate_input_cert_fields(&org_name, &org_unit, 
-                                            &country, &validity) {
+    let infos = match CertificateFields::from_fields (
+        Some(&org_name),
+        Some(&org_unit), 
+        Some(&country),
+        None,
+        Some(&validity)) {
         Ok(i) => i,
         Err(_) => {
             log::error!("Failed to validate user input");
@@ -758,7 +762,27 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     };
     
     // Generate keysas station intermediate CA key pair
-    let st_ca_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+    let ca_infos = match CertificateFields::from_fields(
+        None,
+        None,
+        None,
+        Some("Station CA"),
+        None
+    ) {
+        Ok(i) => i,
+        Err(e) => {
+            log::error!("Failed to generate station CA name field: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+    let ca_name = match ca_infos.generate_dn() {
+        Ok(n) => n,
+        Err(e) => {
+            log::error!("Failed to generate distinguished name for station CA: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+    let st_ca_keys = match generate_signed_keypair(&root_keys, &ca_name, &infos, false) {
         Ok(kp) => kp,
         Err(e) => {
             log::error!("Failed to generate intermediate CA for station: {e}");
@@ -769,7 +793,29 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     // Save keys to directory
 
     // Generate USB signing key pair
-    let usb_keys = match generate_signed_keypair(&root_keys, &infos, &infos) {
+    let usb_infos = match CertificateFields::from_fields(
+        None,
+        None,
+        None,
+        Some("USB admin"),
+        None
+    ) {
+        Ok(i) => i,
+        Err(e) => {
+            log::error!("Failed to generate station CA name field: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+    let usb_name = match usb_infos.generate_dn() {
+        Ok(n) => n,
+        Err(e) => {
+            log::error!("Failed to generate distinguished name for station CA: {e}");
+            return Err(String::from("PKI error"));
+        }
+    };
+    let subject_usb = infos.clone();
+    let usb_keys = match generate_signed_keypair(
+        &root_keys, &usb_name, &infos, true) {
         Ok(kp) => kp,
         Err(e) => {
             log::error!("Failed to generate USB signing key pair: {e}");
