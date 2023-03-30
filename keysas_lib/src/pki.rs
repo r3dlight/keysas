@@ -23,25 +23,29 @@
  #![warn(overflowing_literals)]
  #![warn(deprecated)]
  #![warn(unused_imports)]
+
 use anyhow::{anyhow, Context};
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
 use ed25519_dalek::Sha512;
 use oqs::sig::Algorithm;
-use oqs::sig::PublicKey;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
+use pkcs8::der::asn1::OctetString;
 use pkcs8::der::asn1::SetOfVec;
+use pkcs8::der::oid::db::rfc5280;
 use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
 use rand_dl::RngCore;
 use rand_dl::rngs::OsRng;
+use x509_cert::ext::Extension;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::Duration;
 use x509_cert::certificate::*;
 use x509_cert::der::asn1::BitString;
@@ -126,16 +130,17 @@ use x509_cert::time::Validity;
 /// Structure containing informations to build the certificate
 #[derive(Debug)]
 pub struct CertificateFields {
-    pub org_name: String,
-    pub org_unit: String,
-    pub country: String,
-    pub validity: u32,
+    pub org_name:    Option<String>,
+    pub org_unit:    Option<String>,
+    pub country:     Option<String>,
+    pub common_name: Option<String>,
+    pub validity:    u32,
 }
 
 #[derive(Debug)]
 pub struct KeysasPQKey {
     pub private_key: SecretKey,
-    pub public_key: PublicKey,
+    pub public_key: oqs::sig::PublicKey,
 }
 
 #[derive(Debug)]
@@ -149,36 +154,90 @@ pub struct HybridKeyPair {
 const DILITHIUM5_OID: &str = "1.3.6.1.4.1.2.267.7.8.7";
 const ED25519_OID: &str = "1.3.101.112";
 
-/// Validate user input and construct a certificate fields structure that can be used
-/// to build the certificates of the PKI.
-/// The checks done are :
-///     - Test if country is 2 letters long, if less return error, if more shorten it to the first two letters
-///     - Test if validity can be converted to u32, if not generate error
-///     - Test if sigAlgo is either ed25519 or ed448, if not defaut to ed25519
-pub fn validate_input_cert_fields<'a>(
-    org_name: &'a String,
-    org_unit: &'a String,
-    country: &'a String,
-    validity: &'a str,
-) -> Result<CertificateFields, anyhow::Error> {
-    // Test if country is 2 letters long
-    let cn = match country.len() {
-        0 | 1 => return Err(anyhow!("Failed to parse length field")),
-        2 => country.to_string(),
-        _ => country[..2].to_string(),
-    };
-    // Test if validity can be converted to u32
-    let val = match validity.parse::<u32>() {
-        Ok(v) => v,
-        Err(_) => return Err(anyhow!("Failed to parse validity field")),
-    };
+impl CertificateFields {
+    /// Validate user input and construct a certificate fields structure that can be used
+    /// to build the certificates of the PKI.
+    /// The checks done are :
+    ///     - Test if country is 2 letters long, if less return error, if more shorten it to the first two letters
+    ///     - Test if validity can be converted to u32, if not generate error
+    ///     - Test if sigAlgo is either ed25519 or ed448, if not defaut to ed25519
+    fn validate_input_cert_fields<'a>(
+        org_name: &'a String,
+        org_unit: &'a String,
+        country: &'a String,
+        common_name: &'a String,
+        validity: &'a str,
+    ) -> Result<CertificateFields, anyhow::Error> {
+        // Test if country is 2 letters long
+        let cn = match country.len() {
+            0 | 1 => return Err(anyhow!("Failed to parse length field")),
+            2 => country.to_string(),
+            _ => country[..2].to_string(),
+        };
+        // Test if validity can be converted to u32
+        let val = match validity.parse::<u32>() {
+            Ok(v) => v,
+            Err(_) => return Err(anyhow!("Failed to parse validity field")),
+        };
 
-    Ok(CertificateFields {
-        org_name: org_name.to_string(),
-        org_unit: org_unit.to_string(),
-        country: cn,
-        validity: val,
-    })
+        Ok(CertificateFields {
+            org_name: Some(org_name.to_string()),
+            org_unit: Some(org_unit.to_string()),
+            country: Some(cn),
+            common_name: Some(common_name.to_string()),
+            validity: val,
+        })
+    }
+
+    /// Generate a distinghuished name from the input fields for the certificate
+    fn generate_dn(&self) -> Result<RdnSequence, anyhow::Error> {
+        let mut name = String::new();
+
+        // Add country name
+        if let Some(cn) = &self.country {
+            name.push_str("C=");
+            name.push_str(&cn);
+            name.push_str(",");
+        }
+
+        // Add organisation name
+        if let Some(oa) = &self.org_name {
+            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
+                name.push_str(",");
+            }
+            name.push_str("O=");
+            name.push_str(&oa);
+            name.push_str(",");
+        }
+
+        // Add organisational unit
+        if let Some(ou) = &self.org_unit {
+            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
+                name.push_str(",");
+            }
+            name.push_str("OU=");
+            name.push_str(&ou);
+            name.push_str(",");
+        }
+
+        // Add common name
+        if let Some(co) = &self.common_name {
+            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
+                name.push_str(",");
+            }
+            name.push_str("CN=");
+            name.push_str(&co);
+            name.push_str(",");
+        }
+
+        // Remove trailing ',' if there is one
+        if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
+            name.pop();
+        }
+
+        let rdn = RdnSequence::from_str(&name)?;
+        Ok(rdn)
+    }
 }
 
 fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
@@ -214,15 +273,24 @@ pub fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
 }
 
 fn construct_tbs_certificate(
-    infos: &CertificateFields,
+    issuer_infos: &CertificateFields,
+    subject_name: &RdnSequence,
     pub_value: &[u8],
+    serial: &[u8],
     algo_oid: &ObjectIdentifier,
-) -> Result<TbsCertificate, anyhow::Error> {
-    let dur = Duration::new((infos.validity * 60 * 60 * 24).into(), 0);
-    let issuer_name = RdnSequence::default();
-    let subject_name = RdnSequence::default();
+    is_app_cert: bool,
+    ) -> Result<TbsCertificate, anyhow::Error> {
+    // Convert input validity from days to seconds
+    let dur = Duration::new((issuer_infos.validity * 60 * 60 * 24).into(), 0);
+
+    // Create Distinguished Names for issuer and subject
+    let issuer_name = issuer_infos.generate_dn()?;
+
+    // Convert the public key value to a bit string
     let pub_key =
         BitString::from_bytes(pub_value).with_context(|| "Failed get public key raw value")?;
+
+    // Generate the public key information field
     let pub_key_info = SubjectPublicKeyInfo {
         algorithm: AlgorithmIdentifier {
             oid: *algo_oid,
@@ -230,9 +298,40 @@ fn construct_tbs_certificate(
         },
         subject_public_key: pub_key,
     };
+
+    // Create certificate extensions
+    let mut extensions: Vec<Extension> = Vec::new();
+
+    // Authority Key Identifier
+    // According to RGS, this extension must be present and set to non critical
+    // for application certificate
+    if is_app_cert {
+        extensions.push(Extension {
+            extn_id: rfc5280::ID_CE_AUTHORITY_KEY_IDENTIFIER,
+            critical: false,
+            extn_value: OctetString::new(issuer_name.to_der()?)?
+        });
+    }
+
+    // Key usage
+    // According to RGS, must be set to critical
+    // Bit 0 is set to indicate digitalSignature
+    let ku_value: [u8; 2] = [1, 0];
+    extensions.push(Extension {
+        extn_id: rfc5280::ID_CE_KEY_USAGE,
+        critical: true,
+        extn_value: OctetString::new(ku_value.to_vec())?
+    });
+
+    // Generate the TBS Certificate structure
+    // According to RGS:
+    //  - Version is set to V3
+    //  - Issuer and subject are set with distinguished names
+    //  - Unique Identifiers are not used
+    //  - Extensions are set 
     let tbs = TbsCertificate {
         version: Version::V3,
-        serial_number: SerialNumber::new(&[1])
+        serial_number: SerialNumber::new(serial)
             .with_context(|| "Failed to generate serial number")?,
         signature: AlgorithmIdentifier {
             oid: *algo_oid,
@@ -240,11 +339,11 @@ fn construct_tbs_certificate(
         },
         issuer: issuer_name,
         validity: Validity::from_now(dur).with_context(|| "Failed to generate validity date")?,
-        subject: subject_name,
+        subject: subject_name.clone(),
         subject_public_key_info: pub_key_info,
         issuer_unique_id: None,
         subject_unique_id: None,
-        extensions: None,
+        extensions: Some(extensions),
     };
     Ok(tbs)
 }
@@ -261,12 +360,19 @@ pub fn generate_root_ed25519(
     let ed25519_oid =
         ObjectIdentifier::new(ED25519_OID).with_context(|| "Failed to generate OID")?;
 
-    let tbs = match construct_tbs_certificate(infos, &keypair.public.to_bytes(), &ed25519_oid) {
-        Ok(tbs) => tbs,
-        Err(e) => {
-            return Err(anyhow!("Failed to construct TBS certificate: {e}"));
-        }
-    };
+    // Root ED25519 certificate as serial number 1
+    let serial: [u8; 1] = [1];
+
+    // Build subject DN
+    let subject = infos.generate_dn()?;
+
+    let tbs = construct_tbs_certificate(
+        infos,
+        &subject,
+        &keypair.public.to_bytes(),
+        &serial,
+        &ed25519_oid,
+        true)?;
 
     let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
     let mut prehashed = Sha512::new();
@@ -290,14 +396,28 @@ pub fn generate_root_ed25519(
 
 pub fn generate_root_dilithium(
     infos: &CertificateFields,
-) -> Result<(SecretKey, PublicKey, Certificate), anyhow::Error> {
+) -> Result<(SecretKey, oqs::sig::PublicKey, Certificate), anyhow::Error> {
     // Create the root CA Dilithium key pair
     let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
     let (pk, sk) = pq_scheme.keypair()?;
 
     // OID value for dilithium-sha512 from IBM's networking OID range
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
-    let tbs = construct_tbs_certificate(infos, &pk.clone().into_vec(), &dilithium5_oid)?;
+
+    // Root Dilithium5 certificate as serial number 2
+    let serial: [u8; 1] = [2];
+
+    // Build subject DN
+    let subject = infos.generate_dn()?;
+
+    let tbs = construct_tbs_certificate(
+        infos,
+        &subject,
+        &pk.clone().into_vec(),
+        &serial,
+        &dilithium5_oid,
+        true)?;
+
     let content = tbs.to_der()?;
 
     let signature = pq_scheme.sign(&content, &sk)?;
@@ -374,20 +494,18 @@ pub fn generate_root(
 
 pub fn generate_signed_keypair(
     ca_keys: &HybridKeyPair,
-    _subject_infos: &CertificateFields,
+    subject_name: &RdnSequence,
     pki_infos: &CertificateFields,
+    is_app_key: bool
 ) -> Result<HybridKeyPair, anyhow::Error> {
-    // Create the subject name for the certificate
-    let subject = RdnSequence::default();
-
     // Generate ED25519 key and certificate
     // Create the ED25519 keypair
     let mut csprng = OsRng {};
     let kp_ed = Keypair::generate(&mut csprng);
     // Construct a CSR for the ED25519 key
-    let csr_ed = kp_ed.generate_csr(&subject)?;
+    let csr_ed = kp_ed.generate_csr(subject_name)?;
     // Generate a certificate from the CSR
-    let cert_ed = generate_cert_from_csr(ca_keys, &csr_ed, pki_infos)?;
+    let cert_ed = generate_cert_from_csr(ca_keys, &csr_ed, pki_infos, is_app_key)?;
 
     // Generate Dilithium key and certificate
     // Create the Dilithium key pair
@@ -398,9 +516,9 @@ pub fn generate_signed_keypair(
         public_key: pk_dl
     };
     // Construct a CSR for the Dilithium key
-    let csr_dl = kp_pq.generate_csr(&subject)?;
+    let csr_dl = kp_pq.generate_csr(subject_name)?;
     // Generate a certificate from the CSR
-    let cert_dl = generate_cert_from_csr(ca_keys, &csr_dl, pki_infos)?;
+    let cert_dl = generate_cert_from_csr(ca_keys, &csr_dl, pki_infos, is_app_key)?;
 
     // Construct hybrid key pair
     Ok(HybridKeyPair {
@@ -418,74 +536,75 @@ fn generate_cert_from_csr(
     ca_keys: &HybridKeyPair,
     csr: &CertReq,
     pki_info: &CertificateFields,
+    is_app_cert: bool
 ) -> Result<Certificate, anyhow::Error> {
     // Extract and validate info in the CSR
-    //TODO: validate CSR authenticity
+    let subject = csr.info.subject.clone();
 
-    let _subject = csr.info.subject.clone();
-    //TODO: validate subject
-
-    let pub_key = match csr.info.public_key.subject_public_key.as_bytes() {
-        Some(k) => {
-            //TODO: validate key
-            k
-        }
-        None => {
-            return Err(anyhow!("Invalid public key in CSR"));
-        }
-    };
+    let pub_key = csr.info.public_key.subject_public_key
+        .as_bytes().ok_or(anyhow!("Subject public key missing"))?;
 
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
     let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
     // Build the certificate
-    if let Ok(oid) = csr
+    if let Ok(_) = csr
         .info
         .public_key
         .algorithm
         .assert_algorithm_oid(ed25519_oid)
     {
+        // Validate CSR authenticity
+        let key = ed25519_dalek::PublicKey::from_bytes(pub_key)?;
+        if let Err(_) = key.verify_strict(
+            &csr.info.to_der()?, 
+            &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?) {
+            return Err(anyhow!("Invalid CSR signature"));
+        }
+
+        // Generate serial number
+        let mut serial = [0u8; 20];
+        OsRng.fill_bytes(&mut serial);
+
         // Build the certificate
-        let tbs = construct_tbs_certificate(pki_info, pub_key, &oid)?;
-
-        let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(content);
-        let signature = ca_keys
-            .classic
-            .sign_prehashed(prehashed, None)
-            .with_context(|| "Failed to sign certificate content")?;
-
-        let cert = Certificate {
-            tbs_certificate: tbs,
-            signature_algorithm: AlgorithmIdentifier {
-                oid: dilithium5_oid,
-                parameters: None,
-            },
-            signature: BitString::from_bytes(&signature.to_bytes())?,
-        };
+        let cert = ca_keys.classic.generate_certificate(
+            pki_info,
+            &subject,
+            pub_key,
+            &serial,
+            is_app_cert)?;
 
         Ok(cert)
-    } else if let Ok(oid) = csr
+    } else if let Ok(_) = csr
         .info
         .public_key
         .algorithm
         .assert_algorithm_oid(dilithium5_oid)
     {
-        let tbs = construct_tbs_certificate(pki_info, pub_key, &oid)?;
-        let content = tbs.to_der()?;
-
+        // Validate CSR authenticity
+        oqs::init();
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let signature = pq_scheme.sign(&content, &ca_keys.pq.private_key)?;
+        if let Err(_) = pq_scheme.verify(
+            &csr.info.to_der()?,
+            &pq_scheme.signature_from_bytes(csr.signature.raw_bytes())
+                .ok_or(anyhow!("Failed to create signature"))?,
+            &pq_scheme.public_key_from_bytes(pub_key)
+                .ok_or(anyhow!("Failed to create public key"))?
+        ) {
+            return Err(anyhow!("Invalid CSR signature"));
+        }
 
-        let cert = Certificate {
-            tbs_certificate: tbs,
-            signature_algorithm: AlgorithmIdentifier {
-                oid: dilithium5_oid,
-                parameters: None,
-            },
-            signature: BitString::from_bytes(&signature.into_vec())?,
-        };
+        // Generate serial number
+        let mut serial = [0u8; 20];
+        OsRng.fill_bytes(&mut serial);
+
+        // Build the certificate
+        let cert = ca_keys.pq.generate_certificate(
+            pki_info,
+            &subject,
+            pub_key,
+            &serial,
+            is_app_cert)?;
 
         Ok(cert)
     } else {
@@ -551,6 +670,13 @@ pub trait KeysasKey<T> {
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error>;
     /// Verify the signature of a message
     fn message_verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, anyhow::Error>;
+    /// Generate a certificate from a CSR and signed with the key
+    fn generate_certificate(&self,
+        ca_infos: &CertificateFields, 
+        subject_infos: &RdnSequence,
+        subject_key: &[u8],
+        serial: &[u8],
+        is_app_cert: bool) -> Result<Certificate, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
@@ -661,6 +787,41 @@ impl KeysasKey<Keypair> for Keypair {
         self.verify(message, &sig)?;
         // If no error has been returned then the signature is valid
         Ok(true)
+    }
+
+    fn generate_certificate(&self,
+        ca_infos: &CertificateFields, 
+        subject_infos: &RdnSequence,
+        subject_key: &[u8],
+        serial: &[u8],
+        is_app_cert: bool) -> Result<Certificate, anyhow::Error> {
+        
+        let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+
+        // Build the certificate
+        let tbs = construct_tbs_certificate(
+            ca_infos,
+            subject_infos,
+            subject_key,
+            serial,
+            &ed25519_oid,
+            is_app_cert)?;
+
+        let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
+        let mut prehashed = Sha512::new();
+        prehashed.update(content);
+        let signature = self.sign_prehashed(prehashed, None)
+            .with_context(|| "Failed to sign certificate content")?;
+
+        let cert = Certificate {
+            tbs_certificate: tbs,
+            signature_algorithm: AlgorithmIdentifier {
+                oid: ed25519_oid,
+                parameters: None,
+            },
+            signature: BitString::from_bytes(&signature.to_bytes())?,
+        };
+        Ok(cert)
     }
 }
 
@@ -796,5 +957,39 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             &self.public_key)?;
         // If no error then the signature is valid
         Ok(true)
+    }
+
+    fn generate_certificate(&self,
+        ca_infos: &CertificateFields, 
+        subject_infos: &RdnSequence,
+        subject_key: &[u8],
+        serial: &[u8],
+        is_app_cert: bool) -> Result<Certificate, anyhow::Error> {
+        
+        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+
+        // Build the certificate
+        let tbs = construct_tbs_certificate(
+            ca_infos,
+            subject_infos,
+            subject_key,
+            serial,
+            &dilithium5_oid,
+            is_app_cert)?;
+
+        let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
+        
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let signature = pq_scheme.sign(&content, &self.private_key)?;
+
+        let cert = Certificate {
+            tbs_certificate: tbs,
+            signature_algorithm: AlgorithmIdentifier {
+                oid: dilithium5_oid,
+                parameters: None,
+            },
+            signature: BitString::from_bytes(&signature.into_vec())?,
+        };
+        Ok(cert)
     }
 }
