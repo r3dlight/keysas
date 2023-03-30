@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /*
- * The "keysas-out".
+ * The "keysas-lib".
  *
  * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
- * for building the keysas-out binary.
+ * for building the keysas_lib.
  */
 
  #![warn(unused_extern_crates)]
@@ -23,11 +23,10 @@
  #![warn(overflowing_literals)]
  #![warn(deprecated)]
  #![warn(unused_imports)]
- use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context};
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
 use ed25519_dalek::Sha512;
-use hex_literal::hex;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey;
 use oqs::sig::SecretKey;
@@ -165,7 +164,7 @@ pub fn validate_input_cert_fields<'a>(
     org_name: &'a String,
     org_unit: &'a String,
     country: &'a String,
-    validity: &'a String,
+    validity: &'a str,
 ) -> Result<CertificateFields, ()> {
     // Test if country is 2 letters long
     let cn = match country.len() {
@@ -324,15 +323,15 @@ pub fn generate_root_dilithium(
 pub fn generate_root(
     infos: &CertificateFields,
     pki_dir: &String,
-    pwd: &String,
+    pwd: &str,
 ) -> Result<HybridKeyPair, anyhow::Error> {
     // Generate root ED25519 key and certificate
     let (kp_ed, cert_ed) =
-        generate_root_ed25519(&infos).with_context(|| "ED25519 generation failed")?;
+        generate_root_ed25519(infos).with_context(|| "ED25519 generation failed")?;
 
     // Generate root Dilithium key and certificate
     let (sk_dl, pk_dl, cert_dl) =
-        generate_root_dilithium(&infos).context("Dilithium generation failed")?;
+        generate_root_dilithium(infos).context("Dilithium generation failed")?;
 
     // Construct hybrid key pair
     let hk = HybridKeyPair {
@@ -347,12 +346,12 @@ pub fn generate_root(
 
     // Save hybrid key pair to disk
     hk.classic.save_keys(
-        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-cl.p8")),
+        Path::new(&(pki_dir.to_owned() + "/CA/root-priv-cl.p8")),
         pwd)
         .context("ED25519 storing failed")?;
 
     hk.pq.save_keys(
-        &Path::new(&(pki_dir.to_owned() + "/CA/root-priv-pq.p8")),
+        Path::new(&(pki_dir.to_owned() + "/CA/root-priv-pq.p8")),
         pwd)
         .context("Dilithium storing failed")?;
 
@@ -380,7 +379,7 @@ pub fn generate_root(
 
 pub fn generate_signed_keypair(
     ca_keys: &HybridKeyPair,
-    subject_infos: &CertificateFields,
+    _subject_infos: &CertificateFields,
     pki_infos: &CertificateFields,
 ) -> Result<HybridKeyPair, anyhow::Error> {
     // Create the subject name for the certificate
@@ -428,7 +427,7 @@ fn generate_cert_from_csr(
     // Extract and validate info in the CSR
     //TODO: validate CSR authenticity
 
-    let subject = csr.info.subject.clone();
+    let _subject = csr.info.subject.clone();
     //TODO: validate subject
 
     let pub_key = match csr.info.public_key.subject_public_key.as_bytes() {
@@ -504,7 +503,7 @@ fn store_keypair(
     prk: &[u8],
     pbk: &[u8],
     oid: ObjectIdentifier,
-    pwd: &String,
+    pwd: &str,
     path: &Path,
 ) -> Result<(), anyhow::Error> {
     //Initialize key wrap function parameters
@@ -525,7 +524,7 @@ fn store_keypair(
 
     let pk_info = PrivateKeyInfo {
         algorithm: pkcs8::AlgorithmIdentifierRef {
-            oid: oid,
+            oid,
             parameters: None,
         },
         private_key: prk,
@@ -546,14 +545,14 @@ fn store_keypair(
 }
 
 pub trait KeysasKey<T> {
-    fn load_keys(path: &Path, pwd: &String) -> Result<T, anyhow::Error>;
-    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error>;
+    fn load_keys(path: &Path, pwd: &str) -> Result<T, anyhow::Error>;
+    fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error>;
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
 impl KeysasKey<Keypair> for Keypair {
-    fn load_keys(path: &Path, pwd: &String) -> Result<Keypair, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &str) -> Result<Keypair, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
 
@@ -597,7 +596,7 @@ impl KeysasKey<Keypair> for Keypair {
         }
     }
 
-    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
+    fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         store_keypair(
@@ -636,7 +635,7 @@ impl KeysasKey<Keypair> for Keypair {
             .with_context(|| "Failed to sign certificate content")?;
 
         let csr = CertReq {
-            info: info,
+            info,
             algorithm: AlgorithmIdentifier {
                 oid: ed25519_oid,
                 parameters: None,
@@ -649,7 +648,7 @@ impl KeysasKey<Keypair> for Keypair {
 }
 
 impl KeysasKey<KeysasPQKey> for KeysasPQKey {
-    fn load_keys(path: &Path, pwd: &String) -> Result<KeysasPQKey, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &str) -> Result<KeysasPQKey, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {
@@ -709,7 +708,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         };
     }
 
-    fn save_keys(&self, path: &Path, pwd: &String) -> Result<(), anyhow::Error> {
+    fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         store_keypair(
@@ -745,7 +744,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         let signature = pq_scheme.sign(&content, &self.private_key)?;
     
         let csr = CertReq {
-            info: info,
+            info,
             algorithm: AlgorithmIdentifier {
                 oid: dilithium5_oid,
                 parameters: None,
