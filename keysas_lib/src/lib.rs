@@ -1,3 +1,5 @@
+#![feature(is_some_and)]
+
 use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
