@@ -285,8 +285,11 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
                                         VALUES ('directory', '{}'), ('org_name', '{}'), \
                                         ('org_unit', '{}'), ('country', '{}'), \
                                         ('validity', '{}');",
-                        pki_dir, &infos.org_name, &infos.org_unit,
-                        &infos.country, &infos.validity);
+                        pki_dir,
+                        infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
+                        infos.org_unit.as_ref().unwrap_or(&String::from("")),
+                        infos.country.as_ref().unwrap_or(&String::from("")),
+                        &infos.validity.unwrap_or(0));
                     log::debug!("Query: {}", query);
                     connection.execute(query)?;
                     return Ok(());
