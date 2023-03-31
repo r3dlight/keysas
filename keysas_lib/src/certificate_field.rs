@@ -66,7 +66,7 @@ impl CertificateFields {
         // Test if country is 2 letters long
         let cn = country.map(|name| 
             match name.len() {
-                0|1 => return Err(anyhow!("Invalid country name")),
+                0|1 => Err(anyhow!("Invalid country name")),
                 2 => Ok(name.to_string()),
                 _ => Ok(name[..2].to_string())
             }
@@ -92,38 +92,38 @@ impl CertificateFields {
         // Add country name
         if let Some(cn) = &self.country {
             name.push_str("C=");
-            name.push_str(&cn);
-            name.push_str(",");
+            name.push_str(cn);
+            name.push(',');
         }
 
         // Add organisation name
         if let Some(oa) = &self.org_name {
             if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push_str(",");
+                name.push(',');
             }
             name.push_str("O=");
-            name.push_str(&oa);
-            name.push_str(",");
+            name.push_str(oa);
+            name.push(',');
         }
 
         // Add organisational unit
         if let Some(ou) = &self.org_unit {
             if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push_str(",");
+                name.push(',');
             }
             name.push_str("OU=");
-            name.push_str(&ou);
-            name.push_str(",");
+            name.push_str(ou);
+            name.push(',');
         }
 
         // Add common name
         if let Some(co) = &self.common_name {
             if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push_str(",");
+                name.push(',');
             }
             name.push_str("CN=");
-            name.push_str(&co);
-            name.push_str(",");
+            name.push_str(co);
+            name.push(',');
         }
 
         // Remove trailing ',' if there is one

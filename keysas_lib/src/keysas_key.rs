@@ -157,19 +157,19 @@ impl KeysasKey<Keypair> for Keypair {
         if decoded_pk.private_key.len() == 32 {
             match ed25519_dalek::SecretKey::from_bytes(decoded_pk.private_key) {
                 Ok(secret_key) => {
-                    return Ok(Keypair {
+                    Ok(Keypair {
                         public: (&(secret_key)).into(),
                         secret: secret_key,
-                    });
+                    })
                 }
                 Err(e) => {
-                    return Err(anyhow!(
+                    Err(anyhow!(
                         "Cannot parse private key CLASSIC/ed25519-dalek from pkcs#8: {e}"
-                    ));
+                    ))
                 }
-            };
+            }
         } else {
-            return Err(anyhow!("Key is not 32 bytes long"));
+            Err(anyhow!("Key is not 32 bytes long"))
         }
     }
 
@@ -324,15 +324,15 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
                         return Err(anyhow!("Cannot parse PQC public key from pkcs#8"));
                     }
                 };
-                return Ok(KeysasPQKey {
+                Ok(KeysasPQKey {
                     private_key: secret_key,
                     public_key: public_key.to_owned(),
-                });
+                })
             }
             None => {
-                return Err(anyhow!("No PQC public key found in pkcs#8 format"));
+                Err(anyhow!("No PQC public key found in pkcs#8 format"))
             },
-        };
+        }
     }
 
     fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error> {

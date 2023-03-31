@@ -161,17 +161,17 @@ pub fn generate_cert_from_csr(
     let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
     // Build the certificate
-    if let Ok(_) = csr
+    if csr
         .info
         .public_key
         .algorithm
-        .assert_algorithm_oid(ed25519_oid)
+        .assert_algorithm_oid(ed25519_oid).is_ok()
     {
         // Validate CSR authenticity
         let key = ed25519_dalek::PublicKey::from_bytes(pub_key)?;
-        if let Err(_) = key.verify_strict(
+        if key.verify_strict(
             &csr.info.to_der()?, 
-            &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?) {
+            &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?).is_err() {
             return Err(anyhow!("Invalid CSR signature"));
         }
 
@@ -188,22 +188,22 @@ pub fn generate_cert_from_csr(
             is_app_cert)?;
 
         Ok(cert)
-    } else if let Ok(_) = csr
+    } else if csr
         .info
         .public_key
         .algorithm
-        .assert_algorithm_oid(dilithium5_oid)
+        .assert_algorithm_oid(dilithium5_oid).is_ok()
     {
         // Validate CSR authenticity
         oqs::init();
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        if let Err(_) = pq_scheme.verify(
+        if pq_scheme.verify(
             &csr.info.to_der()?,
-            &pq_scheme.signature_from_bytes(csr.signature.raw_bytes())
+            pq_scheme.signature_from_bytes(csr.signature.raw_bytes())
                 .ok_or(anyhow!("Failed to create signature"))?,
-            &pq_scheme.public_key_from_bytes(pub_key)
+            pq_scheme.public_key_from_bytes(pub_key)
                 .ok_or(anyhow!("Failed to create public key"))?
-        ) {
+        ).is_err() {
             return Err(anyhow!("Invalid CSR signature"));
         }
 
