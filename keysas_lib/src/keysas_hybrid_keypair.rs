@@ -32,9 +32,11 @@
  use oqs::sig::SecretKey;
  use oqs::sig::Sig;
  use pkcs8::LineEnding;
- use pkcs8::der::Encode;
+ use pkcs8::der::DecodePem;
+use pkcs8::der::Encode;
 use rand_dl::rngs::OsRng;
- use std::fs::File;
+ use std::fs;
+use std::fs::File;
  use std::io::Write;
  use std::path::Path;
  use x509_cert::certificate::*;
@@ -152,7 +154,7 @@ impl HybridKeyPair {
     /// The keys will be saved in DER encoded PKCS8 files at: keys_path/name-{cl|pq}.p8
     /// The certificates will be saved in PEM files at: certs_path/name-{cl|pq}.pem
     /// pwd is used for encrypting the PKCS8 files
-    pub fn save(&self, name: &str, keys_path: &Path, _certs_path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
+    pub fn save(&self, name: &str, keys_path: &Path, certs_path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
         // Save keys
         let cl_key_path = keys_path.join(name.to_owned() + "-cl.p8");
         self.classic.save_keys(&cl_key_path, pwd)?;
@@ -161,13 +163,46 @@ impl HybridKeyPair {
         self.pq.save_keys(&pq_key_path, pwd)?;
         
         // Save certificates
-        //let cl_cert_path = certs_path.join(name.to_owned() + "-cl.pem");
-        //self.classic_cert.save_keys(&cl_cert_path, pwd)?;
+        let cl_cert_path = certs_path.join(name.to_owned() + "-cl.pem");
+        let cl_pem = self.classic_cert.to_pem(LineEnding::LF)?;
+        let mut cl_cert_file = File::create(cl_cert_path)?;
+        write!(cl_cert_file, "{}", cl_pem)?;
 
-        //let pq_cert_path = certs_path.join(name.to_owned() + "-pq.pem");
-        //self.pq.save_keys(&pq_cert_path, pwd)?;
+        let pq_cert_path = certs_path.join(name.to_owned() + "-pq.pem");
+        let pq_pem = self.pq_cert.to_pem(LineEnding::LF)?;
+        let mut pq_cert_file = File::create(pq_cert_path)?;
+        write!(pq_cert_file, "{}", pq_pem)?;
 
         Ok(())
+    }
+
+    /// Load the keypair from the disk
+    /// The keys will be loaded in DER encoded PKCS8 files from: keys_path/name-{cl|pq}.p8
+    /// The certificates will be loaded in PEM files from: certs_path/name-{cl|pq}.pem
+    /// pwd is used for decrypting the PKCS8 files
+    pub fn load(name: &str, keys_path: &Path, certs_path: &Path, pwd: &str) -> Result<HybridKeyPair, anyhow::Error> {
+        // Load keys
+        let cl_key_path = keys_path.join(name.to_owned() + "-cl.p8");
+        let cl_keys = Keypair::load_keys(&cl_key_path, pwd)?;
+
+        let pq_key_path = keys_path.join(name.to_owned() + "-pq.p8");
+        let pq_keys = KeysasPQKey::load_keys(&pq_key_path, pwd)?;
+
+        // Load certificates
+        let cl_cert_path = certs_path.join(name.to_owned() + "-cl.pem");
+        let cl_cert_pem = fs::read_to_string(cl_cert_path)?;
+        let cl_cert = Certificate::from_pem(cl_cert_pem)?;
+
+        let pq_cert_path = certs_path.join(name.to_owned() + "-pq.pem");
+        let pq_cert_pem = fs::read_to_string(pq_cert_path)?;
+        let pq_cert = Certificate::from_pem(pq_cert_pem)?;
+
+        Ok(HybridKeyPair {
+            classic: cl_keys,
+            classic_cert: cl_cert,
+            pq: pq_keys,
+            pq_cert: pq_cert
+        })
     }
 
     /// Generate PKI root keys
