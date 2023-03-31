@@ -43,7 +43,7 @@ jobs:
           bash \
           libudev-dev \
           cmake \
-          libsoup-3.0-dev
+          libsoup-2.4-dev
     - run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
     - name: Build
       run: cargo build --verbose
