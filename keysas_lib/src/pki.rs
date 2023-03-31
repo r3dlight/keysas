@@ -8,27 +8,27 @@
  * for building the keysas_lib.
  */
 
- #![warn(unused_extern_crates)]
- #![forbid(non_shorthand_field_patterns)]
- #![warn(dead_code)]
- #![warn(missing_debug_implementations)]
- #![warn(missing_copy_implementations)]
- #![warn(trivial_casts)]
- #![warn(trivial_numeric_casts)]
- #![warn(unused_extern_crates)]
- #![warn(unused_import_braces)]
- #![warn(unused_qualifications)]
- #![warn(variant_size_differences)]
- #![forbid(private_in_public)]
- #![warn(overflowing_literals)]
- #![warn(deprecated)]
- #![warn(unused_imports)]
+#![warn(unused_extern_crates)]
+#![forbid(non_shorthand_field_patterns)]
+#![warn(dead_code)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_copy_implementations)]
+#![warn(trivial_casts)]
+#![warn(trivial_numeric_casts)]
+#![warn(unused_extern_crates)]
+#![warn(unused_import_braces)]
+#![warn(unused_qualifications)]
+#![warn(variant_size_differences)]
+#![forbid(private_in_public)]
+#![warn(overflowing_literals)]
+#![warn(deprecated)]
+#![warn(unused_imports)]
 
 use anyhow::anyhow;
 use oqs::sig::Algorithm;
 use oqs::sig::Sig;
-use rand_dl::RngCore;
 use rand_dl::rngs::OsRng;
+use rand_dl::RngCore;
 use std::fs;
 use std::path::Path;
 use x509_cert::certificate::*;
@@ -149,13 +149,17 @@ pub fn generate_cert_from_csr(
     ca_keys: &HybridKeyPair,
     csr: &CertReq,
     pki_info: &CertificateFields,
-    is_app_cert: bool
+    is_app_cert: bool,
 ) -> Result<Certificate, anyhow::Error> {
     // Extract and validate info in the CSR
     let subject = csr.info.subject.clone();
 
-    let pub_key = csr.info.public_key.subject_public_key
-        .as_bytes().ok_or(anyhow!("Subject public key missing"))?;
+    let pub_key = csr
+        .info
+        .public_key
+        .subject_public_key
+        .as_bytes()
+        .ok_or(anyhow!("Subject public key missing"))?;
 
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
     let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
@@ -165,13 +169,18 @@ pub fn generate_cert_from_csr(
         .info
         .public_key
         .algorithm
-        .assert_algorithm_oid(ed25519_oid).is_ok()
+        .assert_algorithm_oid(ed25519_oid)
+        .is_ok()
     {
         // Validate CSR authenticity
         let key = ed25519_dalek::PublicKey::from_bytes(pub_key)?;
-        if key.verify_strict(
-            &csr.info.to_der()?, 
-            &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?).is_err() {
+        if key
+            .verify_strict(
+                &csr.info.to_der()?,
+                &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?,
+            )
+            .is_err()
+        {
             return Err(anyhow!("Invalid CSR signature"));
         }
 
@@ -185,25 +194,32 @@ pub fn generate_cert_from_csr(
             &subject,
             pub_key,
             &serial,
-            is_app_cert)?;
+            is_app_cert,
+        )?;
 
         Ok(cert)
     } else if csr
         .info
         .public_key
         .algorithm
-        .assert_algorithm_oid(dilithium5_oid).is_ok()
+        .assert_algorithm_oid(dilithium5_oid)
+        .is_ok()
     {
         // Validate CSR authenticity
         oqs::init();
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        if pq_scheme.verify(
-            &csr.info.to_der()?,
-            pq_scheme.signature_from_bytes(csr.signature.raw_bytes())
-                .ok_or(anyhow!("Failed to create signature"))?,
-            pq_scheme.public_key_from_bytes(pub_key)
-                .ok_or(anyhow!("Failed to create public key"))?
-        ).is_err() {
+        if pq_scheme
+            .verify(
+                &csr.info.to_der()?,
+                pq_scheme
+                    .signature_from_bytes(csr.signature.raw_bytes())
+                    .ok_or(anyhow!("Failed to create signature"))?,
+                pq_scheme
+                    .public_key_from_bytes(pub_key)
+                    .ok_or(anyhow!("Failed to create public key"))?,
+            )
+            .is_err()
+        {
             return Err(anyhow!("Invalid CSR signature"));
         }
 
@@ -212,12 +228,10 @@ pub fn generate_cert_from_csr(
         OsRng.fill_bytes(&mut serial);
 
         // Build the certificate
-        let cert = ca_keys.pq.generate_certificate(
-            pki_info,
-            &subject,
-            pub_key,
-            &serial,
-            is_app_cert)?;
+        let cert =
+            ca_keys
+                .pq
+                .generate_certificate(pki_info, &subject, pub_key, &serial, is_app_cert)?;
 
         Ok(cert)
     } else {
