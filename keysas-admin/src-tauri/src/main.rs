@@ -31,6 +31,8 @@
 use crate::errors::*;
 use std::path::Path;
 use async_std::task;
+use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use nom::bytes::complete::take_until;
 use nom::IResult;
 use sha2::{Digest, Sha256};
@@ -753,13 +755,23 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     }
 
     // Generate root key and save them in PKCS12 format
-    let root_keys = match generate_root(&infos, &pki_dir, &admin_pwd) {
+    let root_keys = match HybridKeyPair::generate_root(&infos, &pki_dir, &admin_pwd) {
         Ok(kp) => kp,
         Err(e) => {
             log::error!("Failed to generate PKI root keys: {e}");
             return Err(String::from("PKI error"));
         }
     };
+
+    // Save keys
+    if let Err(e) = root_keys.save(
+        "root",
+        &Path::new(&(pki_dir.to_owned() + "/CA/root")),
+        &Path::new(&(pki_dir.to_owned() + "/CA/root")),
+        &admin_pwd) {
+        log::error!("Failed to save root key to disk: {e}");
+        return Err(String::from("PKI error"));
+    }
     
     // Generate keysas station intermediate CA key pair
     let ca_infos = match CertificateFields::from_fields(
@@ -782,15 +794,22 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
             return Err(String::from("PKI error"));
         }
     };
-    let st_ca_keys = match generate_signed_keypair(&root_keys, &ca_name, &infos, false) {
+    let st_ca_keys = match HybridKeyPair::generate_signed_keypair(&root_keys, &ca_name, &infos, false) {
         Ok(kp) => kp,
         Err(e) => {
             log::error!("Failed to generate intermediate CA for station: {e}");
             return Err(String::from("PKI error"));
         }
     };
-
-    // Save keys to directory
+    // Save keys
+    if let Err(e) = st_ca_keys.save(
+        "st-ca",
+        &Path::new(&(pki_dir.to_owned() + "/CA/st")),
+        &Path::new(&(pki_dir.to_owned() + "/CA/st")),
+        &admin_pwd) {
+        log::error!("Failed to save station CA key to disk: {e}");
+        return Err(String::from("PKI error"));
+    }
 
     // Generate USB signing key pair
     let usb_infos = match CertificateFields::from_fields(
@@ -813,8 +832,7 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
             return Err(String::from("PKI error"));
         }
     };
-    let subject_usb = infos.clone();
-    let usb_keys = match generate_signed_keypair(
+    let usb_keys = match HybridKeyPair::generate_signed_keypair(
         &root_keys, &usb_name, &infos, true) {
         Ok(kp) => kp,
         Err(e) => {
@@ -822,6 +840,15 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
             return Err(String::from("PKI error"));
         }
     };
+    // Save keys
+    if let Err(e) = usb_keys.save(
+        "usb",
+        &Path::new(&(pki_dir.to_owned() + "/CA/usb")),
+        &Path::new(&(pki_dir.to_owned() + "/CA/usb")),
+        &admin_pwd) {
+        log::error!("Failed to save station CA key to disk: {e}");
+        return Err(String::from("PKI error"));
+    }
 
     Ok(String::from("PKI created"))
 }
