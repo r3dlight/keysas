@@ -8,21 +8,21 @@
  * for building the keysas_lib.
  */
 
- #![warn(unused_extern_crates)]
- #![forbid(non_shorthand_field_patterns)]
- #![warn(dead_code)]
- #![warn(missing_debug_implementations)]
- #![warn(missing_copy_implementations)]
- #![warn(trivial_casts)]
- #![warn(trivial_numeric_casts)]
- #![warn(unused_extern_crates)]
- #![warn(unused_import_braces)]
- #![warn(unused_qualifications)]
- #![warn(variant_size_differences)]
- #![forbid(private_in_public)]
- #![warn(overflowing_literals)]
- #![warn(deprecated)]
- #![warn(unused_imports)]
+#![warn(unused_extern_crates)]
+#![forbid(non_shorthand_field_patterns)]
+#![warn(dead_code)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_copy_implementations)]
+#![warn(trivial_casts)]
+#![warn(trivial_numeric_casts)]
+#![warn(unused_extern_crates)]
+#![warn(unused_import_braces)]
+#![warn(unused_qualifications)]
+#![warn(variant_size_differences)]
+#![forbid(private_in_public)]
+#![warn(overflowing_literals)]
+#![warn(deprecated)]
+#![warn(unused_imports)]
 
 use anyhow::{anyhow, Context};
 use ed25519_dalek::Digest;
@@ -32,9 +32,11 @@ use oqs::sig::Algorithm;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
 use pkcs8::der::asn1::SetOfVec;
+use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::PrivateKeyInfo;
-use pkcs8::pkcs5::pbes2;
+use rand_dl::rngs::OsRng;
+use rand_dl::RngCore;
 use std::fs;
 use std::path::Path;
 use x509_cert::certificate::*;
@@ -46,12 +48,10 @@ use x509_cert::request::CertReqInfo;
 use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
-use rand_dl::RngCore;
-use rand_dl::rngs::OsRng;
 
 use crate::certificate_field::CertificateFields;
-use crate::pki::ED25519_OID;
 use crate::pki::DILITHIUM5_OID;
+use crate::pki::ED25519_OID;
 
 #[derive(Debug)]
 pub struct KeysasPQKey {
@@ -119,12 +119,14 @@ pub trait KeysasKey<T> {
     /// Verify the signature of a message
     fn message_verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, anyhow::Error>;
     /// Generate a certificate from a CSR and signed with the key
-    fn generate_certificate(&self,
-        ca_infos: &CertificateFields, 
+    fn generate_certificate(
+        &self,
+        ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
         serial: &[u8],
-        is_app_cert: bool) -> Result<Certificate, anyhow::Error>;
+        is_app_cert: bool,
+    ) -> Result<Certificate, anyhow::Error>;
 }
 
 // Implementing new methods on top of dalek Keypair
@@ -156,17 +158,13 @@ impl KeysasKey<Keypair> for Keypair {
         // ed25519 is only 32 bytes long
         if decoded_pk.private_key.len() == 32 {
             match ed25519_dalek::SecretKey::from_bytes(decoded_pk.private_key) {
-                Ok(secret_key) => {
-                    Ok(Keypair {
-                        public: (&(secret_key)).into(),
-                        secret: secret_key,
-                    })
-                }
-                Err(e) => {
-                    Err(anyhow!(
-                        "Cannot parse private key CLASSIC/ed25519-dalek from pkcs#8: {e}"
-                    ))
-                }
+                Ok(secret_key) => Ok(Keypair {
+                    public: (&(secret_key)).into(),
+                    secret: secret_key,
+                }),
+                Err(e) => Err(anyhow!(
+                    "Cannot parse private key CLASSIC/ed25519-dalek from pkcs#8: {e}"
+                )),
             }
         } else {
             Err(anyhow!("Key is not 32 bytes long"))
@@ -178,10 +176,10 @@ impl KeysasKey<Keypair> for Keypair {
 
         store_keypair(
             self.secret.as_bytes(),
-            self.public.as_bytes(), 
+            self.public.as_bytes(),
             ed25519_oid,
             pwd,
-            path
+            path,
         )
     }
 
@@ -237,13 +235,14 @@ impl KeysasKey<Keypair> for Keypair {
         Ok(true)
     }
 
-    fn generate_certificate(&self,
-        ca_infos: &CertificateFields, 
+    fn generate_certificate(
+        &self,
+        ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
         serial: &[u8],
-        is_app_cert: bool) -> Result<Certificate, anyhow::Error> {
-        
+        is_app_cert: bool,
+    ) -> Result<Certificate, anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         // Build the certificate
@@ -252,12 +251,14 @@ impl KeysasKey<Keypair> for Keypair {
             subject_key,
             serial,
             &ed25519_oid,
-            is_app_cert)?;
+            is_app_cert,
+        )?;
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
         let mut prehashed = Sha512::new();
         prehashed.update(content);
-        let signature = self.sign_prehashed(prehashed, None)
+        let signature = self
+            .sign_prehashed(prehashed, None)
             .with_context(|| "Failed to sign certificate content")?;
 
         let cert = Certificate {
@@ -329,9 +330,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
                     public_key: public_key.to_owned(),
                 })
             }
-            None => {
-                Err(anyhow!("No PQC public key found in pkcs#8 format"))
-            },
+            None => Err(anyhow!("No PQC public key found in pkcs#8 format")),
         }
     }
 
@@ -340,10 +339,10 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
         store_keypair(
             &self.private_key.clone().into_vec(),
-            &self.public_key.clone().into_vec(), 
+            &self.public_key.clone().into_vec(),
             ed25519_oid,
             pwd,
-            path
+            path,
         )
     }
 
@@ -352,7 +351,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
         let pub_key = BitString::from_bytes(&self.public_key.clone().into_vec())
             .with_context(|| "Failed get public key raw value")?;
-    
+
         let info = CertReqInfo {
             version: x509_cert::request::Version::V1,
             subject: subject.to_owned(),
@@ -365,11 +364,11 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             },
             attributes: SetOfVec::new(),
         };
-    
+
         let content = info.to_der().with_context(|| "Failed to convert to DER")?;
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
         let signature = pq_scheme.sign(&content, &self.private_key)?;
-    
+
         let csr = CertReq {
             info,
             algorithm: AlgorithmIdentifier {
@@ -378,7 +377,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             },
             signature: BitString::from_bytes(&signature.into_vec())?,
         };
-    
+
         Ok(csr)
     }
 
@@ -398,21 +397,19 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
                 return Err(anyhow!("Invalid signature input"));
             }
         };
-        pq_scheme.verify(
-            message,
-            sig,
-            &self.public_key)?;
+        pq_scheme.verify(message, sig, &self.public_key)?;
         // If no error then the signature is valid
         Ok(true)
     }
 
-    fn generate_certificate(&self,
-        ca_infos: &CertificateFields, 
+    fn generate_certificate(
+        &self,
+        ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
         serial: &[u8],
-        is_app_cert: bool) -> Result<Certificate, anyhow::Error> {
-        
+        is_app_cert: bool,
+    ) -> Result<Certificate, anyhow::Error> {
         let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
         // Build the certificate
@@ -421,10 +418,11 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             subject_key,
             serial,
             &dilithium5_oid,
-            is_app_cert)?;
+            is_app_cert,
+        )?;
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-        
+
         let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
         let signature = pq_scheme.sign(&content, &self.private_key)?;
 
