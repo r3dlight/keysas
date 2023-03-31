@@ -12,6 +12,9 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
 pub mod pki;
+pub mod keysas_key;
+pub mod keysas_hybrid_keypair;
+pub mod certificate_field;
 
 // Init logger
 pub fn init_logger() {
