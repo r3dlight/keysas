@@ -11,10 +11,10 @@ use std::io::{BufReader, IoSlice, Read};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
-pub mod pki;
-pub mod keysas_key;
-pub mod keysas_hybrid_keypair;
 pub mod certificate_field;
+pub mod keysas_hybrid_keypair;
+pub mod keysas_key;
+pub mod pki;
 
 // Init logger
 pub fn init_logger() {

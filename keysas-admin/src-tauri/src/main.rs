@@ -755,7 +755,7 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     }
 
     // Generate root key and save them in PKCS12 format
-    let root_keys = match HybridKeyPair::generate_root(&infos, &pki_dir, &admin_pwd) {
+    let root_keys = match HybridKeyPair::generate_root(&infos) {
         Ok(kp) => kp,
         Err(e) => {
             log::error!("Failed to generate PKI root keys: {e}");
