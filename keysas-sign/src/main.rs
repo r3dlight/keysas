@@ -16,9 +16,26 @@
 //!     This command is used to load certificate on the station, it can be either:
 //!         - file: the certificate corresponds to the private signing key of the station
 //!         - usb: the certificate corresponds to the USB signing authority
+#![feature(is_some_and)]
+#![warn(unused_extern_crates)]
+#![forbid(non_shorthand_field_patterns)]
+#![warn(dead_code)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_copy_implementations)]
+#![warn(trivial_casts)]
+#![warn(trivial_numeric_casts)]
+#![warn(unused_extern_crates)]
+#![warn(unused_import_braces)]
+#![warn(unused_qualifications)]
+#![warn(variant_size_differences)]
+#![forbid(private_in_public)]
+#![warn(overflowing_literals)]
+#![warn(deprecated)]
+#![warn(unused_imports)]
 
 pub use anyhow::{anyhow, Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
+use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
 use pkcs8::der::EncodePem;
 use std::fs::File;
@@ -30,11 +47,12 @@ use keysas_lib::keysas_key::KeysasPQKey;
 use std::path::Path;
 use std::str;
 
-const FILE_PRIV_PATH: &str = "/etc/keysas/file-sign-priv.pem";
-const FILE_CERT_PATH: &str = "/etc/keysas/file-sign-cert.pem";
+const FILE_PRIV_CL_PATH: &str = "/etc/keysas/file-sign-cl-priv.pem";
+const FILE_CERT_CL_PATH: &str = "/etc/keysas/file-sign-cl-cert.pem";
 const FILE_PRIV_PQ_PATH: &str = "/etc/keysas/file-sign-pq-priv.pem";
 const FILE_CERT_PQ_PATH: &str = "/etc/keysas/file-sign-pq-cert.pem";
-const USB_CERT_PATH: &str = "/etc/keysas/usb-ca-cert.pem";
+const USB_CERT_CL_PATH: &str = "/etc/keysas/usb-ca-cl-cert.pem";
+const USB_CERT_PQ_PATH: &str = "/etc/keysas/usb-ca-pq-cert.pem";
 
 const KEY_PASSWD: &str = "Keysas007";
 
@@ -95,7 +113,7 @@ fn command_args() -> Config {
              .short('t')
              .long("certtype")
              .value_name("certtype")
-             .help("[file|usb]: file is the station file signature certificate, usb is the CA certificate")
+             .help("[file-cl|file-pq|usb-cl|usb-pq]: file is the station file signature certificate, usb is the CA certificate")
              .default_value("")
              .action(clap::ArgAction::Set)
      )
@@ -128,7 +146,7 @@ fn generate_signing_keypair(config: &Config) -> Result<String, anyhow::Error> {
     let pq_key = KeysasPQKey::generate_new()?;
 
     // Save the keys
-    ec_key.save_keys(Path::new(FILE_PRIV_PATH), KEY_PASSWD)?;
+    ec_key.save_keys(Path::new(FILE_PRIV_CL_PATH), KEY_PASSWD)?;
     pq_key.save_keys(Path::new(FILE_PRIV_PQ_PATH), KEY_PASSWD)?;
 
     let infos = CertificateFields::from_fields(None, None, None, Some(&config.name), None)?;
@@ -148,19 +166,21 @@ fn generate_signing_keypair(config: &Config) -> Result<String, anyhow::Error> {
     Ok(hybrid_csr)
 }
 
-fn save_certificate(cert_type: &String, cert: &String) -> Result<()> {
-    if cert_type.eq("usb") {
-        // Test if the certificate received is valid
+/// Save a certificate on the station
+fn save_certificate(cert_type: &str, cert: &str) -> Result<()> {
+    if validate_signing_certificate(cert).is_ok_and(|r| r) {
+        let path = match cert_type {
+            "usb-cl" => USB_CERT_CL_PATH,
+            "usb-pq" => USB_CERT_PQ_PATH,
+            "file-cl" => FILE_CERT_CL_PATH,
+            "file-pq" => FILE_CERT_PQ_PATH,
+            _ => {
+                return Err(anyhow!("Invalid certificate type"));
+            }
+        };
         // Save it to a file
-        let mut out = File::create(USB_CERT_PATH)?;
+        let mut out = File::create(path)?;
         out.write_all(cert.as_bytes())?;
-    } else if cert_type.eq("file") {
-        // Test if the certificate received is valid
-        // Save it to a file
-        let mut out = File::create(FILE_CERT_PATH)?;
-        out.write_all(cert.as_bytes())?;
-    } else {
-        return Err(anyhow!("Invalid certificate type"));
     }
     Ok(())
 }
