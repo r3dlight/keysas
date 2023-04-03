@@ -28,11 +28,13 @@
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::Keypair;
 use ed25519_dalek::Signature as ECSignature;
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::Signer;
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
-use keysas_lib::pki::{KeysasKey, KeysasPQKey};
+use keysas_lib::keysas_key::KeysasKey;
+use keysas_lib::keysas_key::KeysasPQKey;
 use keysas_lib::sha256_digest;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
@@ -256,16 +258,7 @@ fn parse_args() -> Configuration {
 /// This function retrieves the file descriptors and metadata from the messages
 fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
     messages
-        .filter_map(|m| {
-            //Desencapsulate Result
-            match m {
-                Ok(ad) => Some(ad),
-                Err(e) => {
-                    warn!("failed to get ancillary data: {:?}", e);
-                    None
-                }
-            }
-        })
+        .filter_map(|m| m.ok())
         .filter_map(|ad| {
             // Filter AncillaryData to keep only ScmRights
             match ad {
@@ -531,8 +524,8 @@ fn output_files(files: Vec<FileData>, conf: &Configuration) -> Result<()> {
             && f.md.is_type_allowed
             && f.md.av_pass
             && !f.md.is_corrupted
-
-            && (f.md.yara_pass || (!f.md.yara_pass && !conf.yara_clean))
+            && f.md.yara_pass
+            || (!f.md.yara_pass && !conf.yara_clean)
         {
             // Output file
             let mut reader = BufReader::new(&file);
