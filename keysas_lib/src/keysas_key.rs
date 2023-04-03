@@ -108,6 +108,8 @@ fn store_keypair(
 
 /// Generic trait to abstract the main functions of the ED25519 and Dilthium keys
 pub trait KeysasKey<T> {
+    /// Generate a new key pair
+    fn generate_new() -> Result<T, anyhow::Error>;
     /// Load keypair from a DER encoded PKCS8 file protected with a password
     fn load_keys(path: &Path, pwd: &str) -> Result<T, anyhow::Error>;
     /// Save keypair in a DER encoded PKCS8 file protected with a password
@@ -131,6 +133,12 @@ pub trait KeysasKey<T> {
 
 // Implementing new methods on top of dalek Keypair
 impl KeysasKey<Keypair> for Keypair {
+    fn generate_new() -> Result<Keypair, anyhow::Error> {
+        let mut csprng = OsRng {};
+        let kp_ed = Keypair::generate(&mut csprng);
+        Ok(kp_ed)        
+    }
+
     fn load_keys(path: &Path, pwd: &str) -> Result<Keypair, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
@@ -274,7 +282,23 @@ impl KeysasKey<Keypair> for Keypair {
 }
 
 impl KeysasKey<KeysasPQKey> for KeysasPQKey {
+    fn generate_new() -> Result<KeysasPQKey, anyhow::Error> {
+        // Important load oqs:
+        oqs::init();
+
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let (pk_dl, sk_dl) = pq_scheme.keypair()?;
+        let kp_pq = KeysasPQKey {
+            private_key: sk_dl,
+            public_key: pk_dl,
+        };
+        Ok(kp_pq)        
+    }
+
     fn load_keys(path: &Path, pwd: &str) -> Result<KeysasPQKey, anyhow::Error> {
+        // Important load oqs:
+        oqs::init();
+        
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {
@@ -347,6 +371,9 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
     }
 
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
+        // Important load oqs:
+        oqs::init();
+
         let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
         let pub_key = BitString::from_bytes(&self.public_key.clone().into_vec())
@@ -410,6 +437,9 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         serial: &[u8],
         is_app_cert: bool,
     ) -> Result<Certificate, anyhow::Error> {
+        // Important load oqs:
+        oqs::init();
+
         let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
         // Build the certificate

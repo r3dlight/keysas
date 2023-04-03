@@ -6,18 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mbrman = "0.5" 
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
-minisign = "0.7"
 anyhow = "1.0"
-nom = "7"
-libc = "0.2"
-udev = "0.7"
-openssl = "*"
-openssl-sys = "*"
-oqs = "0.7"
 ed25519-dalek = "1.0"
-rand_dl = {package = "rand", version = "0.7"}
 pkcs8 = { version = "0.10", features = ["encryption", "pem"]}
-hex-literal = "*"
-x509-cert = "0.2"
+keysas_lib = { path = "../keysas_lib" }
