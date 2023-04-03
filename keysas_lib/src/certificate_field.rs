@@ -25,6 +25,7 @@
 #![warn(unused_imports)]
 
 use anyhow::{anyhow, Context};
+use pkcs8::der::DecodePem;
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::Encode;
@@ -48,6 +49,17 @@ pub struct CertificateFields {
     pub country: Option<String>,
     pub common_name: Option<String>,
     pub validity: Option<u32>,
+}
+
+/// Validate a Certificate received in PEM format
+/// TODO: Check that the certificate is for signing and follows the allowed format
+pub fn validate_signing_certificate(pem: &str) -> Result<bool, anyhow::Error> {
+    Certificate::from_pem(pem)?;
+
+    //TODO: Validate certificate signature
+    //TODO: Validate certificate policy
+
+    Ok(true)
 }
 
 impl CertificateFields {
