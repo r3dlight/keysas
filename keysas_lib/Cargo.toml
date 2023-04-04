@@ -20,5 +20,6 @@ ed25519-dalek = "1"
 rand_dl = {package = "rand", version = "0.7"}
 rand_core = "0.6.4"
 oqs = "0.7"
-hex-literal = "0.3"
+hex-literal = "0.4"
 tempfile = "3.4"
+der = "0.7"

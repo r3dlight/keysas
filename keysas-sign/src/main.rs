@@ -32,6 +32,7 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
+#![feature(str_split_remainder)]
 
 pub use anyhow::{anyhow, Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
@@ -47,9 +48,12 @@ use keysas_lib::keysas_key::KeysasPQKey;
 use std::path::Path;
 use std::str;
 
-const FILE_PRIV_CL_PATH: &str = "/etc/keysas/file-sign-cl-priv.pem";
+#[cfg(test)]
+mod keysas_sign_tests;
+
+const FILE_PRIV_CL_PATH: &str = "/etc/keysas/file-sign-cl-priv.p8";
 const FILE_CERT_CL_PATH: &str = "/etc/keysas/file-sign-cl-cert.pem";
-const FILE_PRIV_PQ_PATH: &str = "/etc/keysas/file-sign-pq-priv.pem";
+const FILE_PRIV_PQ_PATH: &str = "/etc/keysas/file-sign-pq-priv.p8";
 const FILE_CERT_PQ_PATH: &str = "/etc/keysas/file-sign-pq-cert.pem";
 const USB_CERT_CL_PATH: &str = "/etc/keysas/usb-ca-cl-cert.pem";
 const USB_CERT_PQ_PATH: &str = "/etc/keysas/usb-ca-pq-cert.pem";
@@ -83,9 +87,6 @@ fn command_args() -> Config {
              .help("Generate a private for signing purpose (Default is false).")
              .default_value("false")
              .action(ArgAction::SetTrue)
-             //.requires("orgname")
-             //.requires("orgunit")
-             //.requires("country")
              .conflicts_with("load")
      )
      .arg(
@@ -140,14 +141,19 @@ fn command_args() -> Config {
 /// Generate a new key and certification request
 /// The private key is saved to a new file at privkey_path
 /// The certificate request is a PEM-encoded PKCS#10 structure
-fn generate_signing_keypair(config: &Config) -> Result<String, anyhow::Error> {
+fn generate_signing_keypair(
+    config: &Config,
+    cl_path: &str,
+    pq_path: &str,
+    pwd: &str,
+) -> Result<String, anyhow::Error> {
     // Generate the private keys
     let ec_key = Keypair::generate_new()?;
     let pq_key = KeysasPQKey::generate_new()?;
 
     // Save the keys
-    ec_key.save_keys(Path::new(FILE_PRIV_CL_PATH), KEY_PASSWD)?;
-    pq_key.save_keys(Path::new(FILE_PRIV_PQ_PATH), KEY_PASSWD)?;
+    ec_key.save_keys(Path::new(cl_path), pwd)?;
+    pq_key.save_keys(Path::new(pq_path), pwd)?;
 
     let infos = CertificateFields::from_fields(None, None, None, Some(&config.name), None)?;
 
@@ -160,6 +166,8 @@ fn generate_signing_keypair(config: &Config) -> Result<String, anyhow::Error> {
     let mut hybrid_csr = String::new();
     // Add the ED25519 CSR
     hybrid_csr.push_str(&ec_csr.to_pem(pkcs8::LineEnding::LF)?);
+    // Add a delimiter between the two CSR
+    hybrid_csr.push('|');
     // Add the Dilithium5 CSR
     hybrid_csr.push_str(&pq_csr.to_pem(pkcs8::LineEnding::LF)?);
 
@@ -191,7 +199,7 @@ fn main() -> Result<()> {
     if config.generate {
         // This command generate a new signing keypair for the station
         // and generate a signing request for certificate creation by the admin
-        match generate_signing_keypair(&config) {
+        match generate_signing_keypair(&config, FILE_PRIV_CL_PATH, FILE_PRIV_PQ_PATH, KEY_PASSWD) {
             Ok(r) => {
                 // Return the CSR
                 println!("{}", r);

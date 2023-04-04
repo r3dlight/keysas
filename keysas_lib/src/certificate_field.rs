@@ -25,16 +25,21 @@
 #![warn(unused_imports)]
 
 use anyhow::{anyhow, Context};
-use pkcs8::der::DecodePem;
+use der::asn1::SetOfVec;
+use der::oid::db::rfc4519;
+use der::Any;
+use der::Tag;
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
+use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
-use std::str::FromStr;
 use std::time::Duration;
+use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
 use x509_cert::der::asn1::BitString;
 use x509_cert::ext::Extension;
 use x509_cert::name::RdnSequence;
+use x509_cert::name::RelativeDistinguishedName;
 use x509_cert::serial_number::SerialNumber;
 use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
@@ -99,51 +104,43 @@ impl CertificateFields {
 
     /// Generate a distinghuished name from the input fields for the certificate
     pub fn generate_dn(&self) -> Result<RdnSequence, anyhow::Error> {
-        let mut name = String::new();
+        let mut rdn: SetOfVec<AttributeTypeAndValue> = SetOfVec::new();
 
         // Add country name
         if let Some(cn) = &self.country {
-            name.push_str("C=");
-            name.push_str(cn);
-            name.push(',');
+            rdn.add(AttributeTypeAndValue {
+                oid: rfc4519::C,
+                value: Any::new(Tag::PrintableString, cn.as_bytes())?,
+            })?;
         }
 
         // Add organisation name
         if let Some(oa) = &self.org_name {
-            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push(',');
-            }
-            name.push_str("O=");
-            name.push_str(oa);
-            name.push(',');
+            rdn.add(AttributeTypeAndValue {
+                oid: rfc4519::O,
+                value: Any::new(Tag::PrintableString, oa.as_bytes())?,
+            })?;
         }
 
         // Add organisational unit
         if let Some(ou) = &self.org_unit {
-            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push(',');
-            }
-            name.push_str("OU=");
-            name.push_str(ou);
-            name.push(',');
+            rdn.add(AttributeTypeAndValue {
+                oid: rfc4519::OU,
+                value: Any::new(Tag::PrintableString, ou.as_bytes())?,
+            })?;
         }
 
         // Add common name
         if let Some(co) = &self.common_name {
-            if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-                name.push(',');
-            }
-            name.push_str("CN=");
-            name.push_str(co);
-            name.push(',');
+            rdn.add(AttributeTypeAndValue {
+                oid: rfc4519::CN,
+                value: Any::new(Tag::PrintableString, co.as_bytes())?,
+            })?;
         }
 
-        // Remove trailing ',' if there is one
-        if name.chars().nth_back(0).is_some_and(|c| !c.eq(&',')) {
-            name.pop();
-        }
+        let name = vec![RelativeDistinguishedName::from(rdn)];
 
-        let rdn = RdnSequence::from_str(&name)?;
+        let rdn = RdnSequence::from(name);
         Ok(rdn)
     }
 

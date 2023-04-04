@@ -60,10 +60,13 @@ fn test_pkcs8_create_and_decrypt_der() {
     let file = NamedTempFile::new().unwrap();
     let path = file.into_temp_path();
 
+    let salt = hex!("79d982e70df91a88");
+    let iv = hex!("b2d02d78b2efd9dff694cf8e0af40925");
+
     let params = pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
-        &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+        &salt,
+        &iv,
     )
     .unwrap();
 
@@ -122,10 +125,13 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
     let file = NamedTempFile::new().unwrap();
     let path = file.into_temp_path();
 
+    let salt = hex!("79d982e70df91a88");
+    let iv = hex!("b2d02d78b2efd9dff694cf8e0af40925");
+
     let params = pbes2::Parameters::scrypt_aes256cbc(
         pkcs8::pkcs5::scrypt::Params::recommended(),
-        &hex!("79d982e70df91a88"),
-        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+        &salt,
+        &iv,
     )
     .unwrap();
 

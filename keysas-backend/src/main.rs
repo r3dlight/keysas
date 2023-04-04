@@ -163,15 +163,12 @@ fn get_ip() -> Result<Vec<String>> {
     let mut ips = Vec::new();
     let addrs = nix::ifaddrs::getifaddrs().unwrap();
     for ifaddr in addrs {
-        match ifaddr.address {
-            Some(address) => {
-                let addr = address.to_string();
-                let (_, ip) = parse_ip(&addr).unwrap();
-                if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
-                    ips.push(ip.to_string());
-                }
+        if let Some(address) = ifaddr.address {
+            let addr = address.to_string();
+            let (_, ip) = parse_ip(&addr).unwrap();
+            if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
+                ips.push(ip.to_string());
             }
-            None => {}
         }
     }
     Ok(ips)

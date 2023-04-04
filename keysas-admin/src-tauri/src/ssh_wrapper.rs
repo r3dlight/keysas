@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::net::TcpStream;
 
-use ssh_rs::LocalSession;
 use ssh_rs::algorithm;
 use ssh_rs::ssh;
+use ssh_rs::LocalSession;
 use ssh_rs::SshResult;
 
 const TIMEOUT: u64 = 60 * 1000;
@@ -11,8 +11,10 @@ const USER: &str = "keysas";
 const PASSWORD: &str = "Changeme007";
 
 /// Create SSH connexion with RSA or ECC key
-pub fn connect_key(ip: &String, private_key: &String) 
-            -> Result<LocalSession<TcpStream>, Box<dyn Error>> {
+pub fn connect_key(
+    ip: &str,
+    private_key: &str,
+) -> Result<LocalSession<TcpStream>, Box<dyn Error>> {
     let host = format!("{}{}", ip.trim(), ":22");
     let connector = ssh::create_session_without_default()
         .username(USER)
@@ -33,7 +35,7 @@ pub fn connect_key(ip: &String, private_key: &String)
 }
 
 /// Create SSH connexion with password
-pub fn connect_pwd(ip: &String) -> SshResult<LocalSession<TcpStream>> {
+pub fn connect_pwd(ip: &str) -> SshResult<LocalSession<TcpStream>> {
     let host = format!("{}{}", ip.trim(), ":22");
     let connector = ssh::create_session_without_default()
         .username(USER)
@@ -53,15 +55,20 @@ pub fn connect_pwd(ip: &String) -> SshResult<LocalSession<TcpStream>> {
     Ok(session)
 }
 
-pub fn session_exec(session: &mut LocalSession<TcpStream>, command: &String) 
-        -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn session_exec(
+    session: &mut LocalSession<TcpStream>,
+    command: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let channel = session.open_exec()?;
     let output = channel.send_command(command)?;
     Ok(output)
 }
 
-pub fn session_upload(session: &mut LocalSession<TcpStream>, path_l: &String, path_d: &String) 
-        -> SshResult<()>{
+pub fn session_upload(
+    session: &mut LocalSession<TcpStream>,
+    path_l: &str,
+    path_d: &str,
+) -> SshResult<()> {
     let channel = session.open_scp()?;
     channel.upload(path_l, path_d)
 }
