@@ -136,7 +136,7 @@ impl KeysasKey<Keypair> for Keypair {
     fn generate_new() -> Result<Keypair, anyhow::Error> {
         let mut csprng = OsRng {};
         let kp_ed = Keypair::generate(&mut csprng);
-        Ok(kp_ed)        
+        Ok(kp_ed)
     }
 
     fn load_keys(path: &Path, pwd: &str) -> Result<Keypair, anyhow::Error> {
@@ -292,13 +292,13 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             private_key: sk_dl,
             public_key: pk_dl,
         };
-        Ok(kp_pq)        
+        Ok(kp_pq)
     }
 
     fn load_keys(path: &Path, pwd: &str) -> Result<KeysasPQKey, anyhow::Error> {
         // Important load oqs:
         oqs::init();
-        
+
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {

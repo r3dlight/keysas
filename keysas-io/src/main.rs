@@ -172,7 +172,7 @@ fn hmac_challenge() -> Option<String> {
                     match Store::new(cfg) {
                         Ok(store) => match store.bucket::<String, String>(Some("Keysas")) {
                             Ok(enrolled_yubikeys) => {
-                                enrolled_yubikeys.get(&hex_string).unwrap().map(|name| name)
+                                enrolled_yubikeys.get(&hex_string).unwrap()
                             }
                             Err(why) => {
                                 println!("Error while accessing the Bucket: {why:?}");

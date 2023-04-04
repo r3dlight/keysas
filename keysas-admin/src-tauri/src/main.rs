@@ -15,7 +15,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unstable_features)]
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
@@ -27,12 +26,13 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+#![feature(str_split_remainder)]
 
-use crate::errors::*;
 use std::path::Path;
 use async_std::task;
 use keysas_lib::certificate_field::CertificateFields;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
+use keysas_lib::pki::generate_cert_from_csr;
 use nom::bytes::complete::take_until;
 use nom::IResult;
 use sha2::{Digest, Sha256};
@@ -41,18 +41,61 @@ use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 use tauri_plugin_store::PluginBuilder;
 use std::io::BufReader;
+use anyhow::anyhow;
+use std::fs;
 
-mod errors;
 mod ssh_wrapper;
 use crate::ssh_wrapper::*;
 mod store;
 use crate::store::*;
-
-use keysas_lib::pki::*;
+mod utils;
+use crate::utils::*;
 
 // TODO: place constant paths in constants
+const ST_CA_KEY_NAME: &str = "st-ca";
+const USB_CA_KEY_NAME: &str = "usb";
+const PKI_ROOT_KEY_NAME: &str = "root";
 
-fn main() -> Result<()> {
+const _CA_DIR: &str = "/CA";
+const ST_CA_SUB_DIR: &str = "/CA/st";
+const USB_CA_SUB_DIR: &str = "/CA/usb";
+const PKI_ROOT_SUB_DIR: &str = "/CA/root";
+const _CRL_DIR: &str = "/CRL";
+const CERT_DIR: &str = "/CERT";
+
+fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
+    if !Path::new(path).is_dir() {
+        fs::create_dir(path)?;
+    }
+    Ok(())
+}
+
+/// Create the PKI directory hierachy as follows
+/// pki_dir
+/// |-- CA
+/// |   |--root
+/// |   |--st
+/// |   |--usb
+/// |--CRL
+/// |--CERT
+fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
+    // Test if the directory path is valid
+    if !Path::new(&pki_dir.trim()).is_dir() {
+        return Err(anyhow!("Invalid PKI directory path"));
+    }
+
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/root"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/st"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/usb"))?;
+
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CRL"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "/CERT"))?;
+
+    Ok(())
+}
+
+fn main() -> Result<(), anyhow::Error> {
     // Initiliaze the logger
     simple_logger::init()?;
 
@@ -66,7 +109,7 @@ fn main() -> Result<()> {
 }
 
 /// Creates a sha256 hash from a file
-fn sha256_digest(password: &str) -> Result<String> {
+fn sha256_digest(password: &str) -> Result<String, anyhow::Error> {
     let mut reader = BufReader::new(password.as_bytes());
 
     let digest = {
@@ -86,7 +129,7 @@ fn sha256_digest(password: &str) -> Result<String> {
 
 static STORE_PATH: &str = ".keysas.dat";
 
-async fn init_tauri() -> Result<()> {
+async fn init_tauri() -> Result<(), anyhow::Error> {
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
     //let close = CustomMenuItem::new("close".to_string(), "Close");
     let submenu = Submenu::new("Program", Menu::new().add_item(quit));
@@ -103,12 +146,11 @@ async fn init_tauri() -> Result<()> {
             Ok(())
         })
         .menu(menu)
-        .on_menu_event(|event| match event.menu_item_id() {
-            "quit" => {
+        .on_menu_event(|event| 
+            if event.menu_item_id().eq("quit") {
                 std::process::exit(0);
             }
-            _ => {}
-        })
+        )
         .invoke_handler(tauri::generate_handler![
             reboot,
             update,
@@ -153,11 +195,11 @@ async fn save_sshkeys(public: String, private: String) -> bool {
 fn get_sshkeys() -> Result<(String, String), String> {
     match get_ssh() {
         Ok((public, private)) => {
-            return Ok((public, private));
+            Ok((public, private))
         },
         Err(e) => {
             log::error!("Failed to get ssh keys: {e}");
-            return Err(String::from("Store error"));
+            Err(String::from("Store error"))
         }
     }
 }
@@ -184,11 +226,11 @@ async fn save_station(name: String, ip: String) -> bool {
 fn get_station_ip(name: String) -> Result<String, String> {
     match get_station_ip_by_name(&name) {
         Ok(res) => {
-            return Ok(res);
+            Ok(res)
         },
         Err(e) => {
             log::error!("Failed to get station IP: {e}");
-            return Err(String::from("Store error"));
+            Err(String::from("Store error"))
         }
     }
 }
@@ -207,158 +249,161 @@ fn list_stations() -> Result<String, String> {
                 }
             };
             log::debug!("Station list: {}", result);
-            return Ok(result);
+            Ok(result)
         },
         Err(e) => {
             log::error!("Failed to get station IP: {e}");
-            return Err(String::from("Store error"));
+            Err(String::from("Store error"))
         }
     }
 }
 
 /// This function initialize the keys in the station by
 ///  1. Generate a key pair for file signature on the station
-///  2. Set correct file attributes for the private key file
-///  3. Recover the public part of the key
-///  4. Generate a certificate for the public key
-///  5. Export the created certificate on the station
-///  6. Finally it loads the admin USB signing certificate on the station
+///  2. Recover the public part of the key
+///  3. Generate a certificate for the public key
+///  4. Export the created certificate on the station
+///  5. Finally it loads the admin USB signing certificate on the station
 #[command]
-async fn init_keysas(ip: String, name: String,
-                        ca_pwd: String, st_ca_file: String, usb_ca_file: String,
-                    ) -> bool {
-    /*
-    let private_key = match get_ssh() {
+fn init_keysas(ip: String, name: String,
+                        ca_pwd: String
+                    ) -> Result<String, String> {
+    /* Get admin configuration from the store */
+    // Get SSH key
+    let ssh_key = match get_ssh() {
         Ok((_, private)) => private,
         Err(e) => {
             log::error!("Failed to get private key: {e}");
-            return false;
+            return Err(String::from("No SSH key"));
         } 
     };
+
+    // Get path to PKI directory
+    let pki_dir = match get_pki_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::error!("Failed to get PKI directory: {e}");
+            return Err(String::from("Invalid PKI configuration"));
+        }
+    };
+
+    // Get PKI info
+    let pki_info = match get_pki_info() {
+        Ok(info) => info,
+        Err(e) => {
+            log::error!("Failed to get PKI informations: {e}");
+            return Err(String::from("Invalid PKI configuration"));
+        }
+    };
+
     // Connect to the host
-    let mut session = match connect_key(&ip, &private_key) {
+    let mut session = match connect_key(&ip, &ssh_key) {
         Ok(tu) => tu,
         Err(e) => {
             log::error!("Failed to open ssh connection with station: {e}");
-            return false;
+            return Err(String::from("Connection failed"));
         }
     };
 
     //  1. Generate a key pair for file signature on the station
-    //  2. Set correct file attributes for the private key file
-    //  3. Recover the certification for the key
-    let command = format!("{}{}{}{}{}",
-                                "sudo /usr/bin/keysas-sign --generate",
-                                " --name ", name,
-                                " && sudo /usr/bin/chmod 600 /etc/keysas/file-sign-priv.pem",
-                                " && sudo /usr/bin/chattr +i /etc/keysas/file-sign-priv.pem");
-    let cert_req = match session_exec(&mut session, &command) {
-        Ok(res) => {
-            match X509Req::from_pem(&res) {
-                Ok(req) => req,
-                Err(e) => {
-                    log::error!("failed to convert command output: {:?}", e);
-                    session.close();
-                    return false;
-                }
-            }
-        },
-        Err(why) => {
-            log::error!("Error on send_command: {:?}", why);
+    //  2. Recover the CSR for the keys
+    let (csr_cl, csr_pq) = match cmd_generate_key_and_get_csr(&mut session, &name) {
+        Ok(csrs) => csrs,
+        Err(e) => {
+            log::error!("Failed to generate key on station and get CSR: {e}");
             session.close();
-            return false;
+            return Err(String::from("PKI error"));
         }
     };
-    // 4. Generate a certificate from the request
-    // Load PKI admin key
-    let (root_key, _root_cert) = match load_pkcs12(&st_ca_file, &ca_pwd) {
+
+    // 3. Generate a certificate from the request
+    // Load station CA keypair
+    let st_ca_keys = match HybridKeyPair::load(
+            ST_CA_KEY_NAME, Path::new(ST_CA_SUB_DIR),
+            Path::new(ST_CA_SUB_DIR), &ca_pwd) {
         Ok(k) => k,
         Err(e) => {
-            log::error!("Failed to load PKI private key: {e}");
+            log::error!("Failed to load station CA key: {e}");
             session.close();
-            return false;
+            return Err(String::from("PKI error"));
+        }
+    };
+
+    // Load USB CA keypair
+    let usb_keys = match HybridKeyPair::load(
+            USB_CA_KEY_NAME, Path::new(USB_CA_SUB_DIR),
+            Path::new(USB_CA_SUB_DIR), &ca_pwd) {
+        Ok(k) => k,
+        Err(e) => {
+            log::error!("Failed to load station USB key: {e}");
+            session.close();
+            return Err(String::from("PKI error"));
         }
     };
 
     // Generate certificate
-    let cert = match generate_cert_from_request(&cert_req, &root_key) {
+    let cert_cl = match generate_cert_from_csr(&st_ca_keys, &csr_cl, &pki_info, true) {
         Ok(c) => c,
         Err(e) => {
             log::error!("Failed to generate certificate from request: {e}");
             session.close();
-            return false;
+            return Err(String::from("PKI error"));
         }
     };
 
-    // 5. Export the created certificate on the station
-    let output = match cert.to_pem() {
-        Ok(o) => {
-            match String::from_utf8(o) {
-                Ok(out) => out,
-                Err(e) => {
-                    log::error!("Failed to convert certificate to string: {e}");
-                    session.close();
-                    return false;
-                }
-            }
-        },
+    let cert_pq = match generate_cert_from_csr(&st_ca_keys, &csr_pq, &pki_info, true) {
+        Ok(c) => c,
         Err(e) => {
-            log::error!("Failed to convert certificate to PEM: {e}");
+            log::error!("Failed to generate certificate from request: {e}");
             session.close();
-            return false;
+            return Err(String::from("PKI error"));
         }
     };
-    
-    let command = format!("{}{}",
-            "sudo /usr/bin/keysas-sign --load --certtype file --cert ",
-            output);
-    if let Err(e) = session_exec(&mut session, &command) {
-        log::error!("Failed to load certificate on the station: {e}");
+
+    // Save certificates
+    let path_cl = pki_dir.clone()+CERT_DIR+&name+"-cl.pem";
+    if let Err(e) = save_certificate(&cert_cl, Path::new(&path_cl)) {
+        log::error!("Failed to save station certificate: {e}");
         session.close();
-        return false;
+        return Err(String::from("PKI error"));
     }
 
-    // 6. Finally it loads the admin USB signing certificate
-    // Load USB CA cert
-    let (_usb_key, usb_cert) = match load_pkcs12(&usb_ca_file, &ca_pwd) {
-        Ok(k) => k,
-        Err(e) => {
-            log::error!("Failed to load USB CA certificate: {e}");
-            session.close();
-            return false;
-        }
-    };
-
-    let output = match usb_cert.to_pem() {
-        Ok(o) => {
-            match String::from_utf8(o) {
-                Ok(out) => out,
-                Err(e) => {
-                    log::error!("Failed to convert USB certificate to string: {e}");
-                    session.close();
-                    return false;
-                }
-            }
-        },
-        Err(e) => {
-            log::error!("Failed to convert USB certificate to PEM: {e}");
-            session.close();
-            return false;
-        }
-    };
-    
-    let command = format!("{}{}",
-            "sudo /usr/bin/keysas-sign --load --certtype usb --cert ",
-            output);
-    if let Err(e) = session_exec(&mut session, &command) {
-        log::error!("Failed to load USB certificate on the station: {e}");
+    let path_pq = pki_dir+CERT_DIR+&name+"-pq.pem";
+    if let Err(e) = save_certificate(&cert_cl, Path::new(&path_pq)) {
+        log::error!("Failed to save station certificate: {e}");
         session.close();
-        return false;
+        return Err(String::from("PKI error"));
+    }
+
+    // 4. Export the created certificates on the station
+    if let Err(e) = send_cert_to_station(&mut session, &cert_cl, "file-cl") {
+        log::error!("Failed to load certificate on the station: {e}");
+        session.close();
+        return Err(String::from("Connection error"));
+    }
+
+    if let Err(e) = send_cert_to_station(&mut session, &cert_pq, "file-pq") {
+        log::error!("Failed to load certificate on the station: {e}");
+        session.close();
+        return Err(String::from("Connection error"));
+    }
+
+    // 5. Finally it loads the admin USB signing certificate
+    if let Err(e) = send_cert_to_station(&mut session, &usb_keys.classic_cert, "usb-cl") {
+        log::error!("Failed to load certificate on the station: {e}");
+        session.close();
+        return Err(String::from("Connection error"));
+    }
+
+    if let Err(e) = send_cert_to_station(&mut session, &usb_keys.pq_cert, "usb-pq") {
+        log::error!("Failed to load certificate on the station: {e}");
+        session.close();
+        return Err(String::from("Connection error"));
     }
 
     session.close();
-    */
-    true
+
+    Ok(String::from("OK"))
 }
 
 #[command]
@@ -480,7 +525,7 @@ async fn export_sshpubkey(ip: String) -> bool {
         }
     };
     
-    match session_upload(&mut session, &public_key.trim().to_string(),
+    match session_upload(&mut session, public_key.trim(),
                             &String::from("/home/keysas/.ssh/authorized_keys")) {
         Ok(_) => {
             log::info!("authorized_keys successfully s-copied !");
@@ -498,12 +543,12 @@ async fn export_sshpubkey(ip: String) -> bool {
             log::debug!("Command output: {}", String::from_utf8(res).unwrap());
             log::info!("Password authentication has been disabled.");
             session.close();
-            return true;
+            true
         },
         Err(e) => {
             log::error!("Rust error on open_exec: {:?}", e);
             session.close();
-            return false;
+            false
         }
     }
 }
@@ -565,7 +610,7 @@ async fn sign_key(ip: String, password: String) -> bool {
         } 
     };
 
-    let password = sha256_digest(&password.trim()).unwrap();
+    let password = sha256_digest(password.trim()).unwrap();
     
     // Connect to the host
     let host = format!("{}{}", ip.trim(), ":22");
@@ -577,7 +622,7 @@ async fn sign_key(ip: String, password: String) -> bool {
         }
     };
 
-    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
+    let command = "sudo /usr/bin/keysas-sign --watch".to_string();
     let output = match session_exec(&mut session, &command) {
         Ok(out) => out,
         Err(e) => {
@@ -591,7 +636,7 @@ async fn sign_key(ip: String, password: String) -> bool {
     let command = match String::from_utf8(output) {
         Ok(signme) => {
             let signme = signme.trim();
-            let (command, _) = parser(&signme).unwrap();
+            let (command, _) = parser(signme).unwrap();
             let command = command.replace("YourSecretPassWord", password.trim());
             let command = format!("{}{}{}", "sudo /usr/bin/", command, " --force");
             log::debug!("{}", command);
@@ -646,7 +691,7 @@ async fn revoke_key(ip: String) -> bool {
         }
     };
     
-    let command = format!("{}", "sudo /usr/bin/keysas-sign --watch");
+    let command = "sudo /usr/bin/keysas-sign --watch".to_string();
     let stdout = match session_exec(&mut session, &command) {
         Ok(stdout) => stdout,
         Err(e) => {
@@ -659,8 +704,8 @@ async fn revoke_key(ip: String) -> bool {
     let command = match String::from_utf8(stdout) {
         Ok(signme) => {
             let signme = signme.trim();
-            let (command, _) = parser(&signme).unwrap();
-            let (_, command) = parser_revoke(&command).unwrap();
+            let (command, _) = parser(signme).unwrap();
+            let (_, command) = parser_revoke(command).unwrap();
             let command = format!(
                                     "{}{}{}",
                                     "sudo /usr/bin/",
@@ -695,23 +740,13 @@ async fn revoke_key(ip: String) -> bool {
 
 #[command]
 fn validate_privatekey(public_key: String, private_key: String) -> bool {
-    if Path::new(&public_key.trim()).is_file()
+    Path::new(&public_key.trim()).is_file()
         && Path::new(&private_key.trim()).is_file()
-    {
-        true
-    } else {
-        false
-    }
 }
 
 #[command]
 fn validate_rootkey(root_key: String) -> bool {
-    if Path::new(&root_key.trim()).is_file()
-    {
-        true
-    } else {
-        false
-    }
+    Path::new(&root_key.trim()).is_file()
 }
 
 /// Generate a new PKI in an empty directory
@@ -765,9 +800,9 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
 
     // Save keys
     if let Err(e) = root_keys.save(
-        "root",
-        &Path::new(&(pki_dir.to_owned() + "/CA/root")),
-        &Path::new(&(pki_dir.to_owned() + "/CA/root")),
+        PKI_ROOT_KEY_NAME,
+        Path::new(&(pki_dir.to_owned() + PKI_ROOT_SUB_DIR)),
+        Path::new(&(pki_dir.to_owned() + PKI_ROOT_SUB_DIR)),
         &admin_pwd) {
         log::error!("Failed to save root key to disk: {e}");
         return Err(String::from("PKI error"));
@@ -803,9 +838,9 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     };
     // Save keys
     if let Err(e) = st_ca_keys.save(
-        "st-ca",
-        &Path::new(&(pki_dir.to_owned() + "/CA/st")),
-        &Path::new(&(pki_dir.to_owned() + "/CA/st")),
+        ST_CA_KEY_NAME,
+        Path::new(&(pki_dir.to_owned() + ST_CA_SUB_DIR)),
+        Path::new(&(pki_dir.to_owned() + ST_CA_SUB_DIR)),
         &admin_pwd) {
         log::error!("Failed to save station CA key to disk: {e}");
         return Err(String::from("PKI error"));
@@ -842,9 +877,9 @@ fn generate_pki_in_dir(org_name: String, org_unit: String, country: String,
     };
     // Save keys
     if let Err(e) = usb_keys.save(
-        "usb",
-        &Path::new(&(pki_dir.to_owned() + "/CA/usb")),
-        &Path::new(&(pki_dir.to_owned() + "/CA/usb")),
+        USB_CA_KEY_NAME,
+        Path::new(&(pki_dir.to_owned() + USB_CA_SUB_DIR)),
+        Path::new(&(pki_dir + USB_CA_SUB_DIR)),
         &admin_pwd) {
         log::error!("Failed to save station CA key to disk: {e}");
         return Err(String::from("PKI error"));
