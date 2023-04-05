@@ -11,10 +11,7 @@ const USER: &str = "keysas";
 const PASSWORD: &str = "Changeme007";
 
 /// Create SSH connexion with RSA or ECC key
-pub fn connect_key(
-    ip: &str,
-    private_key: &str,
-) -> Result<LocalSession<TcpStream>, Box<dyn Error>> {
+pub fn connect_key(ip: &str, private_key: &str) -> Result<LocalSession<TcpStream>, Box<dyn Error>> {
     let host = format!("{}{}", ip.trim(), ":22");
     let connector = ssh::create_session_without_default()
         .username(USER)

@@ -51,12 +51,12 @@ use std::str;
 #[cfg(test)]
 mod keysas_sign_tests;
 
-const FILE_PRIV_CL_PATH: &str = "/etc/keysas/file-sign-cl-priv.p8";
-const FILE_CERT_CL_PATH: &str = "/etc/keysas/file-sign-cl-cert.pem";
-const FILE_PRIV_PQ_PATH: &str = "/etc/keysas/file-sign-pq-priv.p8";
-const FILE_CERT_PQ_PATH: &str = "/etc/keysas/file-sign-pq-cert.pem";
-const USB_CERT_CL_PATH: &str = "/etc/keysas/usb-ca-cl-cert.pem";
-const USB_CERT_PQ_PATH: &str = "/etc/keysas/usb-ca-pq-cert.pem";
+const FILE_PRIV_CL_PATH: &str = "/etc/keysas/file-sign-cl.p8";
+const FILE_CERT_CL_PATH: &str = "/etc/keysas/file-sign-cl.pem";
+const FILE_PRIV_PQ_PATH: &str = "/etc/keysas/file-sign-pq.p8";
+const FILE_CERT_PQ_PATH: &str = "/etc/keysas/file-sign-pq.pem";
+const USB_CERT_CL_PATH: &str = "/etc/keysas/usb-ca-cl.pem";
+const USB_CERT_PQ_PATH: &str = "/etc/keysas/usb-ca-pq.pem";
 
 const KEY_PASSWD: &str = "Keysas007";
 
