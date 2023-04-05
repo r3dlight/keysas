@@ -72,9 +72,7 @@ pub fn init_store(path: &str) -> Result<(), anyhow::Error> {
 /// Return a tuple containing (path to public ssh key, path to private ssh key)
 pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let mut public = String::new();
@@ -82,13 +80,21 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
 
                 connection.iterate(GET_PUBLIC_QUERY, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        if key == "path" { if let Some(p) = value {public.push_str(p)}}
+                        if key == "path" {
+                            if let Some(p) = value {
+                                public.push_str(p)
+                            }
+                        }
                     }
                     true
                 })?;
                 connection.iterate(GET_PRIVATE_QUERY, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        if key == "path" {if let Some(p) = value {private.push_str(p)}}
+                        if key == "path" {
+                            if let Some(p) = value {
+                                private.push_str(p)
+                            }
+                        }
                     }
                     true
                 })?;
@@ -99,9 +105,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
                     Err(anyhow!("Failed to find station in database"))
                 }
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
@@ -114,9 +118,7 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
     }
 
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = format!("REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
@@ -124,9 +126,7 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
                 connection.execute(query)?;
                 Ok(())
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
@@ -135,9 +135,7 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
 /// The function first checks that the path are valid files
 pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = format!(
@@ -148,9 +146,7 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
                 connection.execute(query)?;
                 Ok(())
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
@@ -160,9 +156,7 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
 /// the database
 pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = format!("SELECT * FROM station_table WHERE name = '{}';", name);
@@ -170,7 +164,11 @@ pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
                 log::debug!("Query: {}", query);
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        if key == "ip" {if let Some(ip) = value {result.push_str(ip)}}
+                        if key == "ip" {
+                            if let Some(ip) = value {
+                                result.push_str(ip)
+                            }
+                        }
                     }
                     true
                 })?;
@@ -181,9 +179,7 @@ pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
                     Err(anyhow!("Failed to find station in database"))
                 }
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
@@ -192,9 +188,7 @@ pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
 /// Returns an error in case of trouble accessing the database
 pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "SELECT * FROM station_table;".to_string();
@@ -206,8 +200,16 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
                     };
                     for &(key, value) in pairs.iter() {
                         match key {
-                            "name" => if let Some(n) = value {st.name.push_str(n)},
-                            "ip" => if let Some(i) = value {st.ip.push_str(i)},
+                            "name" => {
+                                if let Some(n) = value {
+                                    st.name.push_str(n)
+                                }
+                            }
+                            "ip" => {
+                                if let Some(i) = value {
+                                    st.ip.push_str(i)
+                                }
+                            }
                             _ => (),
                         }
                     }
@@ -217,9 +219,7 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
                 log::debug!("Found: {:?}", result);
                 Ok(result)
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
@@ -228,9 +228,7 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
 /// Returns Ok or an Error
 pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = format!(
@@ -248,43 +246,39 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
                 connection.execute(query)?;
                 Ok(())
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
 
 pub fn get_pki_dir() -> Result<String, anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "SELECT directory FROM ca_table;".to_string();
                 let mut result = String::new();
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        if key == "directory" { if let Some(dir) = value {result.push_str(dir)}}
+                        if key == "directory" {
+                            if let Some(dir) = value {
+                                result.push_str(dir)
+                            }
+                        }
                     }
                     true
                 })?;
                 log::debug!("Found: {:?}", result);
                 Ok(result)
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }
 
 pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
     match STORE_HANDLE.lock() {
-        Err(e) => {
-            Err(anyhow!("Failed to get database lock: {e}"))
-        }
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "SELECT directory FROM ca_table;".to_string();
@@ -293,15 +287,28 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                     org_unit: None,
                     country: None,
                     common_name: None,
-                    validity: None
+                    validity: None,
                 };
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
                         match key {
-                            "org_name" => if let Some(val) = value {result.org_name = Some(val.to_string())},
-                            "org_unit" => if let Some(val) =  value {result.org_unit = Some(val.to_string())},
-                            "country" => if let Some(val) = value {result.country = Some(val.to_string())},
-                            "validity" => if let Some(val) = value {
+                            "org_name" => {
+                                if let Some(val) = value {
+                                    result.org_name = Some(val.to_string())
+                                }
+                            }
+                            "org_unit" => {
+                                if let Some(val) = value {
+                                    result.org_unit = Some(val.to_string())
+                                }
+                            }
+                            "country" => {
+                                if let Some(val) = value {
+                                    result.country = Some(val.to_string())
+                                }
+                            }
+                            "validity" => {
+                                if let Some(val) = value {
                                     let num = match val.parse::<u32>() {
                                         Ok(n) => n,
                                         Err(_) => {
@@ -309,7 +316,8 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                                         }
                                     };
                                     result.validity = Some(num);
-                            },
+                                }
+                            }
                             _ => (),
                         }
                     }
@@ -318,9 +326,7 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                 log::debug!("Found: {:?}", result);
                 Ok(result)
             }
-            None => {
-                Err(anyhow!("Store is not initialized"))
-            }
+            None => Err(anyhow!("Store is not initialized")),
         },
     }
 }

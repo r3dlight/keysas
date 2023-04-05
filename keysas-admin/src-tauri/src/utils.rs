@@ -1,13 +1,13 @@
+use anyhow::anyhow;
+use pkcs8::der::EncodePem;
+use ssh_rs::LocalSession;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
 use std::path::Path;
-use pkcs8::der::EncodePem;
-use ssh_rs::LocalSession;
-use x509_cert::Certificate;
-use x509_cert::request::CertReq;
 use x509_cert::der::DecodePem;
-use anyhow::anyhow;
+use x509_cert::request::CertReq;
+use x509_cert::Certificate;
 
 use crate::ssh_wrapper::session_exec;
 
@@ -15,11 +15,12 @@ use crate::ssh_wrapper::session_exec;
 /// recover CSRs from it
 pub fn cmd_generate_key_and_get_csr(
     session: &mut LocalSession<TcpStream>,
-    name: &str
+    name: &str,
 ) -> Result<(CertReq, CertReq), anyhow::Error> {
-    let command = format!("{}{}{}",
-                                "sudo /usr/bin/keysas-sign --generate",
-                                " --name ", name);
+    let command = format!(
+        "{}{}{}",
+        "sudo /usr/bin/keysas-sign --generate", " --name ", name
+    );
     let cmd_res = match session_exec(session, &command) {
         Ok(res) => res,
         Err(why) => {
@@ -32,30 +33,28 @@ pub fn cmd_generate_key_and_get_csr(
 
     // Recover the CSR from the session command
     let mut csrs = cert_req.split('|');
-    let csr_cl = match csrs.next().and_then(|pem| 
-        match CertReq::from_pem(pem) {
-            Ok(c) => Some(c),
-            Err(e) => {
-                log::error!("Failed to parse certification request: {e}");
-                None
-            }
+    let csr_cl = match csrs.next().and_then(|pem| match CertReq::from_pem(pem) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            log::error!("Failed to parse certification request: {e}");
+            None
         }
-    ) {
+    }) {
         Some(csr) => csr,
         None => {
             return Err(anyhow!("Failed to parse certification request"));
         }
     };
-    
-    let csr_pq = match csrs.remainder().and_then(|pem|
-        match CertReq::from_pem(pem) {
+
+    let csr_pq = match csrs
+        .remainder()
+        .and_then(|pem| match CertReq::from_pem(pem) {
             Ok(c) => Some(c),
             Err(e) => {
                 log::error!("Failed to parse certification request: {e}");
                 None
             }
-        }
-    ) {
+        }) {
         Some(csr) => csr,
         None => {
             return Err(anyhow!("Failed to parse certification request"));
@@ -74,16 +73,15 @@ pub fn cmd_generate_key_and_get_csr(
 pub fn send_cert_to_station(
     session: &mut LocalSession<TcpStream>,
     cert: &Certificate,
-    kind: &str
+    kind: &str,
 ) -> Result<(), anyhow::Error> {
     let output = String::from_utf8(cert.to_pem(pkcs8::LineEnding::LF)?.into())?;
-    
-    let command = format!("{}{}{}{}",
-            "sudo /usr/bin/keysas-sign --load --certtype ",
-            kind,
-            " --cert ",
-            output);
-    
+
+    let command = format!(
+        "{}{}{}{}",
+        "sudo /usr/bin/keysas-sign --load --certtype ", kind, " --cert ", output
+    );
+
     if let Err(e) = session_exec(session, &command) {
         log::error!("Failed to load certificate on the station: {e}");
         return Err(anyhow!("Connection error"));
