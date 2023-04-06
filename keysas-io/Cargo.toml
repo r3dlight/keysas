@@ -7,15 +7,15 @@ edition = "2021"
 
 
 [dependencies]
-tungstenite = "*"
-serde = "*"
-serde_json = "*"
-serde_derive = "*"
+tungstenite = "0.18"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
 log = "0.4"
-anyhow = "*"
+anyhow = "1.0"
 udev = "0.7"
 regex = "1.7"
-libc = "*"
+libc = "0.2"
 nom = "7"
 minisign = "0.7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
@@ -31,6 +31,7 @@ yubico_manager = "0.9"
 walkdir = "2.3"
 landlock = "0.2" 
 flexi_logger = "0.25"
+keysas_lib = { path = "../keysas_lib" }
 
 [dev-dependencies]
 criterion = "0.4"
