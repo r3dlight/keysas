@@ -1,5 +1,12 @@
-#![feature(is_some_and)]
-
+// SPDX-License-Identifier: GPL-3.0-only
+/*
+ * The "keysas-lib".
+ *
+ * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ *
+ * This file contains various funtions
+ * for building the keysas_lib.
+ */
 use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
