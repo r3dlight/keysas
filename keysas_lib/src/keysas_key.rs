@@ -25,12 +25,18 @@
 #![warn(unused_imports)]
 
 use anyhow::{anyhow, Context};
+use der::DecodePem;
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
+use ed25519_dalek::PublicKey;
 use ed25519_dalek::Sha512;
+use ed25519_dalek::Signature as SignatureDalek;
+use ed25519_dalek::Verifier;
 use oqs::sig::Algorithm;
+use oqs::sig::PublicKey as PqPublicKey;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
+use oqs::sig::Signature as SignatureOqs;
 use pkcs8::der::asn1::SetOfVec;
 use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
@@ -38,6 +44,8 @@ use pkcs8::PrivateKeyInfo;
 use rand_dl::rngs::OsRng;
 use rand_dl::RngCore;
 use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use x509_cert::certificate::*;
 use x509_cert::der::asn1::BitString;
@@ -57,6 +65,93 @@ use crate::pki::ED25519_OID;
 pub struct KeysasPQKey {
     pub private_key: SecretKey,
     pub public_key: oqs::sig::PublicKey,
+}
+
+#[derive(Debug)]
+pub struct KeysasHybridPubKeys {
+    pub classic: PublicKey,
+    pub pq: PqPublicKey,
+}
+
+#[derive(Debug)]
+pub struct KeysasHybridSignature {
+    pub classic: SignatureDalek,
+    pub pq: SignatureOqs,
+}
+pub trait PublicKeys<T> {
+    fn get_pubkeys_from_certs(
+        path_cl: &str,
+        path_pq: &str,
+    ) -> Result<Option<KeysasHybridPubKeys>, anyhow::Error>;
+    fn verify_key_signatures(
+        message: &[u8],
+        signatures: KeysasHybridSignature,
+        pubkeys: KeysasHybridPubKeys,
+    ) -> Result<(), anyhow::Error>;
+}
+
+impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
+    fn get_pubkeys_from_certs(
+        cert_cl: &str,
+        cert_pq: &str,
+    ) -> Result<Option<KeysasHybridPubKeys>, anyhow::Error> {
+        let mut cert_cl = File::open(cert_cl)
+            .context("Cannot open Classic PEM certificate to get the public key")?;
+        let mut cert_cl_bytes = Vec::new();
+        cert_cl
+            .read_to_end(&mut cert_cl_bytes)
+            .context("Cannot read Classic certificate file.")?;
+        let mut cert_pq = File::open(cert_pq)
+            .context("Cannot open Dilithium PEM certificate to get the public key")?;
+        let mut cert_pq_bytes = Vec::new();
+        cert_pq
+            .read_to_end(&mut cert_pq_bytes)
+            .context("Cannot read Dilithium certificate file")?;
+        let cert_cl = Certificate::from_pem(cert_cl_bytes)?;
+        let cert_pq = Certificate::from_pem(cert_pq_bytes)?;
+
+        let pub_cl = ed25519_dalek::PublicKey::from_bytes(
+            cert_cl
+                .tbs_certificate
+                .subject_public_key_info
+                .subject_public_key
+                .raw_bytes(),
+        )?;
+        oqs::init();
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let pub_pq = match pq_scheme.public_key_from_bytes(
+            cert_pq
+                .tbs_certificate
+                .subject_public_key_info
+                .subject_public_key
+                .raw_bytes(),
+        ) {
+            Some(pk) => pk,
+            None => return Ok(None),
+        };
+
+        Ok(Some(KeysasHybridPubKeys {
+            classic: pub_cl,
+            pq: pub_pq.to_owned(),
+        }))
+    }
+    fn verify_key_signatures(
+        message: &[u8],
+        signatures: KeysasHybridSignature,
+        pubkeys: KeysasHybridPubKeys,
+    ) -> Result<(), anyhow::Error> {
+        pubkeys
+            .classic
+            .verify(message, &signatures.classic)
+            .context("Invalid Ed25519 signature")?;
+        oqs::init();
+        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        pq_scheme
+            .verify(message, &signatures.pq, &pubkeys.pq)
+            .context("Invalid Dilithium5 signature")?;
+        // If no error has been returned then the signature is valid
+        Ok(())
+    }
 }
 
 /// Store a keypair in a PKCS8 file with a password
