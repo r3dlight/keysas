@@ -560,13 +560,13 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests_out {
     use base64::{engine::general_purpose, Engine};
-    use ed25519_dalek::{self, Sha512, Digest};
-    use keysas_lib::{keysas_hybrid_keypair::HybridKeyPair, certificate_field::CertificateFields};
-    use oqs::sig::{Sig, Algorithm};
-    use pkcs8::der::{EncodePem, DecodePem};
+    use ed25519_dalek::{self, Digest, Sha512};
+    use keysas_lib::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
+    use oqs::sig::{Algorithm, Sig};
+    use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
 
-    use crate::{FileData, FileMetadata, generate_report_metadata, bind_and_sign};
+    use crate::{bind_and_sign, generate_report_metadata, FileData, FileMetadata};
 
     #[test]
     fn test_metadata_valid_file() {
@@ -586,8 +586,8 @@ mod tests_out {
                 yara_report: "".to_string(),
                 timestamp: "timestamp".to_string(),
                 is_corrupted: false,
-                file_type: "txt".to_string()
-            }
+                file_type: "txt".to_string(),
+            },
         };
 
         // Generate report metadata
@@ -597,19 +597,21 @@ mod tests_out {
         assert_eq!(file_data.md.filename, meta.name);
         assert_eq!(file_data.md.file_type, meta.file_type);
         assert_eq!(meta.is_valid, true);
-
     }
 
     #[test]
     fn test_bind_and_sign() {
         // Generate temporary keys
-        let infos = CertificateFields::from_fields(
-            None, None, None, Some("Test_station"), Some("200")
-        ).unwrap();
+        let infos =
+            CertificateFields::from_fields(None, None, None, Some("Test_station"), Some("200"))
+                .unwrap();
         let sign_keys = HybridKeyPair::generate_root(&infos).unwrap();
 
         let mut sign_cert = String::new();
-        let pem_cl = sign_keys.classic_cert.to_pem(pkcs8::LineEnding::LF).unwrap();
+        let pem_cl = sign_keys
+            .classic_cert
+            .to_pem(pkcs8::LineEnding::LF)
+            .unwrap();
         sign_cert.push_str(&pem_cl);
         // Add a delimiter between the two certificates
         sign_cert.push('|');
@@ -632,42 +634,86 @@ mod tests_out {
                 yara_report: "".to_string(),
                 timestamp: "timestamp".to_string(),
                 is_corrupted: false,
-                file_type: "txt".to_string()
-            }
+                file_type: "txt".to_string(),
+            },
         };
 
         let meta = generate_report_metadata(&file_data);
 
-        let report = bind_and_sign(
-            &file_data, &meta, &sign_keys, &sign_cert).unwrap();
+        let report = bind_and_sign(&file_data, &meta, &sign_keys, &sign_cert).unwrap();
         // Test the generated report
-        // Reconstruct the public keys from the binding certficates
+        // Reconstruct the public keys from the binding certificates
         let mut certs = report.binding.station_certificate.split('|');
         let cert_cl = Certificate::from_pem(certs.next().unwrap()).unwrap();
         let cert_pq = Certificate::from_pem(certs.remainder().unwrap()).unwrap();
 
-        let pub_cl = ed25519_dalek::PublicKey::from_bytes(cert_cl.tbs_certificate.subject_public_key_info.subject_public_key.raw_bytes()).unwrap();
+        let pub_cl = ed25519_dalek::PublicKey::from_bytes(
+            cert_cl
+                .tbs_certificate
+                .subject_public_key_info
+                .subject_public_key
+                .raw_bytes(),
+        )
+        .unwrap();
         oqs::init();
         let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
-        let pub_pq = pq_scheme.public_key_from_bytes(cert_pq.tbs_certificate.subject_public_key_info.subject_public_key.raw_bytes()).unwrap();
-        
+        let pub_pq = pq_scheme
+            .public_key_from_bytes(
+                cert_pq
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .subject_public_key
+                    .raw_bytes(),
+            )
+            .unwrap();
+
         // Verify the signature of the report
-        let signature = general_purpose::STANDARD.decode(report.binding.report_signature).unwrap();
-        let concat = format!("{}-{}", 
-            String::from_utf8(general_purpose::STANDARD.decode(report.binding.file_digest).unwrap()).unwrap(),
-            String::from_utf8(general_purpose::STANDARD.decode(report.binding.metadata_digest).unwrap()).unwrap());
+        let signature = general_purpose::STANDARD
+            .decode(report.binding.report_signature)
+            .unwrap();
+        let concat = format!(
+            "{}-{}",
+            String::from_utf8(
+                general_purpose::STANDARD
+                    .decode(report.binding.file_digest)
+                    .unwrap()
+            )
+            .unwrap(),
+            String::from_utf8(
+                general_purpose::STANDARD
+                    .decode(report.binding.metadata_digest)
+                    .unwrap()
+            )
+            .unwrap()
+        );
 
         let mut prehashed = Sha512::new();
         prehashed.update(&concat);
-        assert_eq!(true, pub_cl.verify_prehashed(
-            prehashed,
-            None,
-            &ed25519_dalek::Signature::from_bytes(&signature[0..ed25519_dalek::SIGNATURE_LENGTH]).unwrap())
-            .is_ok());
+        assert_eq!(
+            true,
+            pub_cl
+                .verify_prehashed(
+                    prehashed,
+                    None,
+                    &ed25519_dalek::Signature::from_bytes(
+                        &signature[0..ed25519_dalek::SIGNATURE_LENGTH]
+                    )
+                    .unwrap()
+                )
+                .is_ok()
+        );
 
-        assert_eq!(true, pq_scheme.verify(
-            concat.as_bytes(),
-            pq_scheme.signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..]).unwrap(),
-            pub_pq).is_ok());
+        assert_eq!(
+            true,
+            pq_scheme
+                .verify(
+                    concat.as_bytes(),
+                    pq_scheme
+                        .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
+                        .unwrap(),
+                    pub_pq
+                )
+                .is_ok()
+        );
     }
 }
