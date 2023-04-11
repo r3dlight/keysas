@@ -8,6 +8,7 @@
  */
 
 #![feature(atomic_from_mut)]
+#![feature(str_split_remainder)]
 
 extern crate libc;
 extern crate regex;
@@ -15,7 +16,6 @@ extern crate udev;
 
 use anyhow::anyhow;
 use clap::{crate_version, Arg, Command as Clap_Command};
-use keysas_lib::init_logger;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use std::fs::{self, create_dir_all};
@@ -41,18 +41,17 @@ extern crate serde_derive;
 
 use crate::errors::*;
 use crossbeam_utils::thread;
+use ed25519_dalek::Signature as SignatureDalek;
+use keysas_lib::init_logger;
+use keysas_lib::keysas_key::PublicKeys;
+use keysas_lib::keysas_key::{KeysasHybridPubKeys, KeysasHybridSignature};
 use kv::Config as kvConfig;
 use kv::*;
 use libc::{c_int, c_short, c_ulong, c_void};
-use minisign::PublicKeyBox;
-use minisign::SignatureBox;
-use nom::bytes::complete::take;
-use nom::error::Error;
-use nom::number::complete::be_u32;
+use oqs::sig::{Algorithm, Sig};
 use proc_mounts::MountIter;
 use std::fmt::Write;
 use std::fs::File;
-use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -189,6 +188,7 @@ fn hmac_challenge() -> Option<String> {
                                 None
                             }
                         },
+
                         Err(why) => {
                             error!("Error while accessing the store: {why:?}");
                             None
@@ -210,66 +210,85 @@ fn hmac_challenge() -> Option<String> {
     }
 }
 
-fn get_signature(device: &str) -> Result<String> {
+fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let offset = 512;
     let mut f = File::options()
         .read(true)
         .open(device)
         .context("Cannot open the USB device to verify the signature.")?;
-    let mut buf = vec![0u8; 2048];
+    let mut buf = Vec::new();
     f.seek(SeekFrom::Start(offset))?;
     f.read_exact(&mut buf)?;
+    let buf_str = String::from_utf8(buf)?;
 
-    let (i, len) = be_u32::<&[u8], nom::error::Error<&[u8]>>(&buf).map_err(|err| {
-        err.map(|err| Error::new(String::from_utf8(err.input.to_vec()), err.code))
-    })?;
-    let (_, signature) = take::<u32, &[u8], nom::error::Error<&[u8]>>(len)(i).map_err(|err| {
-        err.map(|err| Error::new(String::from_utf8(err.input.to_vec()), err.code))
-    })?;
-    let signature = str::from_utf8(signature)?;
-    //    match parser(&bufstr) {
-    //        Ok(signature) => {
-    //            info!("{}",signature);
-    //            signature},
-    //        Err(err) => err.to_string(),
-    //    };
-    Ok(signature.to_string())
+    let mut signatures = buf_str.split('|');
+    //TODO: handle these unwrap
+    let s_cl = signatures.next().unwrap();
+    let s_pq = signatures.remainder().unwrap();
+    let sig_dalek = SignatureDalek::from_bytes(s_cl.as_bytes())
+        .context("Cannot parse classic signature from bytes")?;
+    oqs::init();
+    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let sig_pq = match pq_scheme.signature_from_bytes(s_pq.as_bytes()) {
+        Some(sig) => sig,
+        None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
+    };
+    Ok(KeysasHybridSignature {
+        classic: sig_dalek,
+        pq: sig_pq.to_owned(),
+    })
 }
 
 fn is_signed(
     device: &str,
-    pubkey_path: &str,
+    ca_cert_cl: &str,
+    ca_cert_pq: &str,
     id_vendor_id: &str,
     id_model_id: &str,
     id_revision: &str,
     id_serial: &str,
 ) -> Result<bool> {
     debug!("Checking signature for device: {device}");
-    match get_signature(device.remove_last()) {
-        Ok(signature) => {
-            debug!("Read signature from key: {:?}", signature);
-            let pubkey_path = pubkey_path;
-
-            let pk_box_str = fs::read_to_string(pubkey_path)?;
-            let signature_box = SignatureBox::from_string(&signature)?;
-            // Load the public key from the string.
-            let pk_box = PublicKeyBox::from_string(&pk_box_str)?;
-            let pk = pk_box.into_public_key()?;
-            // And verify the data.
-            let data = format!(
-                "{}/{}/{}/{}/{}",
-                id_vendor_id, id_model_id, id_revision, id_serial, "out"
-            );
-            //println!("{data}");
-            let data_reader = Cursor::new(&data);
-            let verified = minisign::verify(&pk, &signature_box, data_reader, true, false, false);
-            info!("USB device is signed: {verified:?}");
-            match verified {
-                Ok(()) => Ok(true),
-                Err(_) => Ok(false),
-            }
+    //Getting both pubkeys for certs
+    let opt_pubkeys = match KeysasHybridPubKeys::get_pubkeys_from_certs(ca_cert_cl, ca_cert_pq) {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Cannot get pubkeys from certs: {e}");
+            return Ok(false);
         }
-        Err(_) => Ok(false),
+    };
+    let pubkeys = match opt_pubkeys {
+        Some(p) => p,
+        None => {
+            error!("No pubkeys found in certificates, cannot build KeysasHybridPubKeys");
+            return Ok(false);
+        }
+    };
+
+    //Let's read the hybrid signature from the device
+    let signatures = match get_signature(device.remove_last()) {
+        Ok(signature) => {
+            info!("Reading signature from device: {:?}", device.remove_last());
+            signature
+        }
+        Err(e) => {
+            error!("Cannot parse signature on the device: {e}");
+            return Ok(false);
+        }
+    };
+    let data = format!(
+        "{}/{}/{}/{}/{}",
+        id_vendor_id, id_model_id, id_revision, id_serial, "out"
+    );
+    match KeysasHybridPubKeys::verify_key_signatures(data.as_bytes(), signatures, pubkeys) {
+        Ok(_) => {
+            info!("USB device is signed");
+            return Ok(true);
+        }
+        Err(e) => {
+            info!("Signatures are not matching on USB device: {e}");
+            return Ok(false);
+        }
     }
 }
 
@@ -369,7 +388,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                                  "Error while copying file {path_to_read}: {e:?}"
                                              );
                                              let mut report =
-                                                 format!("{}{}", path_to_write, ".failed");
+                                                 format!("{}{}", path_to_write, ".ioerror");
                                              match File::create(&report) {
                                                  Ok(_) => warn!("io-error report file created."),
                                                  Err(why) => {
@@ -543,13 +562,22 @@ fn main() -> Result<()> {
         .author("Stephane N")
         .about("keysas-io for USB devices verification.")
         .arg(
-            Arg::new("pubkey")
-                .short('p')
-                .long("pubkey")
-                .value_name("/path/to/public.pub")
+            Arg::new("ca-cert-cl")
+                .short('c')
+                .long("classiccacert")
+                .value_name("/etc/keysas/usb-ca-cl.pem")
                 .value_parser(clap::value_parser!(String))
-                .default_value("/etc/keysas/keysas.pub")
-                .help("The path to public key (Default is /etc/keysas/keysas.pub)."),
+                .default_value("/etc/keysas/usb-ca-cl.pem")
+                .help("The path to Classic CA certificate (Default is /etc/keysas/usb-ca-cl.pem)."),
+        )
+        .arg(
+            Arg::new("ca-cert-pq")
+                .short('p')
+                .long("pqcacert")
+                .value_name("/etc/keysas/usb-ca-pq.pem")
+                .value_parser(clap::value_parser!(String))
+                .default_value("/etc/keysas/usb-ca-pq.pem")
+                .help("The path to post-quantum CA certificate (Default is /etc/keysas/usb-ca-pq.pem)."),
         )
         .arg(
             Arg::new("yubikey")
@@ -562,9 +590,12 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    let pubkey = matches.get_one::<String>("pubkey").unwrap();
-    let pubkey_path = pubkey.to_string();
-    let pubkey_path = Arc::new(pubkey_path);
+    let ca_cert_cl = matches.get_one::<String>("ca-cert-cl").unwrap();
+    let ca_cert_cl = ca_cert_cl.to_string();
+    let ca_cert_cl = Arc::new(ca_cert_cl);
+    let ca_cert_pq = matches.get_one::<String>("ca-cert-pq").unwrap();
+    let ca_cert_pq = ca_cert_pq.to_string();
+    let ca_cert_pq = Arc::new(ca_cert_pq);
     let yubikey = matches.get_one::<String>("yubikey").unwrap();
     let yubikey = yubikey
         .parse::<bool>()
@@ -573,7 +604,8 @@ fn main() -> Result<()> {
     init_logger();
     let server = TcpListener::bind("127.0.0.1:3013")?;
     for stream in server.incoming() {
-        let pubkey_path = Arc::clone(&pubkey_path);
+        let ca_cert_cl = Arc::clone(&ca_cert_cl);
+        let ca_cert_pq = Arc::clone(&ca_cert_pq);
         spawn(move || -> Result<()> {
             let callback = |_req: &Request, response: Response| {
                 info!("keysas-io: Received a new websocket handshake.");
@@ -717,7 +749,8 @@ fn main() -> Result<()> {
 
                     let signed = is_signed(
                         device,
-                        &pubkey_path,
+                        &ca_cert_cl,
+                        &ca_cert_pq,
                         id_vendor_id,
                         id_model_id,
                         id_revision,
