@@ -19,7 +19,6 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.2.3", features = ["api-all", "updater"] }
 ssh-rs = "0.3.2" 
-tauri-plugin-store = { git="https://github.com/r3dlight/tauri-plugin-store", branch="dev" }
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 nom = "7.1"
@@ -36,6 +35,9 @@ rand_dl = {package = "rand", version = "0.7"}
 rand_core = "0.6.4"
 oqs = { version = "0.7", default-features = false, features = ["dilithium"] }
 hex-literal = "0.3"
+libc = "0.2"
+udev = "0.7"
+mbrman = "0.5"
 keysas_lib = { path = "../../keysas_lib" }
 
 [features]
