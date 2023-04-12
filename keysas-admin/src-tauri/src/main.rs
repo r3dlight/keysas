@@ -42,7 +42,6 @@ use std::io::Read;
 use std::path::Path;
 use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
-use tauri_plugin_store::PluginBuilder;
 
 mod ssh_wrapper;
 use crate::ssh_wrapper::*;
@@ -138,7 +137,6 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
         //.add_item(CustomMenuItem::new("hide", "Hide"))
         .add_submenu(submenu);
     tauri::Builder::default()
-        .plugin(PluginBuilder::default().build())
         .setup(|_app| {
             if let Err(e) = init_store(STORE_PATH) {
                 return Err(e.into());
