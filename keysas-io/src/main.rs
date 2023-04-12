@@ -30,7 +30,6 @@ use tungstenite::{
 use udev::Event;
 use walkdir::WalkDir;
 
-extern crate minisign;
 extern crate proc_mounts;
 extern crate serde;
 extern crate serde_json;
