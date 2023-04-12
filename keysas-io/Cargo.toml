@@ -30,7 +30,7 @@ walkdir = "2.3"
 landlock = "0.2" 
 flexi_logger = "0.25"
 keysas_lib = { path = "../keysas_lib" }
-oqs ="0.7"
+oqs = { version = "0.7", default-features = false, features =["dilithium"] }
 ed25519-dalek = "1.0"
 
 [dev-dependencies]
