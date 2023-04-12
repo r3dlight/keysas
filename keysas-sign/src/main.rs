@@ -16,7 +16,6 @@
 //!     This command is used to load certificate on the station, it can be either:
 //!         - file: the certificate corresponds to the private signing key of the station
 //!         - usb: the certificate corresponds to the USB signing authority
-#![feature(is_some_and)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
