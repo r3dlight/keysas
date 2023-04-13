@@ -134,4 +134,8 @@ button {
   color: rgb(158, 161, 163);
   font-size: 1em;
 }
+h3 {
+  margin: 45px 0 0;
+  color: #fff;
+}
 </style>

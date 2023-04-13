@@ -1,7 +1,8 @@
 <template>
+  <br>
   <div class="row align-items-start">
     <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow"
+      <button class="send btn btn-success btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
@@ -9,7 +10,7 @@
       </button>
     </div>
     <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow"
+      <button class="send btn btn-success btn-lg shadow"
               @click="showLoadPKIForm = false;
                       showRootKeyForm = !showRootKeyForm;
                       showPkiDirForm = false;">
@@ -17,7 +18,7 @@
       </button>      
     </div>
     <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow" 
+      <button class="send btn btn-success btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
@@ -75,15 +76,13 @@
       <input type="text" required v-model="country" id="country"/>
       <label type="text"> Validity (days):</label>
       <input type="text" required v-model="validity" id="validity"/>
-      <label type="text"> Signature algorithm (default ed25519 / ed448):</label>
-      <input type="text" required v-model="sigAlgo" id="sigAlgo"/>
       <label type="text"> Select directory:</label>
       <input type="text" required v-model="pkiDir" id="pkiDir"/>
-      <label type="text"> Password:</label>
-      <input type="text" required v-model="adminPwd" id="adminPwd"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIDir">Browse</button>
       </div>
+      <label type="text"> Password:</label>
+      <input type="password" required v-model="adminPwd" id="adminPwd"/>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
       <br><br>
@@ -100,7 +99,7 @@
 </template>
 
 <script>
-"use strict";
+//"use strict";
 
 import {getRootKeyPath, getPKIFolder, getPKIDir} from "../utils/utils";
 
@@ -118,7 +117,6 @@ export default {
       orgUnit: '',
       country: '',
       validity: '',
-      sigAlgo: '',
       adminPwd: '',
       pkiFolder: '',
       keysError: '',
@@ -155,12 +153,11 @@ export default {
             orgUnit: this.orgUnit,
             country: this.country,
             validity: this.validity,
-            sigAlgo: this.sigAlgo,
             adminPwd: this.adminPwd,
             pkiDir: this.pkiDir
 
         })
-        .then((res) => console.log(res))
+        .then((res) => this.ShowTwoSec())
         .catch((error) => console.error(error));
     },
     ShowTwoSec() {
