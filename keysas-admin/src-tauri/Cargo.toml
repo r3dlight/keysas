@@ -38,6 +38,7 @@ hex-literal = "0.3"
 libc = "0.2"
 udev = "0.7"
 mbrman = "0.5"
+base64 = "0.21"
 keysas_lib = { path = "../../keysas_lib" }
 
 [features]

@@ -15,3 +15,4 @@ keysas-admin/src-tauri/target
 keysas-admin/.vscode
 keysas-admin/.keysas.dat
 keysas-admin/src-tauri/.keysas.dat
+.vscode

@@ -7,7 +7,7 @@
  * This file contains the main function.
  */
 
-#![forbid(unsafe_code)]
+//#![forbid(unsafe_code)]
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
@@ -49,6 +49,8 @@ mod store;
 use crate::store::*;
 mod utils;
 use crate::utils::*;
+mod usb_sign;
+use crate::usb_sign::*;
 
 // TODO: place constant paths in constants
 const ST_CA_KEY_NAME: &str = "st-ca";
@@ -601,6 +603,7 @@ fn is_alive(name: String) -> Result<bool, String> {
     Ok(true)
 }
 
+// TODO: to be modified to work locally
 #[command]
 async fn sign_key(ip: String, password: String) -> bool {
     let private_key = match get_ssh() {
@@ -672,6 +675,7 @@ fn parser_revoke(s: &str) -> IResult<&str, &str> {
     take_until("--sign")(s)
 }
 
+// TODO: to be modified to work locally
 #[command]
 async fn revoke_key(ip: String) -> bool {
     let private_key = match get_ssh() {

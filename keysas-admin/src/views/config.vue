@@ -16,10 +16,10 @@
     </div>
     <div class="row">
       <h3>PKI configuration</h3>
-      <div class="box">
+      <div class="col-sm">
         <SigningKeys />
       </div>
-      <div class="box">
+      <div class="col-sm">
         <DisplaySigningConfig />
       </div>
     </div>

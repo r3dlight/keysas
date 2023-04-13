@@ -90,7 +90,7 @@
             ShowPasswordGenerateKeypair = !ShowPasswordGenerateKeypair">
               <span class="bi bi-magic"> Generate a signing keypair</span>
             </button> -->
-            <button class="send btn btn-lg btn-outline-success shadow" @click="flush();
+            <!--<button class="send btn btn-lg btn-outline-success shadow" @click="flush();
             ShowPasswordSign = !ShowPasswordSign;
             ">
               <span class="bi bi-usb-drive"> Sign an output key</span>
@@ -99,7 +99,7 @@
             ShowRevDeviceValidate = !ShowRevDeviceValidate;
             ">
               <span class="bi bi-usb-drive"> Revoke an output key</span>
-            </button>
+            </button>-->
             <button class="send btn btn-lg btn-outline-primary shadow" @click="flush();
             ShowAddYubikey = !ShowAddYubikey">
               <span class="bi bi-cart-check"> Add a Yubikey</span>
