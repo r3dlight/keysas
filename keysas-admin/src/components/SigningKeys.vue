@@ -2,15 +2,15 @@
   <br>
   <div class="row align-items-start">
     <div class="col">
-      <button class="send btn btn-success btn-lg shadow"
+      <button class="send btn btn-light btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
-        Load PKI
+        Load from local PKI
       </button>
     </div>
     <div class="col">
-      <button class="send btn btn-success btn-lg shadow"
+      <button class="send btn btn-light btn-lg shadow"
               @click="showLoadPKIForm = false;
                       showRootKeyForm = !showRootKeyForm;
                       showPkiDirForm = false;">
@@ -18,11 +18,11 @@
       </button>      
     </div>
     <div class="col">
-      <button class="send btn btn-success btn-lg shadow" 
+      <button class="send btn btn-light btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
-        Do it for me
+        Create one for me
       </button>      
     </div>
   </div>
