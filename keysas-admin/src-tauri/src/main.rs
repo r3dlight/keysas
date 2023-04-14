@@ -605,65 +605,7 @@ fn is_alive(name: String) -> Result<bool, String> {
 
 // TODO: to be modified to work locally
 #[command]
-async fn sign_key(ip: String, password: String) -> bool {
-    let private_key = match get_ssh() {
-        Ok((_, private)) => private,
-        Err(e) => {
-            log::error!("Failed to get private key: {e}");
-            return false;
-        }
-    };
-
-    let password = sha256_digest(password.trim()).unwrap();
-
-    // Connect to the host
-    let host = format!("{}{}", ip.trim(), ":22");
-    let mut session = match connect_key(&ip, &private_key) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to open ssh connection with station: {e}");
-            return false;
-        }
-    };
-
-    let command = "sudo /usr/bin/keysas-sign --watch".to_string();
-    let output = match session_exec(&mut session, &command) {
-        Ok(out) => out,
-        Err(e) => {
-            session.close();
-            log::error!("Failed to connect to station: {e}");
-            return false;
-        }
-    };
-
-    // Replace password
-    let command = match String::from_utf8(output) {
-        Ok(signme) => {
-            let signme = signme.trim();
-            let (command, _) = parser(signme).unwrap();
-            let command = command.replace("YourSecretPassWord", password.trim());
-            let command = format!("{}{}{}", "sudo /usr/bin/", command, " --force");
-            log::debug!("{}", command);
-            command
-        }
-        Err(why) => {
-            log::error!("Rust error on session.open_exec: {:?}", why);
-            session.close();
-            return false;
-        }
-    };
-
-    log::debug!("Going to sign a new USB device on keysas: {}", host);
-    match session_exec(&mut session, &command) {
-        Ok(_) => {
-            log::info!("USB storage successfully signed !");
-        }
-        Err(why) => {
-            log::error!("Error while sign a USB storage: {:?}", why);
-            session.close();
-            return false;
-        }
-    }
+async fn sign_key(password: String) -> bool {
     true
 }
 
