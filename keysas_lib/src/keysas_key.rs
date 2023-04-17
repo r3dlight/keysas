@@ -221,7 +221,7 @@ pub trait KeysasKey<T> {
         ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
-        serial: &[u8],
+        serial: &[u8; 20],
         is_app_cert: bool,
     ) -> Result<Certificate, anyhow::Error>;
 }
@@ -343,7 +343,7 @@ impl KeysasKey<Keypair> for Keypair {
         ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
-        serial: &[u8],
+        serial: &[u8; 20],
         is_app_cert: bool,
     ) -> Result<Certificate, anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
@@ -529,7 +529,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         ca_infos: &CertificateFields,
         subject_infos: &RdnSequence,
         subject_key: &[u8],
-        serial: &[u8],
+        serial: &[u8; 20],
         is_app_cert: bool,
     ) -> Result<Certificate, anyhow::Error> {
         // Important load oqs:

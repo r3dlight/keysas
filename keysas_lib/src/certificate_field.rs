@@ -151,7 +151,7 @@ impl CertificateFields {
         &self,
         subject_name: &RdnSequence,
         pub_value: &[u8],
-        serial: &[u8],
+        serial: &[u8; 20],
         algo_oid: &ObjectIdentifier,
         is_app_cert: bool,
     ) -> Result<TbsCertificate, anyhow::Error> {
@@ -209,10 +209,12 @@ impl CertificateFields {
         //  - Issuer and subject are set with distinguished names
         //  - Unique Identifiers are not used
         //  - Extensions are set
+        log::debug!("Serial number generated is {:?}", serial);
+        let serial_number = SerialNumber::new(&serial[0..19])
+            .with_context(|| "Failed to generate serial number")?;
         let tbs = TbsCertificate {
             version: Version::V3,
-            serial_number: SerialNumber::new(serial)
-                .with_context(|| "Failed to generate serial number")?,
+            serial_number,
             signature: AlgorithmIdentifier {
                 oid: *algo_oid,
                 parameters: None,
