@@ -1,6 +1,6 @@
 [package]
 name = "keysas-admin"
-version = "0.1.2"
+version = "0.2.0"
 description = "Keysas stations administration application"
 authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
