@@ -25,6 +25,8 @@
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
+use ed25519_dalek::Digest;
+use ed25519_dalek::Sha512;
 use oqs::sig::Algorithm;
 use oqs::sig::Sig;
 use rand_dl::rngs::OsRng;
@@ -140,7 +142,19 @@ pub fn generate_cert_from_csr(
     {
         // Validate CSR authenticity
         let key = ed25519_dalek::PublicKey::from_bytes(pub_key)?;
+        let mut prehashed = Sha512::new();
+        prehashed.update(&csr.info.to_der()?);
         if key
+            .verify_prehashed(
+                prehashed,
+                None,
+                &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?,
+            )
+            .is_err()
+        {
+            return Err(anyhow!("Invalid CSR signature"));
+        }
+        /*if key
             .verify_strict(
                 &csr.info.to_der()?,
                 &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?,
@@ -148,7 +162,7 @@ pub fn generate_cert_from_csr(
             .is_err()
         {
             return Err(anyhow!("Invalid CSR signature"));
-        }
+        }*/
 
         // Generate serial number
         let mut serial = [0u8; 20];

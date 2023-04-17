@@ -77,8 +77,8 @@ fn generate_root_ed25519(
     let ed25519_oid =
         ObjectIdentifier::new(ED25519_OID).with_context(|| "Failed to generate OID")?;
 
-    // Root ED25519 certificate as serial number 1
-    let serial: [u8; 1] = [1];
+    // Root ED25519 certificate will have serial number
+    let serial: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
     // Build subject DN
     let subject = infos.generate_dn()?;
@@ -121,8 +121,8 @@ fn generate_root_dilithium(
     // OID value for dilithium-sha512 from IBM's networking OID range
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
-    // Root Dilithium5 certificate as serial number 2
-    let serial: [u8; 1] = [2];
+    // Root Dilithium5 certificate will have this serial number
+    let serial: [u8; 20] = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
     // Build subject DN
     let subject = infos.generate_dn()?;
