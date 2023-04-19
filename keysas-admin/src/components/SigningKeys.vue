@@ -1,31 +1,31 @@
 <template>
-  <br>
-  <div class="row align-items-start">
+  <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-light btn-lg shadow"
+      <button class="send btn btn-info btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
         Load from local PKI
       </button>
     </div>
-    <div class="col">
+    <!-- No pkcs11 for now-->
+    <!--<div class="col">
       <button class="send btn btn-light btn-lg shadow"
               @click="showLoadPKIForm = false;
                       showRootKeyForm = !showRootKeyForm;
                       showPkiDirForm = false;">
         Generate from Root CA
       </button>      
-    </div>
+    </div>-->
     <div class="col">
-      <button class="send btn btn-light btn-lg shadow" 
+      <button class="send btn btn-info btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
-        Create one for me
+        Create a new PKI
       </button>      
     </div>
-  </div>
+  <!--</div>-->
   <div v-if="showLoadPKIForm">
     <form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Path to your PKI folder:</label>
@@ -87,15 +87,20 @@
       </div>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
-                @click="submitPKIDirForm">
+        <button v-if="!waiting" class="send btn btn-outline-success btn-lg shadow"
+                @click="submit();">
           <i class="bi bi-check-square"> Ok</i>
         </button>
-        <br><br>
-        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
+        <div v-if="waiting">
+          Wait while creating PKI... <span class="spinner-border text-info"></span>
+        </div>
+        <br>
+        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">PKI successfully created !</h3>
       </div>
     </form>
   </div>
+</div>
+
 </template>
 
 <script>
@@ -121,6 +126,7 @@ export default {
       pkiFolder: '',
       keysError: '',
       show: false,
+      waiting: false,
       showLoadPKIForm: false,
       showRootKeyForm: false,
       showPkiDirForm: false
@@ -146,9 +152,13 @@ export default {
     async submitRootCAForm() {
       console.log('Root CA form submission');
     },
+    async submit() {
+      this.waiting = true;
+      await this.submitPKIDirForm();
+    },
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
-      invoke('generate_pki_in_dir', {
+      await invoke('generate_pki_in_dir', {
             orgName: this.orgName,
             orgUnit: this.orgUnit,
             country: this.country,
@@ -157,14 +167,18 @@ export default {
             pkiDir: this.pkiDir
 
         })
-        .then((res) => this.ShowTwoSec())
+        .then((res) => this.pkiGenerated())
         .catch((error) => console.error(error));
     },
-    ShowTwoSec() {
+    async pkiGenerated(){
+      this.waiting = false;
+      this.ShowFiveSec();
+    },
+    ShowFiveSec() {
       this.show=true;
       setTimeout(() => {
         this.show = false
-        }, 2000)
+        }, 5000)
       }  
     }
 }

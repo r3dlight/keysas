@@ -86,6 +86,12 @@ body {
   background-image: linear-gradient(to right, #7a7979 0%, rgb(41, 40, 40) 100%);
 }
 
+h1 {
+  font-weight: bold;
+  color: #fff;
+  font-size: 26px;
+}
+
 nav {
   //padding: 10px;
 a {

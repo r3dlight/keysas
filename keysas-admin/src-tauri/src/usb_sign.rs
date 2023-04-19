@@ -12,7 +12,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
-//extern crate udev;
 use base64::{engine::general_purpose, Engine as _};
 use ed25519_dalek::Keypair;
 use keysas_lib::keysas_key::KeysasKey;
@@ -86,7 +85,7 @@ fn rm_last(value: &str) -> &str {
     }
 }
 
-/// Construct an hybrid signature from
+/// Construct an hybrid signature from firmware information
 #[cfg(target_os = "linux")]
 fn sign_device(
     vendor: &str,
@@ -114,7 +113,7 @@ fn sign_device(
 }
 
 #[cfg(target_os = "linux")]
-fn watch_new_usb() -> Result<String> {
+pub fn watch_new_usb() -> Result<String> {
     let socket = udev::MonitorBuilder::new()?
         //.match_subsystem_devtype("usb", "usb_device")?
         .match_subsystem("block")?
@@ -190,7 +189,7 @@ fn watch_new_usb() -> Result<String> {
                             .ok_or_else(|| anyhow!("Cannot convert ID_SERIAL to str."))?,
                     )
                     .ok_or_else(|| anyhow!("Cannot get ID_SERIAL from event."))?;
-                log::info!(
+                log::debug!(
                     "Found new USB device : Device: {}, Vendor: {}, Model: {}, Revision: {}, Serial: {}",
                     device,
                     vendor.to_string_lossy(),
