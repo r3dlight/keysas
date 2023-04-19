@@ -1,5 +1,5 @@
 <template>
-  <form class="add-form" @submit.prevent="onSubmit">
+  <form class="box" @submit.prevent="onSubmit">
     <label type="text"> Path to your SSH public key:</label>
     <input type="text" required v-model="publicKey" id="publicKey"/>
     <div class="text-center">

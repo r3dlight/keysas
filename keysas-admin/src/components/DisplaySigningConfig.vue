@@ -2,22 +2,12 @@
   <div class="tip">
     <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
     <br>
-    <span class="tip-text">You must provide the application a dedicated root 
-      Certificate Authority keypair to setup the PKI.</span>
-    <span class="tip-text"> ED25519 or ED448 keys are accepted in PKCS#12 format.<br> 
-      To generate this new keypair on your local machine, open a terminal and 
-      enter to following commands:</span>
-    <br>
-    <div class="terminal-left">
-      <span class="textterminal"># Generate private key for the root CA</span><br>
-      <span class="textterminal">> openssl genpkey -algorithm ed25519 -out root-priv.pem</span><br>
-      <span class="textterminal"># Generate corresponding certificate</span><br>
-      <span class="textterminal">> openssl req -new x509 -nodes -days 3650 -key root-priv.pem -out root-cert.pem</span><br>
-      <span class="textterminal"># Generate PKCS#12 file with the two keys</span><br>
-      <span class="textterminal">> openssl pkcs12 -export -out root-store.p12 -inkey root-priv.pem -in root-cert.pem</span><br>
-      <span class="textterminal"># Clean private key file</span><br>
-      <span class="textterminal">> rm ./root-priv.pem</span>
-    </div>
+    <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, click on <b>Create a new PKI</b>.</span>
+    <span class="tip-text"> Then, provide all the requested information to allow us to create a new PKI for you.<br> 
+    When done, you will be able to start signing new outgoing USB devices.<br> 
+    </span>
+    <span class="tip-text">If you have already created a PKI and you want to restore it, choose <b>Load from local PKI</b></span>
+
   </div>
   <br>
   <div v-if="!hide" class="custom-li tip">

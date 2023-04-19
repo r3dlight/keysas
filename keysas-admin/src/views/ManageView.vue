@@ -1,6 +1,6 @@
 <template>
   <NavBar />
-  <h2>Manage your registered Keysas stations</h2>
+  <h1>Manage your registered Keysas stations</h1>
   <div class="box">
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
@@ -86,20 +86,6 @@
             ShowPasswordInit = !ShowPasswordInit">
               <span class="bi bi-magic"> Initialize</span>
             </button>
-            <!-- <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
-            ShowPasswordGenerateKeypair = !ShowPasswordGenerateKeypair">
-              <span class="bi bi-magic"> Generate a signing keypair</span>
-            </button> -->
-            <!--<button class="send btn btn-lg btn-outline-success shadow" @click="flush();
-            ShowPasswordSign = !ShowPasswordSign;
-            ">
-              <span class="bi bi-usb-drive"> Sign an output key</span>
-            </button>
-            <button class="send btn btn-lg btn-outline-danger shadow" @click="flush();
-            ShowRevDeviceValidate = !ShowRevDeviceValidate;
-            ">
-              <span class="bi bi-usb-drive"> Revoke an output key</span>
-            </button>-->
             <button class="send btn btn-lg btn-outline-primary shadow" @click="flush();
             ShowAddYubikey = !ShowAddYubikey">
               <span class="bi bi-cart-check"> Add a Yubikey</span>
@@ -150,56 +136,7 @@
         </div>
       </div>
     </div>
-    <div v-if="ShowPasswordSign" class="add-form">
-      <div class="container">
-        <div class="row">
-          <div class="col-sm">
-            <div class="tip">
-              <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
-              <br><br>
-              <span class="tip-text">Enter your signing password and plug the new key in your Keysas station within 30
-                seconds.</span>
-            </div>
-          </div>
-          <div class="col-sm">
-            <form class="add-form password" @submit.prevent="onSubmitSign">
-              <label type="text">Password:</label>
-              <input type="password" required v-model="password" placeholder="8 caracters min" id="password" />
-              <div v-if="passwordError" class="error"> {{ passwordError }}</div>
-              <div class="submit">
-                <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Sign !</i></button>
-                <br><br>
-                <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-    </div>
-    <div v-if="ShowRevDeviceValidate" class="add-form">
-      <div class="container">
-        <div class="row">
-          <div class="col-sm">
-            <div class="tip">
-              <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
-              <br><br>
-              <span class="tip-text">Click on the button and plug the USB key in your Keysas station within 30 seconds
-                to revoke it</span><br>
-            </div>
-          </div>
-          <div class="col-sm">
-            <div class="tip">
-              <button class="send btn btn-lg btn-outline-danger shadow" @click="onSubmitRevoke()"><i
-                  class="bi bi-check-square"> Revoke !</i></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     <GenKeypair v-if="ShowGenKeypair" :CreateKeypairStatus="create_keypair_status"></GenKeypair>
-    <RevokeDevice v-if="ShowRevDevice" :revokeUsbStatus="revoke_usb_status"></RevokeDevice>
-    <SignKey v-if="ShowSignKey" :signUsbStatus="sign_usb_status"></SignKey>
     <AddYubikey v-if="ShowAddYubikey"></AddYubikey>
     <RevokeYubikey v-if="ShowRevYubikey"></RevokeYubikey>
     <UpdateKeysas v-if="ShowUpdateKeysas" :updateStatus="update_status"></UpdateKeysas>
@@ -220,8 +157,6 @@
 //import '@coreui/coreui/dist/css/coreui.min.css'
 import NavBar from '../components/NavBar.vue'
 import GenKeypair from '../components/GenKeypair.vue'
-import RevokeDevice from '../components/RevokeDevice.vue'
-import SignKey from '../components/SignKey.vue'
 import AddYubikey from '../components/AddYubikey.vue'
 import RevokeYubikey from '../components/RevokeYubikey.vue'
 import UpdateKeysas from '../components/UpdateKeysas.vue'
@@ -238,8 +173,6 @@ export default {
   components: {
     NavBar,
     GenKeypair,
-    RevokeDevice,
-    SignKey,
     AddYubikey,
     RevokeYubikey,
     UpdateKeysas,
@@ -258,9 +191,7 @@ export default {
       current_keysas: '',
       current_ip: '',
       ShowGenKeypair: false,
-      ShowRevDevice: false,
       ShowRevDeviceValidate: false,
-      ShowSignKey: false,
       ShowAddYubikey: false,
       ShowRevYubikey: false,
       ShowUpdateKeysas: false,
@@ -304,7 +235,6 @@ export default {
     flush() {
       this.ShowGenKeypair = false;
       this.ShowRevKeypair = false;
-      this.ShowSignKey = false;
       this.ShowAddYubikey = false;
       this.ShowRevYubikey = false;
       this.ShowRevDeviceValidate = false;
@@ -426,11 +356,6 @@ export default {
       else {
         console.log('CreateKeypair not called!')
       }
-    },
-    async onSubmitRevoke() {
-      this.revoke_usb_status = undefined;
-      this.ShowRevDevice = true;
-      await this.RevokeUSB(this.current_keysas);
     },
     isalive() {
       this.polling = setInterval(() => {

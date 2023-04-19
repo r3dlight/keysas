@@ -2,7 +2,7 @@
   <NavBar />
   <div class="container">
     <div class="row">
-      <h2>Add a new Keysas station !</h2>
+      <h1>Add a new Keysas station !</h1>
     </div>
     <div class="row">
       <div class="col-sm">

@@ -561,7 +561,7 @@ async fn export_sshpubkey(ip: String) -> bool {
 #[command]
 fn is_alive(name: String) -> Result<bool, String> {
     if name.chars().count() == 0 {
-        log::warn!("Name must not be empty");
+        log::warn!(" is_alive: Name must not be empty");
         return Ok(false);
     }
 
@@ -606,6 +606,16 @@ fn is_alive(name: String) -> Result<bool, String> {
 // TODO: to be modified to work locally
 #[command]
 async fn sign_key(password: String) -> bool {
+    let device = match watch_new_usb(){
+        Ok(dev) => {
+            log::debug!("{dev}");
+            dev
+        },
+        Err(e) => {
+            log::error!("Error while looking for new USB device: {e}");
+            return false;
+        }
+    };
     true
 }
 
@@ -681,12 +691,12 @@ async fn revoke_key(ip: String) -> bool {
 }
 
 #[command]
-fn validate_privatekey(public_key: String, private_key: String) -> bool {
+async fn validate_privatekey(public_key: String, private_key: String) -> bool {
     Path::new(&public_key.trim()).is_file() && Path::new(&private_key.trim()).is_file()
 }
 
 #[command]
-fn validate_rootkey(root_key: String) -> bool {
+async fn validate_rootkey(root_key: String) -> bool {
     Path::new(&root_key.trim()).is_file()
 }
 
@@ -703,7 +713,7 @@ fn validate_rootkey(root_key: String) -> bool {
 /// # Return
 /// Return a result containing an error message if any
 #[command]
-fn generate_pki_in_dir(
+async fn generate_pki_in_dir(
     org_name: String,
     org_unit: String,
     country: String,
