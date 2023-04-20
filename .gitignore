@@ -19,3 +19,4 @@ keysas-admin/src-tauri/.keysas.dat
 .vs/
 x64/
 x86/
+.vscode/c_cpp_properties.json
