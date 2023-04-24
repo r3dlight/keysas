@@ -606,11 +606,17 @@ fn is_alive(name: String) -> Result<bool, String> {
 // TODO: to be modified to work locally
 #[command]
 async fn sign_key(password: String) -> bool {
-    let device = match watch_new_usb(){
-        Ok(dev) => {
-            log::debug!("{dev}");
-            dev
-        },
+    let (device, vendor, model, revision, serial) = match watch_new_usb() {
+        Ok(dev) => dev,
+        Err(e) => {
+            log::error!("Error while looking for new USB device: {e}");
+            return false;
+        }
+    };
+    let result = match sign_usb(
+        &device, &vendor, &model, &revision, &serial, "out", &password,
+    ) {
+        Ok(o) => o,
         Err(e) => {
             log::error!("Error while looking for new USB device: {e}");
             return false;
