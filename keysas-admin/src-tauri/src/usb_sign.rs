@@ -7,18 +7,19 @@
  * The code for keysas-sign binary.
  */
 
+use crate::get_pki_dir;
 use anyhow::{anyhow, Context, Result};
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::SeekFrom;
-use std::path::Path;
 use base64::{engine::general_purpose, Engine as _};
 use ed25519_dalek::Keypair;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use libc::{c_int, c_short, c_ulong, c_void};
 use std::ffi::OsStr;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::SeekFrom;
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 use std::ptr;
 use std::str;
 use std::thread;
@@ -66,6 +67,7 @@ impl StrExt for str {
         }
     }
 }
+const USB_CA_SUB_DIR: &str = "/CA/usb";
 
 // Remove the partition number and return the device
 // TODO: manage if nb partition >= 10
@@ -113,7 +115,7 @@ fn sign_device(
 }
 
 #[cfg(target_os = "linux")]
-pub fn watch_new_usb() -> Result<String> {
+pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
     let socket = udev::MonitorBuilder::new()?
         //.match_subsystem_devtype("usb", "usb_device")?
         .match_subsystem("block")?
@@ -197,25 +199,29 @@ pub fn watch_new_usb() -> Result<String> {
                     revision.to_string_lossy(),
                     serial.to_string_lossy()
                 );
-                let information = format!("New USB device found: Vendor ID: {}, Model ID: {}, Revision: {}, Serial number: {}", vendor.to_string_lossy() ,model.to_string_lossy(), revision.to_string_lossy(), serial.to_string_lossy());
-                return Ok(information);
+                //let information = format!("New USB device found: Vendor ID: {}, Model ID: {}, Revision: {}, Serial number: {}", vendor.to_string_lossy() ,model.to_string_lossy(), revision.to_string_lossy(), serial.to_string_lossy());
+                return Ok((
+                    device.to_string(),
+                    vendor.to_string_lossy().to_string(),
+                    model.to_string_lossy().to_string(),
+                    revision.to_string_lossy().to_string(),
+                    serial.to_string_lossy().to_string(),
+                ));
             }
         }
     }
 }
 
-fn sign_usb(
+pub fn sign_usb(
     device: &str,
     vendor: &str,
     model: &str,
     revision: &str,
     serial: &str,
     direction: &str,
-    path_cl: &Path,
-    path_pq: &Path,
     password: &str,
 ) -> Result<()> {
-    log::debug!("Let's start signing the new out-key !");
+    log::debug!("Resetting the MBR for {device}.");
     let mut f = File::options()
         .write(true)
         .read(true)
@@ -247,6 +253,19 @@ fn sign_usb(
 
     //Let's write behind the magic number now
     let offset = 512;
+    // Get path to PKI directory
+    let pki_dir = match get_pki_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::error!("Failed to get PKI directory: {e}");
+            return Err(anyhow!("Invalid PKI configuration"));
+        }
+    };
+    let binding_cl = (pki_dir.clone() + USB_CA_SUB_DIR + "/usb-cl.p8");
+    let path_cl = Path::new(&binding_cl);
+    let binding_pq = (pki_dir.clone() + USB_CA_SUB_DIR + "/usb-pq.p8");
+    let path_pq = Path::new(&binding_pq);
+
     let attrs = sign_device(
         vendor, model, revision, serial, direction, path_cl, path_pq, password,
     )?;

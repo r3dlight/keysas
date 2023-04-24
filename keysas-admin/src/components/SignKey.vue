@@ -24,12 +24,14 @@
         </div>
       </div>
       <div v-if="showSign" class="term">
-        Please plug a new USB device... <br>
-        <span v-if="signUsbStatus" class="animate__animated animate__flash textterm text-success">If the provided password
-          is good, the new device should signed now !</span>
-        <span v-else-if="shutdownStatus === false" class="animate__animated animate__flash textterm text-danger">Error:
-          can't connect to the Keysas station or somthing went wrong !</span>
-        <span v-else class="textterm spinner-border text-info"></span>
+        <span v-if="signUsbStatus" class="animate__animated animate__flash textterm text-success">
+          Success, the new device should signed now !</span>
+        <span v-else-if="signUsbStatus === false" class="animate__animated animate__flash textterm text-danger">
+          Error while signing the new device !</span>
+        <div v-else> 
+          Please plug a new USB device...<br> 
+          <span class="textterm spinner-border text-info"></span>
+        </div>
       </div>
     </div>
 
@@ -56,6 +58,7 @@ export default {
       hide: false,
       showSign: false,
       passwordError: false,
+      signUsbStatus: undefined,
     }
   },
   methods: {
@@ -64,7 +67,7 @@ export default {
       await invoke('sign_key', {
             password: this.password,
         })
-        .then((res) => console.log("good"))
+        .then((res) => this.signUsbStatus = res)
         .catch((error) => console.error(error));
     },
     async onSubmitSign(){

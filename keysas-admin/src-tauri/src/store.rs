@@ -22,7 +22,7 @@ static STORE_HANDLE: Mutex<Option<Connection>> = Mutex::new(None);
 const CREATE_QUERY: &str = "
     CREATE TABLE IF NOT EXISTS ssh_table (name TEXT, path TEXT);
     CREATE TABLE IF NOT EXISTS station_table (name TEXT, ip TEXT);
-    CREATE TABLE IF NOT EXISTS ca_table (param TEXT, value TEXT);
+    CREATE TABLE IF NOT EXISTS ca_table (param TEXT PRIMARY KEY, value TEXT);
 ";
 
 const GET_PUBLIC_QUERY: &str = "SELECT * FROM ssh_table WHERE name='public';";
@@ -256,11 +256,12 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = "SELECT directory FROM ca_table;".to_string();
+                let query = "SELECT * FROM ca_table WHERE param = 'directory';".to_string();
                 let mut result = String::new();
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        if key == "directory" {
+                        println!("{:?}:{:?}", key, value);
+                        if key == "value" {
                             if let Some(dir) = value {
                                 result.push_str(dir)
                             }
@@ -281,7 +282,7 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = "SELECT directory FROM ca_table;".to_string();
+                let query = "SELECT * FROM ca_table;".to_string();
                 let mut result = CertificateFields {
                     org_name: None,
                     org_unit: None,
