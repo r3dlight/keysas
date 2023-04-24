@@ -38,7 +38,7 @@
           AddSSHPubKey(device.name)">
             <span class="bi bi-send"> Export SSH pubkey</span>
           </button>
-          <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device);
+          <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device.name);
           flush();
           hide = true">
             <span class="bi bi-exclamation-circle"> Delete</span>
@@ -260,9 +260,11 @@ export default {
     async removeKeysas(keysas) {
       this.confirmed = await confirm('Please confirm', { title: 'Remove this Keysas ?', type: 'warning' });
       if (this.confirmed == true) {
-        await removeKey(keysas);
-        this.keys = await getKeys();
+        await invoke('remove_station', {name: keysas})
+                .then((res) => console.log("Station deleted"))
+                .catch((error) => console.error(error));
         this.confirmed = false;
+        await this.displayKeysasList();
       }
     },
     getKeysasIP(keysas) {

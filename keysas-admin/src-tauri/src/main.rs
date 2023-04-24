@@ -168,6 +168,7 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             save_station,
             get_station_ip,
             list_stations,
+            remove_station,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -212,6 +213,18 @@ async fn save_station(name: String, ip: String) -> bool {
         Ok(_) => true,
         Err(e) => {
             log::error!("Failed to save station: {e}");
+            false
+        }
+    }
+}
+
+/// This function delete a Keysas station fromthe database.
+#[command]
+async fn remove_station(name: String) -> bool {
+    match delete_station(&name) {
+        Ok(_) => true,
+        Err(e) => {
+            log::error!("Failed to delete station: {e}");
             false
         }
     }

@@ -20,8 +20,8 @@ use keysas_lib::certificate_field::CertificateFields;
 static STORE_HANDLE: Mutex<Option<Connection>> = Mutex::new(None);
 
 const CREATE_QUERY: &str = "
-    CREATE TABLE IF NOT EXISTS ssh_table (name TEXT, path TEXT);
-    CREATE TABLE IF NOT EXISTS station_table (name TEXT, ip TEXT);
+    CREATE TABLE IF NOT EXISTS ssh_table (name TEXT PRIMARY KEY, path TEXT);
+    CREATE TABLE IF NOT EXISTS station_table (name TEXT PRIMARY KEY, ip TEXT);
     CREATE TABLE IF NOT EXISTS ca_table (param TEXT PRIMARY KEY, value TEXT);
 ";
 
@@ -142,6 +142,22 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
                     "REPLACE INTO station_table (name, ip) VALUES ('{}', '{}');",
                     name, ip
                 );
+                log::debug!("Query: {}", query);
+                connection.execute(query)?;
+                Ok(())
+            }
+            None => Err(anyhow!("Store is not initialized")),
+        },
+    }
+}
+
+/// Delete a Keysas station
+pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
+    match STORE_HANDLE.lock() {
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
+        Ok(hdl) => match hdl.as_ref() {
+            Some(connection) => {
+                let query = format!("DELETE FROM station_table WHERE name = '{}';", name);
                 log::debug!("Query: {}", query);
                 connection.execute(query)?;
                 Ok(())
