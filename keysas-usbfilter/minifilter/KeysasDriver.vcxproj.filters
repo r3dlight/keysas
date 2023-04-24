@@ -27,5 +27,31 @@
     <ClCompile Include="keysasDriver.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="keysasInstance.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="keysasFile.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="keysasCommunication.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="keysasDriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keysasInstance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keysasFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keysasCommunication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keysasUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -29,8 +29,11 @@ ed25519-dalek = "1.0"
 rand = "0.8"
 pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
-oqs = { version = "0.7", default-features = false, features = ["dilithium"] }
 
+[dependencies.oqs]
+version = "0.7"
+default-features = false
+features = ["dilithium"]
 
 [[bin]]
 name = "keysas-in"

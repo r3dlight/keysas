@@ -7,7 +7,7 @@ A windows minifilter and application to validate files on USB sticks.
 The driver can be built with VS 2022.
 
 ### Installation
-The driver can be installed with a Right click on the INF file in `./minifilter/KeysasDriver/x64/[Debug|Release]/KeysasDriver`.
+The driver can be installed with a Right click on the INF file in `./minifilter/x64/[Debug|Release]/KeysasDriver`.
 
 To check the installation use:
 - `sc.exe query KeysasDriver`

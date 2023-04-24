@@ -1,12 +1,21 @@
 [package]
-name = "keysas-minifilter"
+name = "keysas-usbfilter-daemon"
 version = "0.1.0"
+description = "Keysas USB firewall daemon"
+authors = ["Luc Bonnafoux", "Stephane N"]
+license = "GPL-3.0"
+repository = ""
+default-run = "keysas-usbfilter-daemon"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 widestring = "1.0"
+anyhow = "1.0"
+simple_logger = "4.1"
+log = "0.4"
+wchar = "0.11"
 
 [dependencies.windows]
 version = "0.48.0"
@@ -14,5 +23,6 @@ features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Storage_InstallableFileSystems",
-    "Win32_System_IO"
+    "Win32_System_IO",
+    "Win32_System_Threading"
 ]

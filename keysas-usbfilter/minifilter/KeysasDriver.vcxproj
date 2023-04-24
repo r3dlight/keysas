@@ -110,7 +110,17 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="keysasCommunication.c" />
     <ClCompile Include="keysasDriver.c" />
+    <ClCompile Include="keysasFile.c" />
+    <ClCompile Include="keysasInstance.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="keysasCommunication.h" />
+    <ClInclude Include="keysasFile.h" />
+    <ClInclude Include="keysasInstance.h" />
+    <ClInclude Include="keysasDriver.h" />
+    <ClInclude Include="keysasUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

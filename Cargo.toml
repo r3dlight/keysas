@@ -7,6 +7,9 @@ members = [
     "keysas-sign/",
     "keysas-fido/",
     "keysas_lib/",
-    "keysas-admin/src-tauri",
-    "keysas-minifilter"
+    "keysas-admin/src-tauri"
+]
+
+exclude = [
+    "keysas-usbfilter"
 ]
