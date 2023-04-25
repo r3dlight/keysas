@@ -36,6 +36,9 @@
     <ClCompile Include="keysasCommunication.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="keysasUtils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="keysasDriver.h">

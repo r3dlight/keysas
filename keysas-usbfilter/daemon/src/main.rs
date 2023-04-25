@@ -25,6 +25,8 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
+#![feature(vec_into_raw_parts)]
+
 pub mod driver_interface;
 pub mod windows_driver_interface;
 
@@ -45,8 +47,6 @@ fn main() -> Result<(), anyhow::Error> {
     log::info!("Driver interface OK");
 
     loop {}
-
-    Ok(())
 }
 
 // Initialize the driver interface and register the callbacks

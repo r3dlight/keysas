@@ -22,6 +22,7 @@ Environment:
 #define _H_KEYSAS_FILE_
 
 #include "keysasDriver.h"
+#include "keysasCommunication.h"
 
 typedef struct _KEYSAS_FILE_CTX {
 	// Authorization state of the file
@@ -42,6 +43,7 @@ KfFileContextCleanup(
 NTSTATUS
 KeysasScanFileInUserMode(
 	_In_ PUNICODE_STRING FileName,
+	_In_ KEYSAS_FILTER_OPERATION Operation,
 	_Out_ PBOOLEAN SafeToOpen
 );
 

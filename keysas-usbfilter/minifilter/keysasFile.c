@@ -244,7 +244,10 @@ Return Value:
 	}
 
 	// Get a read lock on the instance context
-	AcquireResourceRead(instanceContext->Resource);
+	if (!AcquireResourceRead(instanceContext->Resource)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in read mode\n"));
+	}
+
 	switch (instanceContext->Authorization)
 	{
 	case AUTH_BLOCK:
@@ -335,6 +338,8 @@ Return Value:
 	BOOLEAN safeToOpen = TRUE;
 	PKEYSAS_FILE_CTX fileContext = NULL;
 	BOOLEAN contextCreated = FALSE;
+	KEYSAS_FILTER_OPERATION operation = SCAN_FILE;
+	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
 
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
@@ -345,7 +350,8 @@ Return Value:
 	// If the create is failing, don't bother with it
 	if (!NT_SUCCESS(Data->IoStatus.Status) ||
 		(STATUS_REPARSE == Data->IoStatus.Status)) {
-		return FLT_POSTOP_FINISHED_PROCESSING;
+		status = FLT_POSTOP_FINISHED_PROCESSING;
+		goto cleanup;
 	}
 
 	// Check if the file is of interest
@@ -357,7 +363,8 @@ Return Value:
 	if (!NT_SUCCESS(status)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FltGetFileNameInformation failed with status: %0x8x\n",
 			status));
-		return FLT_POSTOP_FINISHED_PROCESSING;
+		status = FLT_POSTOP_FINISHED_PROCESSING;
+		goto cleanup;
 	}
 
 	FltParseFileNameInformation(nameInfo);
@@ -367,46 +374,96 @@ Return Value:
 		nameInfo->Extension,
 		nameInfo->Volume));
 
-	FltReleaseFileNameInformation(nameInfo);
-
 	// Find or create File context
 	status = FindFileContext(Data, &fileContext, &contextCreated);
 	if (!NT_SUCCESS(status)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FindFileContext failed with status: %0x8x\n",
 			status));
-		return FLT_POSTOP_FINISHED_PROCESSING;
+		status = FLT_POSTOP_FINISHED_PROCESSING;
+		goto cleanup;
 	}
 	// Acquire lock on File context
 	// By default acquire in shared mode only to read the authorization state
 	// If the authorization state is unknown then try to acquire the lock in write mode to scan the file
-	AcquireResourceRead(fileContext->Resource);
+	if (!AcquireResourceRead(fileContext->Resource)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in read mode\n"));
+	}
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in read mode\n"));
 
 	if (AUTH_UNKNOWN == fileContext->Authorization) {
 		// The authorization status is not known for this file
 		// Get a write lock
 		ReleaseResource(fileContext->Resource);
-		AcquireResourceWrite(fileContext->Resource);
+		if (!AcquireResourceWrite(fileContext->Resource)) {
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in write mode\n"));
+		}
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in write mode\n"));
 		// Test the authorization again as it can have been preempted
 		if (AUTH_UNKNOWN == fileContext->Authorization) {
 			fileContext->Authorization = AUTH_PENDING;
-			// Send the file to further analysis in user space
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Send request to userspace\n"));
-			(VOID)KeysasScanFileInUserMode(
-				&nameInfo->Name,
-				&safeToOpen
-			);
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Received authorization from userspace\n"));
 
-			// TODO: by default allow all files
-			if (TRUE == safeToOpen) {
-				fileContext->Authorization = AUTH_ALLOW_READ;
-				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization ALLOW\n"));
+			// Try to acquire the instance context as the file authorization will depend on the instance status
+			status = FindInstanceContext(
+				Data->Iopb->TargetInstance,
+				&instanceContext,
+				&contextCreated
+			);
+			if (!NT_SUCCESS(status)) {
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FindInstanceContext failed with status: %0x8x\n",
+					status));
+				status = FLT_POSTOP_FINISHED_PROCESSING;
+				goto cleanup;
 			}
-			else {
+
+			// Get read access to the instance state
+			if (!AcquireResourceRead(instanceContext->Resource)) {
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in read mode\n"));
+			}
+
+			// Set the scan operation depending on the instance status
+			operation = SCAN_FILE;
+			switch (instanceContext->Authorization) {
+			case AUTH_BLOCK:
+				// Set the file to block mode
+				ReleaseResource(instanceContext->Resource);
 				fileContext->Authorization = AUTH_BLOCK;
-				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization BLOCK\n"));
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Instance blocked, File authorization BLOCK\n"));
+				break;
+			case AUTH_ALLOW_WARNING:
+				// In this case, ask for the user authorization
+				operation = USER_ALLOW_FILE;
+			case AUTH_ALLOW_READ:
+				// Ask the userspace to scan the file
+				ReleaseResource(instanceContext->Resource);
+				// Send the file to further analysis in user space
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Send request to userspace\n"));
+				(VOID)KeysasScanFileInUserMode(
+					&nameInfo->Name,
+					operation,
+					&safeToOpen
+				);
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Received authorization from userspace\n"));
+				// Allow or block the file depending on the userspace result
+				if (TRUE == safeToOpen) {
+					fileContext->Authorization = AUTH_ALLOW_READ;
+					KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization ALLOW\n"));
+				}
+				else {
+					fileContext->Authorization = AUTH_BLOCK;
+					KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization BLOCK\n"));
+				}
+				break;
+			case AUTH_ALLOW_ALL:
+				// Set the file to allow mode
+				ReleaseResource(instanceContext->Resource);
+				fileContext->Authorization = AUTH_ALLOW_READ;
+				break;
+			default:
+				// Should not happen, log and set file to blocking
+				ReleaseResource(instanceContext->Resource);
+				fileContext->Authorization = AUTH_BLOCK;
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Incoherent instance state, File authorization BLOCK\n"));
+				break;
 			}
 		}
 	}
@@ -427,15 +484,34 @@ Return Value:
 		break;
 	}
 
-	ReleaseResource(fileContext->Resource);
-	FltReleaseContext(fileContext);
+	status = FLT_POSTOP_FINISHED_PROCESSING;
 
-	return FLT_POSTOP_FINISHED_PROCESSING;
+cleanup:
+	if (NULL != nameInfo) {
+		FltReleaseFileNameInformation(nameInfo);
+	}
+
+	if (NULL != fileContext) {
+		if (NULL != fileContext->Resource) {
+			ReleaseResource(fileContext->Resource);
+		}
+		FltReleaseContext(fileContext);
+	}
+
+	if (NULL != instanceContext) {
+		if (NULL != instanceContext->Resource) {
+			ReleaseResource(instanceContext->Resource);
+		}
+		FltReleaseContext(instanceContext);
+	}
+
+	return status;
 }
 
 NTSTATUS
 KeysasScanFileInUserMode(
 	_In_ PUNICODE_STRING FileName,
+	_In_ KEYSAS_FILTER_OPERATION Operation,
 	_Out_ PBOOLEAN SafeToOpen
 )
 /*++
@@ -449,6 +525,7 @@ Routine Description:
 	bootstrapping problem -- how would we ever load the .exe for the service?
 Arguments:
 	FileName - Name of the file. It should be NORMALIZED thus the complete path is given
+	Operation - Operation code for the user app
 	SafeToOpen - Set to FALSE if the file is scanned successfully and it contains
 				 foul language.
 Return Value:
@@ -493,6 +570,7 @@ Return Value:
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Failed to convert UNICODE_STRING\n"));
 		goto end;
 	}
+	request->Operation = Operation;
 
 	replyLength = sizeof(request);
 

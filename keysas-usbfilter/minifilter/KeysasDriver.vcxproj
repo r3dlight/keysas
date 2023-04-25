@@ -114,6 +114,7 @@
     <ClCompile Include="keysasDriver.c" />
     <ClCompile Include="keysasFile.c" />
     <ClCompile Include="keysasInstance.c" />
+    <ClCompile Include="keysasUtils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="keysasCommunication.h" />
