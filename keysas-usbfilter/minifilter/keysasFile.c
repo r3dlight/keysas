@@ -226,9 +226,22 @@ Return Value:
 	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
 
 	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
+	UNREFERENCED_PARAMETER(CompletionContext = NULL);
 
 	PAGED_CODE();
+
+	// Allow call from our userspace application
+	if (IoThreadToProcess(Data->Thread) == KeysasData.UserProcess) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	// Don't filter call to directories
+	if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DIRECTORY_FILE)) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY)) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
 
 	// Get the instance context
 	// If the instance is blocked, reject all calls
