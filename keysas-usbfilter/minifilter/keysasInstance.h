@@ -66,4 +66,11 @@ KfInstanceContextCleanup(
 	_In_ FLT_CONTEXT_TYPE ContextType
 );
 
+NTSTATUS
+FindInstanceContext(
+	_In_ PFLT_INSTANCE Instance,
+	_Outptr_ PKEYSAS_INSTANCE_CTX* InstanceContext,
+	_Out_opt_ PBOOLEAN ContextCreated
+);
+
 #endif _H_KEYSAS_INSTANCE_

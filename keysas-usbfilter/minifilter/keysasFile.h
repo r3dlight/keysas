@@ -60,4 +60,11 @@ KfPostCreateHandler(
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
 
+NTSTATUS
+FindFileContext(
+	_In_ PFLT_CALLBACK_DATA Data,
+	_Outptr_ PKEYSAS_FILE_CTX* FileContext,
+	_Out_opt_ PBOOLEAN ContextCreated
+);
+
 #endif

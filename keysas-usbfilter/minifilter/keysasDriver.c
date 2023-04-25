@@ -63,12 +63,6 @@ KfUnload(
 	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
 );
 
-VOID
-KfContextCleanup(
-	_In_ PFLT_CONTEXT Context,
-	_In_ FLT_CONTEXT_TYPE ContextType
-);
-
 //
 //  Assign text sections for each routine.
 //
@@ -76,11 +70,6 @@ KfContextCleanup(
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(INIT, DriverEntry)
 #pragma alloc_text(PAGE, KfUnload)
-#pragma alloc_text(PAGE, KfContextCleanup)
-#pragma alloc_text(PAGE, KfInstanceQueryTeardown)
-#pragma alloc_text(PAGE, KfInstanceSetup)
-#pragma alloc_text(PAGE, KfInstanceTeardownStart)
-#pragma alloc_text(PAGE, KfInstanceTeardownComplete)
 #endif
 
 //
@@ -237,10 +226,14 @@ Return Value:
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfUnload: Entered\n"));
 
 	FltCloseCommunicationPort(KeysasData.ServerPort);
-	KeysasData.ServerPort = NULL;
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfUnload: Closed server port\n"));
 
 	FltUnregisterFilter(KeysasData.Filter);
 	KeysasData.Filter = NULL;
+	KeysasData.ServerPort = NULL;
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfUnload: Done\n"));
 
 	return STATUS_SUCCESS;
 }

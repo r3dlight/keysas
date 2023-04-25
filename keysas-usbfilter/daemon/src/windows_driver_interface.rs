@@ -125,6 +125,8 @@ impl WindowsDriverInterface {
                     )
                     .unwrap();
                 }
+
+                println!("Sent response");
             }
         });
         Ok(())

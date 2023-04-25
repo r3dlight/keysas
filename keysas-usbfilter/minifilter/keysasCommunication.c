@@ -30,6 +30,11 @@ Environment:
 // Name of the port used to communicate with user space
 const PWSTR KeysasPortName = L"\\KeysasPort";
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KeysasPortConnect)
+#pragma alloc_text(PAGE, KeysasPortDisconnect)
+#endif
+
 NTSTATUS
 KeysasInitPort(
 

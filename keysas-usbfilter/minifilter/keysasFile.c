@@ -28,6 +28,14 @@ Environment:
 #include "keysasDriver.h"
 #include "keysasCommunication.h"
 #include "keysasUtils.h"
+#include "keysasInstance.h"
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KfFileContextCleanup)
+#pragma alloc_text(PAGE, FindFileContext)
+#pragma alloc_text(PAGE, KfPostCreateHandler)
+#pragma alloc_text(PAGE, KfPreCreateHandler)
+#endif
 
 VOID
 KfFileContextCleanup(
@@ -46,6 +54,7 @@ Return Value:
 	PKEYSAS_FILE_CTX fileContext;
 
 	PAGED_CODE();
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfFileContextCleanup: Entered\n"));
 
 	switch (ContextType) {
 	case FLT_FILE_CONTEXT:
@@ -55,9 +64,10 @@ Return Value:
 			ExFreePoolWithTag(fileContext->Resource, KEYSAS_MEMORY_TAG);
 		}
 		fileContext->Authorization = AUTH_UNKNOWN;
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfFileContextCleanup: Cleaned context\n"));
 		break;
 	default:
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfContextCleanup: Unsupport context type\n"));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfFileContextCleanup: Unsupport context type\n"));
 		break;
 	}
 }
@@ -116,6 +126,7 @@ Return Value:
 	if (!NT_SUCCESS(status)
 		&& (STATUS_NOT_FOUND == status)) {
 
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: File context not found\n"));
 		status = FltAllocateContext(
 			KeysasData.Filter,
 			FLT_FILE_CONTEXT,
@@ -124,7 +135,7 @@ Return Value:
 			&fileContext
 		);
 		if (!NT_SUCCESS(status)) {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: FltAllocateContext failed with status: 0x%x\n",
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: FltAllocateContext failed with status: %0x8x\n",
 				status));
 			return status;
 		}
@@ -138,7 +149,7 @@ Return Value:
 			KEYSAS_MEMORY_TAG
 		);
 		if (NULL == fileContext->Resource) {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: ExAllocatePoolZero failed with status: 0x%x\n",
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: ExAllocatePoolZero failed with status: %0x8x\n",
 				status));
 			FltReleaseContext(fileContext);
 			return STATUS_INSUFFICIENT_RESOURCES;
@@ -158,18 +169,19 @@ Return Value:
 			FltReleaseContext(fileContext);
 
 			if (STATUS_FLT_CONTEXT_ALREADY_DEFINED != status) {
-				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: FltSetFileContext failed with status: 0x%x\n",
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: FltSetFileContext failed with status: %0x8x\n",
 					status));
-				FltReleaseContext(fileContext);
 				return status;
 			}
 
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: File context already defined\n"));
 			// A context already exists
 			fileContext = oldFileContext;
 			status = STATUS_SUCCESS;
 		}
 		else {
 			// Successful creation of a new file context
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindFileContext: Created a new file context\n"));
 			*ContextCreated = TRUE;
 		}
 	}
@@ -211,10 +223,51 @@ Return Value:
 	NTSTATUS status = STATUS_SUCCESS;
 	NTSTATUS result = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
+	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
+
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
 
 	PAGED_CODE();
+
+	// Get the instance context
+	// If the instance is blocked, reject all calls
+	status = FltGetInstanceContext(
+		Data->Iopb->TargetInstance,
+		&instanceContext
+	);
+	if (!NT_SUCCESS(status)) {
+		// There should always be a context for an instance to which the filter is attached
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: FltGetInstanceContext failed with status: %0x8x\n",
+			status));
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	// Get a read lock on the instance context
+	AcquireResourceRead(instanceContext->Resource);
+	switch (instanceContext->Authorization)
+	{
+	case AUTH_BLOCK:
+		// Block all calls
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+		ReleaseResource(instanceContext->Resource);
+		return FLT_PREOP_COMPLETE;
+		break;
+	case AUTH_ALLOW_ALL:
+		// Allow all call without verification
+		ReleaseResource(instanceContext->Resource);
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+		break;
+	case AUTH_UNKNOWN:
+	case AUTH_PENDING:
+		// These two states should not happen
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: Invalid instance authorization state\n"));
+	default:
+		break;
+	}
+	ReleaseResource(instanceContext->Resource);
+	FltReleaseContext(instanceContext);
 
 	// Check if the file is of interest
 	status = FltGetFileNameInformation(
@@ -223,9 +276,9 @@ Return Value:
 		&nameInfo
 	);
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: FltGetFileNameInformation failed with status: 0x%x\n",
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: FltGetFileNameInformation failed with status: %0x8x\n",
 			status));
-		return FLT_POSTOP_FINISHED_PROCESSING;
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
 	FltParseFileNameInformation(nameInfo);
@@ -292,7 +345,6 @@ Return Value:
 	// If the create is failing, don't bother with it
 	if (!NT_SUCCESS(Data->IoStatus.Status) ||
 		(STATUS_REPARSE == Data->IoStatus.Status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failing create call\n"));
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -303,7 +355,7 @@ Return Value:
 		&nameInfo
 	);
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FltGetFileNameInformation failed with status: 0x%x\n",
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FltGetFileNameInformation failed with status: %0x8x\n",
 			status));
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -320,7 +372,7 @@ Return Value:
 	// Find or create File context
 	status = FindFileContext(Data, &fileContext, &contextCreated);
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FindFileContext failed with status: 0x%x\n",
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FindFileContext failed with status: %0x8x\n",
 			status));
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -328,23 +380,34 @@ Return Value:
 	// By default acquire in shared mode only to read the authorization state
 	// If the authorization state is unknown then try to acquire the lock in write mode to scan the file
 	AcquireResourceRead(fileContext->Resource);
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in read mode\n"));
 
 	if (AUTH_UNKNOWN == fileContext->Authorization) {
 		// The authorization status is not known for this file
 		// Get a write lock
 		ReleaseResource(fileContext->Resource);
 		AcquireResourceWrite(fileContext->Resource);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in write mode\n"));
 		// Test the authorization again as it can have been preempted
 		if (AUTH_UNKNOWN == fileContext->Authorization) {
 			fileContext->Authorization = AUTH_PENDING;
 			// Send the file to further analysis in user space
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Send request to userspace\n"));
 			(VOID)KeysasScanFileInUserMode(
 				&nameInfo->Name,
 				&safeToOpen
 			);
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Received authorization from userspace\n"));
 
 			// TODO: by default allow all files
-			fileContext->Authorization = AUTH_ALLOW_READ;
+			if (TRUE == safeToOpen) {
+				fileContext->Authorization = AUTH_ALLOW_READ;
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization ALLOW\n"));
+			}
+			else {
+				fileContext->Authorization = AUTH_BLOCK;
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization BLOCK\n"));
+			}
 		}
 	}
 
@@ -353,6 +416,7 @@ Return Value:
 		// Block the transaction
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 		Data->IoStatus.Information = 0;
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File blocked\n"));
 		break;
 	case AUTH_PENDING:
 	case AUTH_UNKNOWN:
@@ -364,6 +428,7 @@ Return Value:
 	}
 
 	ReleaseResource(fileContext->Resource);
+	FltReleaseContext(fileContext);
 
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
@@ -444,7 +509,7 @@ Return Value:
 
 	if (STATUS_SUCCESS == status) {
 		*SafeToOpen = ((PKEYSAS_REPLY)request)->Result;
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Result: %p\n", SafeToOpen));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Received result\n"));
 	}
 	else {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Failed to send request to userspace\n"));

@@ -54,6 +54,7 @@ typedef enum _KEYSAS_AUTHORIZATION {
 	AUTH_PENDING,		// Authorization request pending
 	AUTH_BLOCK,			// Access is blocked
 	AUTH_ALLOW_READ,	// Access is allowed in read mode
+	AUTH_ALLOW_WARNING,	// Access is allowed but with a warning to the user
 	AUTH_ALLOW_ALL		// Access is allowed for all operations
 } KEYSAS_AUTHORIZATION;
 

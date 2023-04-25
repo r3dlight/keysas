@@ -25,6 +25,134 @@ Environment:
 #include <ntstrsafe.h>
 #include <ntdef.h>
 
+#include "keysasUtils.h"
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KfInstanceContextCleanup)
+#pragma alloc_text(PAGE, KfInstanceQueryTeardown)
+#pragma alloc_text(PAGE, KfInstanceSetup)
+#pragma alloc_text(PAGE, KfInstanceTeardownComplete)
+#pragma alloc_text(PAGE, KfInstanceTeardownStart)
+#pragma alloc_text(PAGE, FindInstanceContext)
+#endif
+
+NTSTATUS
+FindInstanceContext(
+	_In_ PFLT_INSTANCE Instance,
+	_Outptr_ PKEYSAS_INSTANCE_CTX* InstanceContext,
+	_Out_opt_ PBOOLEAN ContextCreated
+)
+/*++
+
+Routine Description:
+
+	Find an existing instance context or create one if there is none
+
+Arguments:
+
+	Instance - Pointer to the instance
+
+	InstanceContext - Pointer to the Instance context
+
+	ContextCreated - Set to TRUE if the context has been created during the call
+
+Return Value:
+
+	The return value is the status of the operation.
+
+--*/
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
+	PKEYSAS_INSTANCE_CTX oldInstanceContext = NULL;
+
+	PAGED_CODE();
+
+	// Initialize output paramters
+	*InstanceContext = NULL;
+	if (NULL != ContextCreated) {
+		*ContextCreated = FALSE;
+	}
+	else {
+		// ContextCreated must point to valid memory
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: Invalid input\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	// Try to find an existing instance context
+	status = FltGetInstanceContext(
+		Instance,
+		&instanceContext
+	);
+
+	// If the call fail because the context does not exist, create a new one
+	if (!NT_SUCCESS(status)
+		&& (STATUS_NOT_FOUND == status)) {
+
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: Instance context not found\n"));
+		status = FltAllocateContext(
+			KeysasData.Filter,
+			FLT_INSTANCE_CONTEXT,
+			KEYSAS_INSTANCE_CTX_SIZE,
+			PagedPool,
+			&instanceContext
+		);
+		if (!NT_SUCCESS(status)) {
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: FltAllocateContext failed with status: %0x8x\n",
+				status));
+			return status;
+		}
+
+		// Initialize the context
+		// Set all the fields to 0 => Authorization = UNKNOWN
+		RtlZeroMemory(instanceContext, KEYSAS_INSTANCE_CTX_SIZE);
+		instanceContext->Resource = ExAllocatePoolZero(
+			NonPagedPool,
+			sizeof(ERESOURCE),
+			KEYSAS_MEMORY_TAG
+		);
+		if (NULL == instanceContext->Resource) {
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: ExAllocatePoolZero failed with status: %0x8x\n",
+				status));
+			FltReleaseContext(instanceContext);
+			return STATUS_INSUFFICIENT_RESOURCES;
+		}
+		ExInitializeResourceLite(instanceContext->Resource);
+
+		// Attach the context to the file
+		status = FltSetInstanceContext(
+			Instance,
+			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
+			instanceContext,
+			&oldInstanceContext
+		);
+
+		if (!NT_SUCCESS(status)) {
+			FltReleaseContext(instanceContext);
+
+			if (STATUS_FLT_CONTEXT_ALREADY_DEFINED != status) {
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: FltSetInstanceContext failed with status: %0x8x\n",
+					status));
+				return status;
+			}
+
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: Instance context already defined\n"));
+			// A context already exists
+			instanceContext = oldInstanceContext;
+			status = STATUS_SUCCESS;
+		}
+		else {
+			// Successful creation of a new file context
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: Created a new instance context\n"));
+			*ContextCreated = TRUE;
+		}
+	}
+
+	*InstanceContext = instanceContext;
+
+	return status;
+}
+
 NTSTATUS
 KfInstanceSetup(
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -73,6 +201,7 @@ Return Value:
 	STORAGE_DESCRIPTOR_HEADER	HeaderDescriptor = { 0 };
 	ULONG						SizeNeeded, RetLength, OutputLength, SizeRequired;
 	PKEYSAS_INSTANCE_CTX		instanceContext = NULL;
+	BOOLEAN						instanceCreated = FALSE;
 
 	// Print debug info on the call context
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Entered\n"));
@@ -85,7 +214,7 @@ Return Value:
 	// Open the volume to get information on it
 	status = FltOpenVolume(FltObjects->Instance, &FsVolumeHandle, &FsFileObject);
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltOpenVolume failed with status = 0x%x\n", status));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltOpenVolume failed with status = %0x8x\n", status));
 		goto end;
 	}
 
@@ -111,7 +240,7 @@ Return Value:
 		&RetLength);
 
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltDeviceIoControlFile failed with status = 0x%x\n", status));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltDeviceIoControlFile failed with status = %0x8x\n", status));
 		goto end;
 	}
 
@@ -140,7 +269,7 @@ Return Value:
 	);
 
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltDeviceIoControlFile failed with status = 0x%x\n", status));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltDeviceIoControlFile failed with status = %0x8x\n", status));
 		goto end;
 	}
 
@@ -149,36 +278,25 @@ Return Value:
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: USB descriptor found attach\n"));
 		status = STATUS_SUCCESS;
 
-		// Create a context for the instance
-		status = FltAllocateContext(
-			FltObjects->Filter,
-			FLT_INSTANCE_CONTEXT,
-			KEYSAS_INSTANCE_CTX_SIZE,
-			NonPagedPool,
-			&instanceContext
-		);
-		if (!NT_SUCCESS(status)) {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltAllocateContext failed with status = 0x%x\n", status));
-			status = STATUS_FLT_DO_NOT_ATTACH;
-			goto end;
-
-		}
-
-		instanceContext->Authorization = AUTH_UNKNOWN;
-		instanceContext->Resource = NULL;
-
-		status = FltSetInstanceContext(
+		status = FindInstanceContext(
 			FltObjects->Instance,
-			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
-			instanceContext,
-			NULL
+			&instanceContext,
+			&instanceCreated
 		);
+
 		if (!NT_SUCCESS(status)) {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltSetInstanceContext failed with status = 0x%x\n", status));
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FindInstanceContext failed with status = %0x8x\n", status));
 			status = STATUS_FLT_DO_NOT_ATTACH;
 			goto end;
 
 		}
+
+		// TODO: default set instance to ALLOW
+		AcquireResourceWrite(instanceContext->Resource);
+		instanceContext->Authorization = AUTH_ALLOW_WARNING;
+		ReleaseResource(instanceContext->Resource);
+
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Instance context attached\n"));
 	}
 	else {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Not a USB device do not attach\n"));
@@ -337,6 +455,8 @@ Return Value:
 
 	PAGED_CODE();
 
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceContextCleanup: Entered\n"));
+
 	switch (ContextType) {
 	case FLT_INSTANCE_CONTEXT:
 		instanceContext = (PKEYSAS_INSTANCE_CTX)Context;
@@ -345,9 +465,10 @@ Return Value:
 			ExFreePoolWithTag(instanceContext->Resource, KEYSAS_MEMORY_TAG);
 		}
 		instanceContext->Authorization = AUTH_UNKNOWN;
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceContextCleanup: Cleaned instance context\n"));
 		break;
 	default:
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfContextCleanup: Unsupport context type\n"));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceContextCleanup: Unsupport context type\n"));
 		break;
 	}
 }
