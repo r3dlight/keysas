@@ -6,17 +6,17 @@
       <br>
     </div>
   <div class="box">
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
-      <span class="bi bi-arrows-expand"> Device signing</span>
+    <button class="btn btn-outline-success btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
+      <span class="bi bi-arrows-expand"> USB signing</span>
     </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
-      <span class="bi bi-arrows-expand"> Device revoking</span>
+    <button class="btn btn-outline-warning btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
+      <span class="bi bi-arrows-expand"> USB revoking</span>
     </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
+    <button class="btn btn-outline-primary btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
       <span class="bi bi-arrows-expand"> SSH configuration</span>
     </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
-      <span class="bi bi-arrows-expand"> PKI configuration</span>
+    <button class="btn btn-outline-danger btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
+      <span class="bi bi-arrows-expand"> IKPQPKI configuration</span>
     </button>
   </div>
     <div class="row" v-if="ShowSign">
@@ -41,7 +41,7 @@
       </div>
     </div>
     <div class="row" v-if="ShowPKI">
-      <h3>PKI configuration</h3>
+      <h3>IKPQPKI configuration</h3>
       <div class="col-sm">
         <SigningKeys />
       </div>

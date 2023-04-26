@@ -16,7 +16,7 @@
         </div>
         <div class="col-sm">
           <div class="tip">
-            <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
+            <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
             <br><br>
             <span class="tip-text">Enter your signing password and plug the new device within 30
               seconds to sign it.</span>
