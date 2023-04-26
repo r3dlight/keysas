@@ -17,41 +17,33 @@
           <span class="textterminal">> ssh-keygen -m PEM -t ed25519 -f mykey</span>
         </div>
         <br>
-        <li class="doc">Then, <b>set the path</b> of both keys in the <b>"SSH configuration"</b> menu ;</li>
+        <li class="doc">Then, <b>set the path</b> of both keys in the <b>"Admin configuration/SSH configuration"</b> menu ;</li>
       </ul>
-      <li><b>Generate key to sign USB devices</b></li>
+      <br>
+      <li><b>Generate a IKPQPKI</b></li>
       <ul>
-        <li>Create a ED25519 key pair and generate the corresponding self-sign certificate. This key pair must then be wrapped in a PKCS#12 file. This can be done with the following commands:</li>
-        <div class="terminal-left">
-          <span class="textterminal"># Generate private key for USB device signing</span><br>
-          <span class="textterminal">> openssl genpkey -algorithm ed25519 -out admin-priv-usb.pem</span><br>
-          <span class="textterminal"># Generate corresponding certificate</span><br>
-          <span class="textterminal">> openssl req -new x509 -nodes -days 3650 -key admin-priv-usb.pem -out admin-usb-cert.pem</span><br>
-          <span class="textterminal"># Generate PKCS#12 file with the two keys</span><br>
-          <span class="textterminal">> openssl pkcs12 -export -out admin-usb-store.p12 -inkey admin-priv-usb.pem -in admin-usb-cert.pem</span><br>
-          <span class="textterminal"># Clean private key file</span><br>
-          <span class="textterminal">> rm ./admin-priv-usb.pem</span>
-        </div>
+        <li>To be able to sign your outgoing USB devices and to enroll new Keysas stations, you need to create a <b>IKPQPKI</b> 
+          <br>(<b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture) &#x1F601;</li>
+        <li>If you have never created a IKPQPKI, go to "<b>Admin configuration</b>-><b>IKPQPKI configuration</b>" and click on "<b>Create a new IKPQPKI</b>"</li>
+        <li>Provide the information requested to build your own custom PKI</li>
+        <li>Be patient, this may take a while &#x2615;</li>
       </ul>
-      <li><b>Generate key to sign Keysas stations</b></li>
+      <br>
+      <li><b>Enroll you Keysas stations</b></li>
       <ul>
-        <li>Create a ED25519 key pair and generate the corresponding self-sign certificate. This key pair must then be wrapped in a PKCS#12 file. This can be done with the following commands:</li>
-        <div class="terminal-left">
-          <span class="textterminal"># Generate private key for keysas stations signing</span><br>
-          <span class="textterminal">> openssl genpkey -algorithm ed25519 -out admin-priv-st.pem</span><br>
-          <span class="textterminal"># Generate corresponding certificate</span><br>
-          <span class="textterminal">> openssl req -new x509 -nodes -days 3650 -key admin-priv-st.pem -out admin-st-cert.pem</span><br>
-          <span class="textterminal"># Generate PKCS#12 file with the two keys</span><br>
-          <span class="textterminal">> openssl pkcs12 -export -out admin-st-store.p12 -inkey admin-priv-st.pem -in admin-st-cert.pem</span><br>
-          <span class="textterminal"># Clean private key file</span><br>
-          <span class="textterminal">> rm ./admin-priv-st.pem</span>
-        </div>
+        <li>You can now start <b>adding</b> new keysas stations in the <b>"Add a new Keysas"</b> menu
+          providing a name and an IP address</li>
+        <li>When done, <b>export</b> the public key by clicking the <b>"Export SSH pubkey"</b> button for each station added</li>
       </ul>
-      <li>You can now <b>add</b> a new device in the <b>"Add a new Keysas"</b> menu
-        providing a name and an IP address ;</li>
-      <li>When done, <b>export</b> the public key by clicking the <b>"Export SSH pubkey"</b> button ;</li>
-      <li>You can now change the default keysas user's password ;</li>
-      <li>You're now ready to go !</li>
+      <br>
+      <li><b>Sign your outgoing USB keys</b></li>
+      <ul>
+        <li>You can now start signing at least one USB device in "<b>Admin configuration</b>-><b>USB Signing</b>"</li>
+        <li>Type the password provided during your IKPQPKI creation and plug the USB key</li>
+        <li>Be patient, this may take a while &#x2615;</li>
+      </ul>
+      <br>
+      <li><b>You're now ready to go !</b></li>
     </ul>
     <br><br><span class="website">Please visit <a href="#https://keysas.fr" class="text-primary">keysas.fr</a> to learn
       more !</span>

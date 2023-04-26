@@ -1,6 +1,6 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
+    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
     <span class="tip-text">Add here the Keysas stations you want to manage with this application.</span><br>
     <span class="tip-text">You can find the IP address in the Help menu of your Keysas station <i
@@ -16,7 +16,7 @@
     <div class="List">
       <ul class="list-group-item">
         <li class="list-group-item list-group-item-light" v-for="(device, key) in stations" :key="key">
-          {{ device }}
+          {{ device.name }}: {{ device.ip }}
           <br />
         </li>
       </ul>
@@ -46,7 +46,7 @@ export default {
   },
   async mounted() {
     invoke('list_stations')
-      .then((list) => this.stations = list)
+      .then((list) => this.stations = JSON.parse(list))
       .catch((error) => console.error(error));
   },
 

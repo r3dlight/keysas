@@ -1,6 +1,6 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
+    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
     <span class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
       stations.</span>

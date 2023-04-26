@@ -1,11 +1,11 @@
 <template>
   <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-info btn-lg shadow"
+      <button class="send btn btn-outline-info btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
-        Load from local PKI
+        Load from local IKPQPKI
       </button>
     </div>
     <!-- No pkcs11 for now-->
@@ -18,17 +18,17 @@
       </button>      
     </div>-->
     <div class="col">
-      <button class="send btn btn-info btn-lg shadow" 
+      <button class="send btn btn-outline-info btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
-        Create a new PKI
+        Create a new IKPQPKI
       </button>      
     </div>
   <!--</div>-->
   <div v-if="showLoadPKIForm">
     <form class="add-form" @submit.prevent="onSubmit">
-      <label type="text"> Path to your PKI folder:</label>
+      <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
@@ -48,7 +48,7 @@
   </div>
   <div v-if="showRootKeyForm">
     <form class="add-form" @submit.prevent="onSubmit">
-      <label type="text"> Path to your Root CA key file (PKCS#12):</label>
+      <label type="text"> Path to your Root CA key file (PKCS#8):</label>
       <input type="text" required v-model="rootKeyPath" id="rootKey"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
@@ -70,7 +70,7 @@
     <form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Organization name:</label>
       <input type="text" required v-model="orgName" id="orgName"/>
-      <label type="text"> PKI name:</label>
+      <label type="text"> IKPQPKI name:</label>
       <input type="text" required v-model="orgUnit" id="orgUnit"/>
       <label type="text"> Country (first two letters):</label>
       <input type="text" required v-model="country" id="country"/>
@@ -92,10 +92,10 @@
           <i class="bi bi-check-square"> Ok</i>
         </button>
         <div v-if="waiting">
-          Wait while creating PKI... <span class="spinner-border text-info"></span>
+          Wait while creating IKPQPKI... <span class="spinner-border text-info"></span>
         </div>
         <br>
-        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">PKI successfully created !</h3>
+        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">IKPQPKI successfully created !</h3>
       </div>
     </form>
   </div>

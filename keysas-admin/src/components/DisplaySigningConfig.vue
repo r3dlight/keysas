@@ -1,23 +1,25 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
+    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
-    <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, click on <b>Create a new PKI</b>.</span>
-    <span class="tip-text"> Then, provide all the requested information to allow us to create a new PKI for you.<br> 
-    When done, you will be able to start signing new outgoing USB devices.<br> 
+    <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
+      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture (IKPQPKI).
+      Click on <b>Create a new IKPQPKI</b>.</span>
+    <span class="tip-text"> Then, provide all the requested information to allow us to create a new IKPQPKI for you.<br> 
+    When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.<br> 
     </span>
-    <span class="tip-text">If you have already created a PKI and you want to restore it, choose <b>Load from local PKI</b></span>
+    <span class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></span>
 
   </div>
   <br>
   <div v-if="!hide" class="box-custom">
     <div class="text-center">
       <button class="send btn btn-light shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
-          PKI configuration</span></button>
+        IKPQPKI configuration</span></button>
       <br><br>
       <div class="List">
         <ul class="list-group-item">
-          <li class="list-group-item list-group-item-light">PKI directory: <span class="text-secondary">{{
+          <li class="list-group-item list-group-item-light">IKPQPKI directory: <span class="text-secondary">{{
             pkiPath
           }}</span></li>
           <li class="list-group-item list-group-item-light">Country: <span class="text-secondary">{{
