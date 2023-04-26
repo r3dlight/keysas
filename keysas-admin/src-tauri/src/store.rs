@@ -22,7 +22,7 @@ static STORE_HANDLE: Mutex<Option<Connection>> = Mutex::new(None);
 const CREATE_QUERY: &str = "
     CREATE TABLE IF NOT EXISTS ssh_table (name TEXT PRIMARY KEY, path TEXT);
     CREATE TABLE IF NOT EXISTS station_table (name TEXT PRIMARY KEY, ip TEXT);
-    CREATE TABLE IF NOT EXISTS ca_table (param TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);
 ";
 
 const GET_PUBLIC_QUERY: &str = "SELECT * FROM ssh_table WHERE name='public';";
@@ -248,10 +248,9 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = format!(
-                    "REPLACE INTO ca_table (param, value) \
-                                        VALUES ('directory', '{}'), ('org_name', '{}'), \
-                                        ('org_unit', '{}'), ('country', '{}'), \
-                                        ('validity', '{}');",
+                    "REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
+                                        VALUES ('{}','{}', '{}','{}','{}','{}');",
+                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),             
                     pki_dir,
                     infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
                     infos.org_unit.as_ref().unwrap_or(&String::from("")),
@@ -272,12 +271,12 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = "SELECT * FROM ca_table WHERE param = 'directory';".to_string();
+                let query = "SELECT * FROM ca_table;".to_string();
                 let mut result = String::new();
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
                         println!("{:?}:{:?}", key, value);
-                        if key == "value" {
+                        if key == "directory" {
                             if let Some(dir) = value {
                                 result.push_str(dir)
                             }
@@ -299,6 +298,7 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "SELECT * FROM ca_table;".to_string();
+                log::debug!("Query is: {query}");
                 let mut result = CertificateFields {
                     org_name: None,
                     org_unit: None,
@@ -307,33 +307,21 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                     validity: None,
                 };
                 connection.iterate(query, |pairs| {
-                    for &(key, value) in pairs.iter() {
-                        match key {
-                            "org_name" => {
-                                if let Some(val) = value {
-                                    result.org_name = Some(val.to_string())
-                                }
-                            }
-                            "org_unit" => {
-                                if let Some(val) = value {
-                                    result.org_unit = Some(val.to_string())
-                                }
-                            }
-                            "country" => {
-                                if let Some(val) = value {
-                                    result.country = Some(val.to_string())
-                                }
-                            }
+                    for &(param, value) in pairs.iter() {
+                        //println!("param/value: {param}::::{value:?}");
+                        //println!("pair: {:?}", pairs);
+                        match param {
+                            "org_name" => result.org_name = Some(value.unwrap().to_string()),
+                            "org_unit" => result.org_unit = Some(value.unwrap().to_string()),
+                            "country" => result.country = Some(value.unwrap().to_string()),
                             "validity" => {
-                                if let Some(val) = value {
-                                    let num = match val.parse::<u32>() {
-                                        Ok(n) => n,
-                                        Err(_) => {
-                                            return true;
-                                        }
-                                    };
-                                    result.validity = Some(num);
-                                }
+                                let num = match value.unwrap().parse::<u32>() {
+                                    Ok(n) => n,
+                                    Err(_) => {
+                                        return true;
+                                    }
+                                };
+                                result.validity = Some(num);
                             }
                             _ => (),
                         }

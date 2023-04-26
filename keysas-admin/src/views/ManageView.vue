@@ -267,7 +267,7 @@ export default {
         await this.displayKeysasList();
       }
     },
-    getKeysasIP(keysas) {
+    async getKeysasIP(keysas) {
       invoke('get_station_ip', {name: keysas})
         .then((ip) => this.current_ip = ip)
         .catch((error) => console.error(error));
@@ -335,8 +335,7 @@ export default {
       var password = prompt("Enter PKI password");
       if (this.confirmed == true) {
         //TODO 
-        this.update_status = await init(this.current_ip, this.current_keysas,
-                                          password);
+        this.update_status = await init(this.current_ip, this.current_keysas,password);
         this.confirmed = false;
         this.ShowGenKeypair = true;
       } else {
