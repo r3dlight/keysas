@@ -33,6 +33,7 @@ use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
+use serde::Serialize;
 use std::time::Duration;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
@@ -47,7 +48,7 @@ use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 
 /// Structure containing informations to build the certificate
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CertificateFields {
     pub org_name: Option<String>,
     pub org_unit: Option<String>,

@@ -10,27 +10,40 @@
 
   </div>
   <br>
-  <div v-if="!hide" class="custom-li tip">
+  <div v-if="!hide" class="box-custom">
     <div class="text-center">
-      <button class="send btn btn-light shadow" @click="hide = true; getRootKey()"><span class="bi bi-caret-up-fill"> Hide
-          registred Root CA key</span></button>
+      <button class="send btn btn-light shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
+          PKI configuration</span></button>
       <br><br>
       <div class="List">
         <ul class="list-group-item">
-          <li class="list-group-item list-group-item-light">Registred Root CA key:<br><span class="text-secondary">{{
-            pubKey
+          <li class="list-group-item list-group-item-light">PKI directory: <span class="text-secondary">{{
+            pkiPath
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Country: <span class="text-secondary">{{
+            pkiConfig.country
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Organization name: <span class="text-secondary">{{
+            pkiConfig.org_name
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Organization unit: <span class="text-secondary">{{
+            pkiConfig.org_unit
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Validity: <span class="text-secondary">{{
+            pkiConfig.validity
           }}</span></li>
         </ul>
       </div>
     </div>
   </div>
   <div v-else>
-    <button class="send btn btn-light shadow" @click="hide = false; getRootKey()"><span class="bi bi-caret-down-fill">
-        Show registred Root CA key</span></button>
+    <button class="send btn btn-light shadow" @click="hide = false; getPKIConfig()"><span class="bi bi-caret-down-fill">
+        Show current PKI configuration</span></button>
   </div>
 </template>
 
 <script>
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'DisplaySigningConfig',
@@ -40,6 +53,8 @@ export default {
     return {
       rootKey: '',
       hide: true,
+      pkiConfig: '',
+      pkiPath: '',
     }
   },
   mounted() {
@@ -47,11 +62,21 @@ export default {
   },
 
   methods: {
-    getRootKey() {
-      let paths = localStorage.getItem('rootCA');
+    async getPKIConfig() {
+      //let paths = localStorage.getItem('rootCA');
       //console.log("Path: "+ paths);
-      this.rootKey = JSON.parse(paths).pub;
-      console.log("Path: " + this.rootKey);
+      invoke('get_pki_config')
+      .then((config) => {
+        console.log(config);
+        this.pkiConfig = config;
+      })
+      .catch((error) => console.error(error));
+      invoke('get_pki_path')
+      .then((dir) => {
+        console.log(dir);
+        this.pkiPath = dir;
+      })
+      .catch((error) => console.error(error));      
     }
   }
 }
@@ -65,6 +90,18 @@ label {
   margin: 25px 0 15px;
   font-size: 1.1em;
   text-transform: uppercase;
+  font-weight: bold;
+}
+
+.box-custom {
+  max-width: 1000px;
+  margin: 10px auto;
+  background: white;
+  color: white;
+  text-align: left;
+  padding: 10px;
+  border-radius: 15px;
+  font-size: 1.1em;
   font-weight: bold;
 }
 

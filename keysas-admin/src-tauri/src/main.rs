@@ -35,10 +35,7 @@ use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::pki::generate_cert_from_csr;
 use nom::bytes::complete::take_until;
 use nom::IResult;
-use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::BufReader;
-use std::io::Read;
 use std::path::Path;
 use tauri::command;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
@@ -109,25 +106,6 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Creates a sha256 hash from a file
-fn sha256_digest(password: &str) -> Result<String, anyhow::Error> {
-    let mut reader = BufReader::new(password.as_bytes());
-
-    let digest = {
-        let mut hasher = Sha256::new();
-        let mut buffer = [0; 1024];
-        loop {
-            let count = reader.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            hasher.update(&buffer[..count]);
-        }
-        hasher.finalize()
-    };
-    Ok(format!("{:x}", digest))
-}
-
 static STORE_PATH: &str = ".keysas.dat";
 
 async fn init_tauri() -> Result<(), anyhow::Error> {
@@ -169,6 +147,8 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             get_station_ip,
             list_stations,
             remove_station,
+            get_pki_config,
+            get_pki_path,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -218,7 +198,7 @@ async fn save_station(name: String, ip: String) -> bool {
     }
 }
 
-/// This function delete a Keysas station fromthe database.
+/// This function delete a Keysas station from the database.
 #[command]
 async fn remove_station(name: String) -> bool {
     match delete_station(&name) {
@@ -419,6 +399,7 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
     Ok(String::from("OK"))
 }
 
+/// This function update a Keysas station using apt
 #[command]
 async fn update(ip: String) -> bool {
     let private_key = match get_ssh() {
@@ -454,6 +435,7 @@ async fn update(ip: String) -> bool {
     true
 }
 
+/// This function reboot a Keysas station using systemctl
 #[command]
 async fn reboot(ip: String) -> bool {
     let private_key = match get_ssh() {
@@ -487,6 +469,7 @@ async fn reboot(ip: String) -> bool {
     true
 }
 
+/// This function shutdown a Keysas station using systemctl
 #[command]
 async fn shutdown(ip: String) -> bool {
     let private_key = match get_ssh() {
@@ -519,6 +502,8 @@ async fn shutdown(ip: String) -> bool {
     true
 }
 
+/// This function export the SSH pubkey to a Keysas station
+/// Monitoring a Keysas station won't work until this has been done.
 #[command]
 async fn export_sshpubkey(ip: String) -> bool {
     let public_key = match get_ssh() {
@@ -616,7 +601,7 @@ fn is_alive(name: String) -> Result<bool, String> {
     Ok(true)
 }
 
-// TODO: to be modified to work locally
+// This function sign a USB device using firmware information
 #[command]
 async fn sign_key(password: String) -> bool {
     let (device, vendor, model, revision, serial) = match watch_new_usb() {
@@ -626,7 +611,7 @@ async fn sign_key(password: String) -> bool {
             return false;
         }
     };
-    let result = match sign_usb(
+    let _result = match sign_usb(
         &device, &vendor, &model, &revision, &serial, "out", &password,
     ) {
         Ok(o) => o,
@@ -856,4 +841,30 @@ async fn generate_pki_in_dir(
     }
 
     Ok(String::from("PKI created"))
+}
+
+/// Get the PKI configuration from database.
+#[command]
+async fn get_pki_config() -> Result<CertificateFields, String> {
+    let cert_fields = match get_pki_info() {
+        Ok(list) => list,
+        Err(e) => {
+            log::error!("Cannot get PKI configuration in database: {e}.");
+            return Err(String::from("Cannot get PKI configuration in database"));
+        }
+    };
+    Ok(cert_fields)
+}
+
+/// Get the PKI path from database.
+#[command]
+async fn get_pki_path() -> Result<String, String> {
+    let dir = match get_pki_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("Cannot get PKI directory in database: {e}.");
+            return Err(String::from("Cannot get PKI directory in database"));
+        }
+    };
+    Ok(dir)
 }

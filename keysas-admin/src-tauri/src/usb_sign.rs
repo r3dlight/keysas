@@ -261,9 +261,9 @@ pub fn sign_usb(
             return Err(anyhow!("Invalid PKI configuration"));
         }
     };
-    let binding_cl = (pki_dir.clone() + USB_CA_SUB_DIR + "/usb-cl.p8");
+    let binding_cl = pki_dir.clone() + USB_CA_SUB_DIR + "/usb-cl.p8";
     let path_cl = Path::new(&binding_cl);
-    let binding_pq = (pki_dir.clone() + USB_CA_SUB_DIR + "/usb-pq.p8");
+    let binding_pq = pki_dir.clone() + USB_CA_SUB_DIR + "/usb-pq.p8";
     let path_pq = Path::new(&binding_pq);
 
     let attrs = sign_device(
@@ -278,7 +278,7 @@ pub fn sign_usb(
 }
 
 fn revoke_device(device: &str) -> Result<()> {
-    log::debug!("Let's revoke the device.");
+    log::debug!("Revoking the device.");
     let mut f = File::options()
         .write(true)
         .read(true)
@@ -287,11 +287,11 @@ fn revoke_device(device: &str) -> Result<()> {
 
     //Let's write behind the magic number now
     let offset = 512;
-    let blank: String = String::from("0000000");
+    let blank: String = String::from("00000000");
     let size_u32 = blank.len() as u32;
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
     f.write_all(blank.as_bytes())?;
-    log::info!("USB device is now signed successfully.");
+    log::info!("USB device is now revoked successfully.");
     Ok(())
 }
