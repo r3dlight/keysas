@@ -149,6 +149,7 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             remove_station,
             get_pki_config,
             get_pki_path,
+            revoke_usb,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -867,4 +868,24 @@ async fn get_pki_path() -> Result<String, String> {
         }
     };
     Ok(dir)
+}
+
+/// Revoke a signed USB device.
+#[command]
+async fn revoke_usb() -> bool {
+    let (device, _vendor, _model, _revision, _serial) = match watch_new_usb() {
+        Ok(dev) => dev,
+        Err(e) => {
+            log::error!("Error while looking for new USB device: {e}");
+            return false;
+        }
+    };
+    let _result = match revoke_device(&device) {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("Cannot revoke device: {e}.");
+            return false;
+        }
+    };
+    true
 }
