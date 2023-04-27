@@ -353,6 +353,7 @@ Return Value:
 	BOOLEAN contextCreated = FALSE;
 	KEYSAS_FILTER_OPERATION operation = SCAN_FILE;
 	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
+	POBJECT_NAME_INFORMATION msFileName = NULL;
 
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
@@ -400,8 +401,9 @@ Return Value:
 	// If the authorization state is unknown then try to acquire the lock in write mode to scan the file
 	if (!AcquireResourceRead(fileContext->Resource)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in read mode\n"));
+		status = FLT_POSTOP_FINISHED_PROCESSING;
+		goto cleanup;
 	}
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in read mode\n"));
 
 	if (AUTH_UNKNOWN == fileContext->Authorization) {
 		// The authorization status is not known for this file
@@ -409,8 +411,9 @@ Return Value:
 		ReleaseResource(fileContext->Resource);
 		if (!AcquireResourceWrite(fileContext->Resource)) {
 			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in write mode\n"));
+			status = FLT_POSTOP_FINISHED_PROCESSING;
+			goto cleanup;
 		}
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Acquired ressource in write mode\n"));
 		// Test the authorization again as it can have been preempted
 		if (AUTH_UNKNOWN == fileContext->Authorization) {
 			fileContext->Authorization = AUTH_PENDING;
@@ -450,8 +453,9 @@ Return Value:
 				ReleaseResource(instanceContext->Resource);
 				// Send the file to further analysis in user space
 				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Send request to userspace\n"));
+				IoQueryFileDosDeviceName(FltObjects->FileObject, &msFileName);
 				(VOID)KeysasScanFileInUserMode(
-					&nameInfo->Name,
+					&msFileName->Name,
 					operation,
 					&safeToOpen
 				);
@@ -539,8 +543,7 @@ Routine Description:
 Arguments:
 	FileName - Name of the file. It should be NORMALIZED thus the complete path is given
 	Operation - Operation code for the user app
-	SafeToOpen - Set to FALSE if the file is scanned successfully and it contains
-				 foul language.
+	SafeToOpen - Set to TRUE if the file is valid
 Return Value:
 	The status of the operation, hopefully STATUS_SUCCESS.  The common failure
 	status will probably be STATUS_INSUFFICIENT_RESOURCES.
@@ -592,7 +595,7 @@ Return Value:
 		KeysasData.Filter,
 		&KeysasData.ClientPort,
 		request,
-		sizeof(request->Content),
+		FileName->Length+sizeof(KEYSAS_FILTER_OPERATION),
 		request,
 		&replyLength,
 		NULL

@@ -34,6 +34,7 @@ Environment:
 #pragma alloc_text(PAGE, KfInstanceTeardownComplete)
 #pragma alloc_text(PAGE, KfInstanceTeardownStart)
 #pragma alloc_text(PAGE, FindInstanceContext)
+#pragma alloc_text(PAGE, KeysasScanInstanceInUserMode)
 #endif
 
 NTSTATUS
@@ -154,6 +155,93 @@ Return Value:
 }
 
 NTSTATUS
+KeysasScanInstanceInUserMode(
+	_In_ PUNICODE_STRING InstanceName,
+	_In_ KEYSAS_FILTER_OPERATION Operation,
+	_Out_ PBOOLEAN SafeToOpen
+)
+/*++
+Routine Description:
+	This routine is called to send a request up to user mode to scan a given
+	instance and tell our caller whether it's safe to open it.
+Arguments:
+	FileName - Name of the file. It should be NORMALIZED thus the complete path is given
+	Operation - Operation code for the user app
+	SafeToOpen - Set to TRUE if the instance is valid
+Return Value:
+	The status of the operation, hopefully STATUS_SUCCESS.  The common failure
+	status will probably be STATUS_INSUFFICIENT_RESOURCES.
+--*/
+
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PKEYSAS_DRIVER_REQUEST request = NULL;
+	ULONG replyLength = 0;
+
+	// Set default authorization to true
+	*SafeToOpen = TRUE;
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Entered\n"));
+
+	if (NULL == KeysasData.ClientPort) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Invalid client port\n"));
+		return status;
+	}
+
+	if (InstanceName->Length > (KEYSAS_REQUEST_BUFFER_SIZE - 1)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: File name too long\n"));
+	}
+
+	// Allocate request buffer
+	request = ExAllocatePoolZero(
+		NonPagedPool,
+		sizeof(KEYSAS_DRIVER_REQUEST),
+		KEYSAS_MEMORY_TAG
+	);
+
+	if (NULL == request) {
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto end;
+	}
+
+	// Copy the name of the file in the request
+	status = RtlStringCbCopyUnicodeString(request->Content, KEYSAS_REQUEST_BUFFER_SIZE * sizeof(WCHAR), InstanceName);
+	if (STATUS_SUCCESS != status) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Failed to convert UNICODE_STRING\n"));
+		goto end;
+	}
+	request->Operation = Operation;
+
+	replyLength = sizeof(request);
+
+	// Send request to userspace
+	status = FltSendMessage(
+		KeysasData.Filter,
+		&KeysasData.ClientPort,
+		request,
+		sizeof(request->Content),
+		request,
+		&replyLength,
+		NULL
+	);
+
+	if (STATUS_SUCCESS == status) {
+		*SafeToOpen = ((PKEYSAS_REPLY)request)->Result;
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Received result\n"));
+	}
+	else {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Failed to send request to userspace\n"));
+	}
+
+end:
+	if (NULL != request) {
+		ExFreePoolWithTag(request, KEYSAS_MEMORY_TAG);
+	}
+
+	return status;
+}
+
+NTSTATUS
 KfInstanceSetup(
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	_In_ FLT_INSTANCE_SETUP_FLAGS Flags,
@@ -202,6 +290,9 @@ Return Value:
 	ULONG						SizeNeeded, RetLength, OutputLength, SizeRequired;
 	PKEYSAS_INSTANCE_CTX		instanceContext = NULL;
 	BOOLEAN						instanceCreated = FALSE;
+	wchar_t						nameBuffer[512] = { 0 };
+	UNICODE_STRING				volumeName = { 0, sizeof(nameBuffer)-sizeof(wchar_t), nameBuffer};
+	BOOLEAN						instanceValid = TRUE;
 
 	// Print debug info on the call context
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Entered\n"));
@@ -273,6 +364,8 @@ Return Value:
 		goto end;
 	}
 
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Storage property size = %lu\n", RetLength));
+
 	pStorageDesciptor = (PSTORAGE_ADAPTER_DESCRIPTOR)buffer;
 	if (pStorageDesciptor->BusType == BusTypeUsb) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: USB descriptor found attach\n"));
@@ -288,11 +381,33 @@ Return Value:
 			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FindInstanceContext failed with status = %0x8x\n", status));
 			status = STATUS_FLT_DO_NOT_ATTACH;
 			goto end;
-
 		}
 
 		// TODO: default set instance to ALLOW
 		AcquireResourceWrite(instanceContext->Resource);
+
+		status = FltGetVolumeName(FltObjects->Volume, &volumeName, NULL);
+
+		if (!NT_SUCCESS(status)) {
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: FltGetVolumeName failed with status = %0x8x\n", status));
+			status = STATUS_FLT_DO_NOT_ATTACH;
+			goto end;
+		}
+
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Volume name = %wZ\n", volumeName));
+
+		status = KeysasScanInstanceInUserMode(
+			&volumeName,
+			SCAN_USB,
+			&instanceValid
+		);
+
+		if (!NT_SUCCESS(status)) {
+			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: KeysasScanInstanceInUserMode failed with status = %0x8x\n", status));
+			status = STATUS_FLT_DO_NOT_ATTACH;
+			goto end;
+		}
+
 		instanceContext->Authorization = AUTH_ALLOW_WARNING;
 		ReleaseResource(instanceContext->Resource);
 
@@ -324,6 +439,9 @@ end:
 	}
 
 	if (instanceContext != NULL) {
+		if (NULL != instanceContext->Resource) {
+			ReleaseResource(instanceContext->Resource);
+		}
 		FltReleaseContext(instanceContext);
 		instanceContext = NULL;
 	}

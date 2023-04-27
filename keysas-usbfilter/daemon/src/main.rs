@@ -24,8 +24,9 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
-
 #![feature(vec_into_raw_parts)]
+#![feature(is_some_and)]
+#![feature(str_split_remainder)]
 
 pub mod driver_interface;
 pub mod windows_driver_interface;
@@ -33,6 +34,9 @@ pub mod windows_driver_interface;
 use crate::driver_interface::init_driver_com;
 
 use anyhow::anyhow;
+
+#[macro_use]
+extern crate serde_derive;
 
 fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger

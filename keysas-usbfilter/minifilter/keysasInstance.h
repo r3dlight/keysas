@@ -22,6 +22,7 @@ Environment:
 #define _H_KEYSAS_INSTANCE_
 
 #include "keysasDriver.h"
+#include "keysasCommunication.h"
 
 // Instance context data structure
 typedef struct _KEYSAS_INSTANCE_CTX {
@@ -71,6 +72,13 @@ FindInstanceContext(
 	_In_ PFLT_INSTANCE Instance,
 	_Outptr_ PKEYSAS_INSTANCE_CTX* InstanceContext,
 	_Out_opt_ PBOOLEAN ContextCreated
+);
+
+NTSTATUS
+KeysasScanInstanceInUserMode(
+	_In_ PUNICODE_STRING FileName,
+	_In_ KEYSAS_FILTER_OPERATION Operation,
+	_Out_ PBOOLEAN SafeToOpen
 );
 
 #endif _H_KEYSAS_INSTANCE_

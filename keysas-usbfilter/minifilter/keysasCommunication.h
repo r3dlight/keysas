@@ -32,6 +32,7 @@ Environment:
 typedef enum _KEYSAS_FILTER_OPERATION {
 	SCAN_FILE = 0,				// Validate the signature of the file and the report
 	USER_ALLOW_FILE,			// Ask user to allow the file
+	SCAN_USB,					// Ask to validate the USB drive signature
 	USER_ALLOW_USB_ALL,			// Ask user to allow complete access the USB drive
 	USER_ALLOW_USB_WITH_WARNING // Ask user to allow access to USB drive with warning on file opening
 } KEYSAS_FILTER_OPERATION;
