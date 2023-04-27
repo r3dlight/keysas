@@ -23,7 +23,7 @@ export default {
 
 <template>
   <NavBar />
-  <h2>Version 0.2.0</h2>
+  <h2>Version 2.0.0</h2>
   <h3>Copyright Keysas 2022-2023.</h3>
 </template>
 

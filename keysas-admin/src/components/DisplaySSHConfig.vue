@@ -123,7 +123,7 @@ button {
 .tip {
   max-width: 1000px;
   text-align: left;
-  margin: 30px auto;
+  margin: 40px auto;
   background: white;
   padding: 40px;
   border-radius: 10px;
