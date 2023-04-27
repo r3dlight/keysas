@@ -4,7 +4,7 @@
     <p>Welcome to Keysas-admin ! <br> This application allows you to manage your Keysas stations.<br>
       You can register news Keysas stations, update them, sign USB devices and much more.
     </p><br /><br />
-    <span class="text-info fw-bold bi bi-magic"> QUICK START</span>
+    <h1 class="text-info fw-bold bi bi-magic"> QUICK START</h1>
     <br />
     <ul class="doc">
       <li><b>SSH configuration</b></li>
