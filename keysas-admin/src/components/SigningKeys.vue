@@ -74,6 +74,7 @@
       <input type="text" required v-model="orgUnit" id="orgUnit"/>
       <label type="text"> Country (first two letters):</label>
       <input type="text" required v-model="country" id="country"/>
+      <div v-if="countryError" class="error"> {{ countryError }}</div>
       <label type="text"> Validity (days):</label>
       <input type="text" required v-model="validity" id="validity"/>
       <label type="text"> Select directory:</label>
@@ -131,6 +132,7 @@ export default {
       showRootKeyForm: false,
       showPkiDirForm: false,
       passwordError: '',
+      countryError: '',
     }
   },
 
@@ -160,7 +162,9 @@ export default {
       console.log('PKI Dir form submission');
       this.passwordError = this.adminPwd.length > 7 ?
         '' : "Password should have been created with at least 8 chars";
-      if (!this.passwordError) {
+        this.countryError = this.country.length < 3 ?
+        '' : "Country must be 2 chars long";
+      if (!this.passwordError && !this.countryError) {
         this.waiting = true;
         await invoke('generate_pki_in_dir', {
              orgName: this.orgName,
