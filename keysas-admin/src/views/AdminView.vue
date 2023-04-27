@@ -22,7 +22,7 @@
     <div class="row" v-if="ShowSign">
       <h3>USB device signing</h3>
       <div class="col-sm">
-        <SignKey />
+        <SignDevice />
       </div>
     </div>
     <div class="row" v-if="ShowRevoke">
@@ -58,14 +58,14 @@ import SSHKeys from '../components/SSHKeys.vue'
 import DisplaySSHConfig from '../components/DisplaySSHConfig.vue'
 import SigningKeys from '../components/SigningKeys.vue'
 import DisplaySigningConfig from '../components/DisplaySigningConfig.vue'
-import SignKey from '../components/SignKey.vue'
+import SignDevice from '../components/SignDevice.vue'
 import RevokeDevice from '../components/RevokeDevice.vue'
 
 export default {
-  name: 'AddView',
+  name: 'AdminView',
   components: {
     NavBar,
-    SignKey,
+    SignDevice,
     SSHKeys,
     DisplaySSHConfig,
     SigningKeys,
