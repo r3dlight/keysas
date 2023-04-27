@@ -83,7 +83,7 @@
       </div>
       <label type="text"> Password:</label>
       <input type="password" required v-model="adminPwd" id="adminPwd"/>
-      <div v-if="keysError" class="error"> {{ keysError }}
+      <div v-if="passwordError" class="error"> {{ passwordError }}
       </div>
       <br><br>
       <div class="submit">
@@ -129,7 +129,8 @@ export default {
       waiting: false,
       showLoadPKIForm: false,
       showRootKeyForm: false,
-      showPkiDirForm: false
+      showPkiDirForm: false,
+      passwordError: '',
     }
   },
 
@@ -153,22 +154,25 @@ export default {
       console.log('Root CA form submission');
     },
     async submit() {
-      this.waiting = true;
       await this.submitPKIDirForm();
     },
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
-      await invoke('generate_pki_in_dir', {
-            orgName: this.orgName,
-            orgUnit: this.orgUnit,
-            country: this.country,
-            validity: this.validity,
-            adminPwd: this.adminPwd,
-            pkiDir: this.pkiDir
-
-        })
+      this.passwordError = this.adminPwd.length > 7 ?
+        '' : "Password should have been created with at least 8 chars";
+      if (!this.passwordError) {
+        this.waiting = true;
+        await invoke('generate_pki_in_dir', {
+             orgName: this.orgName,
+             orgUnit: this.orgUnit,
+             country: this.country,
+             validity: this.validity,
+             adminPwd: this.adminPwd,
+             pkiDir: this.pkiDir
+         })
         .then((res) => this.pkiGenerated())
         .catch((error) => console.error(error));
+      } else {console.log("Password incorrect lengh !")}
     },
     async pkiGenerated(){
       this.waiting = false;
