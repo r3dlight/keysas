@@ -50,7 +50,7 @@ import { invoke } from "@tauri-apps/api";
 import 'animate.css';
 
 export default {
-  name: 'SignKey',
+  name: 'SignDevice',
   props: {
     signUsbStatus: Boolean,
   },
