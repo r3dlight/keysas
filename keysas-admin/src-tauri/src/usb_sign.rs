@@ -277,7 +277,7 @@ pub fn sign_usb(
     Ok(())
 }
 
-fn revoke_device(device: &str) -> Result<()> {
+pub fn revoke_device(device: &str) -> Result<()> {
     log::debug!("Revoking the device.");
     let mut f = File::options()
         .write(true)
@@ -287,7 +287,7 @@ fn revoke_device(device: &str) -> Result<()> {
 
     //Let's write behind the magic number now
     let offset = 512;
-    let blank: String = String::from("00000000");
+    let blank: String = String::from("000000000000000000");
     let size_u32 = blank.len() as u32;
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;

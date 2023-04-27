@@ -18,12 +18,12 @@
         </div>
       </div>
     </div>
-    <div class="term">
-      Revoking the output key:<br>
-      <span v-if="revokeUsbStatus" class="animate__animated animate__flash textterm text-success">Success</span>
+    <div v-if="revokeUsbStatus" class="term">
+      Revoking the USB device:<br>
+      <span v-if="revokeUsbStatus === true" class="animate__animated animate__flash textterm text-success">Success</span>
       <span v-else-if="revokeUsbStatus === false" class="animate__animated animate__flash textterm text-danger">Error:
-        can't connect to the Keysas station !</span>
-      <span v-else class="textterm spinner-border text-info"></span>
+        can't revoke the device !</span>
+      <span v-else-if="revokeUsbStatus == 'waiting'" class="textterm spinner-border text-info"></span>
     </div>
   </div>
 
@@ -33,6 +33,7 @@
 "use strict";
 
 import 'animate.css';
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'RevokeDevice',
@@ -40,29 +41,28 @@ export default {
     revokeUsbStatus: Boolean,
   },
   computed: {
-
   },
   data() {
     return {
       keys: '',
       hide: false,
+      revokeUsbStatus: undefined
     }
   },
   async mounted() {
-    this.keys = await getKeys();
-
   },
 
   methods: {
-    async displayKeysasList() {
-      loadStore();
-      this.keys = await getKeys();
-    }
-  }
+    async onSubmitRevoke() {
+      this.revokeUsbStatus = "waiting";
+      await invoke('revoke_usb')
+        .then((res) => this.revokeUsbStatus = res)
+        .catch((error) => console.error(error));
+    },
+  },
 }
 </script>
 
 
 <style lang="scss">
-
 </style>
