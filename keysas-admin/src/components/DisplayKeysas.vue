@@ -4,7 +4,7 @@
     <br>
     <span class="tip-text">Add here the Keysas stations you want to manage with this application.</span><br>
     <span class="tip-text">You can find the IP address in the Help menu of your Keysas station <i
-        class="bi bi-emoji-wink"></i></span>
+        class="bi bi-emoji-wink"></i><br>Do not not forget to enroll it when done !</span>
   </div>
   <br>
   <div v-if="!hide" class="custom-li tip">
