@@ -35,6 +35,7 @@ Environment:
 #pragma alloc_text(PAGE, FindFileContext)
 #pragma alloc_text(PAGE, KfPostCreateHandler)
 #pragma alloc_text(PAGE, KfPreCreateHandler)
+#pragma alloc_text(PAGE, KeysasScanFileInUserMode)
 #endif
 
 VOID
@@ -554,6 +555,8 @@ Return Value:
 	PKEYSAS_DRIVER_REQUEST request = NULL;
 	ULONG replyLength = 0;
 
+	PAGED_CODE();
+
 	// Set default authorization to true
 	*SafeToOpen = TRUE;
 
@@ -588,7 +591,7 @@ Return Value:
 	}
 	request->Operation = Operation;
 
-	replyLength = sizeof(request);
+	replyLength = sizeof(*request);
 
 	// Send request to userspace
 	status = FltSendMessage(

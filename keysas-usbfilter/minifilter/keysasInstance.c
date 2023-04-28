@@ -178,6 +178,8 @@ Return Value:
 	PKEYSAS_DRIVER_REQUEST request = NULL;
 	ULONG replyLength = 0;
 
+	PAGED_CODE();
+
 	// Set default authorization to true
 	*SafeToOpen = TRUE;
 
@@ -212,7 +214,7 @@ Return Value:
 	}
 	request->Operation = Operation;
 
-	replyLength = sizeof(request);
+	replyLength = sizeof(*request);
 
 	// Send request to userspace
 	status = FltSendMessage(
@@ -274,6 +276,7 @@ Return Value:
 {
 	UNREFERENCED_PARAMETER(Flags);
 	UNREFERENCED_PARAMETER(VolumeFilesystemType);
+	UNREFERENCED_PARAMETER(VolumeDeviceType);
 
 	PAGED_CODE();
 
@@ -312,7 +315,10 @@ Return Value:
 	// Create a query and get the storage descriptor header
 	SizeNeeded = max(sizeof(STORAGE_DESCRIPTOR_HEADER), sizeof(STORAGE_PROPERTY_QUERY));
 	OutputBuffer = (PSTORAGE_PROPERTY_QUERY)ExAllocatePool2(POOL_FLAG_NON_PAGED, SizeNeeded, KEYSAS_MEMORY_TAG);
-	ASSERT(OutputBuffer != NULL);
+	if (NULL == OutputBuffer) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: ExAllocatePool2 failed\n"));
+		goto end;
+	}
 
 	RtlZeroMemory(OutputBuffer, SizeNeeded);
 
@@ -337,11 +343,17 @@ Return Value:
 
 	// Get the header size and update the query with the correct size
 	OutputLength = HeaderDescriptor.Size;
-	ASSERT(OutputLength >= sizeof(STORAGE_DESCRIPTOR_HEADER));
+	if (OutputLength < sizeof(STORAGE_DESCRIPTOR_HEADER)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Invalid output length\n"));
+		goto end;
+	}
 
 	SizeRequired = max(OutputLength, sizeof(STORAGE_PROPERTY_QUERY));
 	buffer = (PSTORAGE_PROPERTY_QUERY)ExAllocatePool2(POOL_FLAG_NON_PAGED, SizeRequired, KEYSAS_MEMORY_TAG);
-	ASSERT(buffer != NULL);
+	if (NULL == buffer) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: ExAllocatePool2 failed\n"));
+		goto end;
+	}
 
 	RtlZeroMemory(buffer, SizeRequired);
 	pQuery = (PSTORAGE_PROPERTY_QUERY)buffer;

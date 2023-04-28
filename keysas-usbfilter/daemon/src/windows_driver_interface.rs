@@ -57,7 +57,7 @@ use base64::{engine::general_purpose, Engine as _};
 use x509_cert::Certificate;
 use ed25519_dalek::{self, Digest, Sha512};
 use pkcs8::der::{DecodePem, EncodePem};
-//use oqs::sig::{Algorithm, Sig};
+use oqs::sig::{Algorithm, Sig};
 
 // Operation code for the request to userland
 #[derive(Debug)]
@@ -468,7 +468,7 @@ fn parse_report(report_path: &Path) -> Result<Report, anyhow::Error> {
             .subject_public_key
             .raw_bytes(),
     )?;
-/*
+
     oqs::init();
     let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
     let pub_pq = pq_scheme
@@ -480,7 +480,7 @@ fn parse_report(report_path: &Path) -> Result<Report, anyhow::Error> {
                 .raw_bytes(),
         )
         .unwrap();
-*/
+
     // Verify the signature of the report
     let signature = general_purpose::STANDARD
         .decode(&report.binding.report_signature)?;

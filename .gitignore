@@ -19,6 +19,8 @@ keysas-admin/src-tauri/.keysas.dat
 .vs/
 x64/
 x86/
+sdv/
+minifilterx64/
 .vscode/c_cpp_properties.json
 # Logs
 logs
@@ -44,3 +46,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+keysas-usbfilter/minifilter/runsdvui.cmd
+keysas-usbfilter/minifilter/SDV-default.xml
+keysas-usbfilter/minifilter/sdv-user.sdv
+keysas-usbfilter/minifilter/smvstats.txt

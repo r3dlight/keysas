@@ -38,3 +38,8 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Storage_FileSystem"
 ]
+
+[dependencies.oqs]
+version = "0.7"
+default-features = false
+features = ["dilithium"]
