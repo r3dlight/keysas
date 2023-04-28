@@ -84,7 +84,7 @@
           <div class="btn-group" role="group" aria-label="Basic outlined example">
             <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
             ShowPasswordInit = !ShowPasswordInit">
-              <span class="bi bi-magic"> Initialize</span>
+              <span class="bi bi-magic"> Enroll</span>
             </button>
             <button class="send btn btn-lg btn-outline-primary shadow" @click="flush();
             ShowAddYubikey = !ShowAddYubikey">
@@ -109,25 +109,23 @@
         <div class="row">
           <div class="col-sm">
             <div class="tip">
-              <span class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></span>
+              <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
               <br>
-              <span class="tip-text">We need to create a dedicated keypair on this Keysas station to be able to sign
-                output files.
-                No need to create a password to protect this key pair but need for the PKI password
+              <span class="tip-text">Type your <b>IKPQPKI</b> password to enroll this <b>Keysas</b> station.
               </span>
               <br><br>
               <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
-              <span class="tip-text">This will create a new signing keypair and remove any previously created one.
-                Therefore, any previously signed output keys on this Keysas station will be revoked.</span>
+              <span class="tip-text">This action will sign the CSRs automatically generated at first boot
+                on this Keysas station.</span>
             </div>
           </div>
           <div class="col-sm">
             <form class="add-form password" @submit.prevent="onSubmitInit">
-              <label type="text">TODO remove:</label>
+              <label type="text">IKPQPKI password:</label>
               <input type="password" required v-model="password" placeholder="8 characters minimum" id="password" />
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
-                <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Do it !</i></button>
+                <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Enroll it</i></button>
                 <br><br>
                 <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
               </div>
@@ -355,7 +353,7 @@ export default {
         console.log("sign_usb_status: " + this.sign_usb_status);
       }
       else {
-        console.log('CreateKeypair not called!')
+        console.log('SignUSB not called!')
       }
     },
     isalive() {
