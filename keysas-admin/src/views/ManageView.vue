@@ -134,7 +134,6 @@
         </div>
       </div>
     </div>
-    <GenKeypair v-if="ShowGenKeypair" :CreateKeypairStatus="create_keypair_status"></GenKeypair>
     <AddYubikey v-if="ShowAddYubikey"></AddYubikey>
     <RevokeYubikey v-if="ShowRevYubikey"></RevokeYubikey>
     <UpdateKeysas v-if="ShowUpdateKeysas" :updateStatus="update_status"></UpdateKeysas>
@@ -152,9 +151,7 @@
 <script>
 "use strict";
 
-//import '@coreui/coreui/dist/css/coreui.min.css'
 import NavBar from '../components/NavBar.vue'
-import GenKeypair from '../components/GenKeypair.vue'
 import AddYubikey from '../components/AddYubikey.vue'
 import RevokeYubikey from '../components/RevokeYubikey.vue'
 import UpdateKeysas from '../components/UpdateKeysas.vue'
@@ -170,7 +167,6 @@ export default {
   name: 'ManageView',
   components: {
     NavBar,
-    GenKeypair,
     AddYubikey,
     RevokeYubikey,
     UpdateKeysas,
@@ -188,7 +184,6 @@ export default {
       hide: true,
       current_keysas: '',
       current_ip: '',
-      ShowGenKeypair: false,
       ShowRevDeviceValidate: false,
       ShowAddYubikey: false,
       ShowRevYubikey: false,
@@ -231,7 +226,6 @@ export default {
   },
   methods: {
     flush() {
-      this.ShowGenKeypair = false;
       this.ShowRevKeypair = false;
       this.ShowAddYubikey = false;
       this.ShowRevYubikey = false;
@@ -335,7 +329,6 @@ export default {
         //TODO 
         this.update_status = await init(this.current_ip, this.current_keysas,password);
         this.confirmed = false;
-        this.ShowGenKeypair = true;
       } else {
         this.ShowUpdateKeysas = false;
       }
@@ -356,13 +349,13 @@ export default {
         console.log('SignUSB not called!')
       }
     },
-    isalive() {
+    async isalive() {
       this.polling = setInterval(() => {
         this.statusButton(this.current_keysas);
       }, 20000);
     },
-    statusButton(device) {
-      invoke('is_alive', {name: device})
+    async statusButton(device) {
+      await invoke('is_alive', {name: device})
         .then((status) => this.KeysasAlive = status)
         .catch((error) => {
           console.error(error);
