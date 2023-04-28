@@ -10,14 +10,14 @@
       <li><b>SSH configuration</b></li>
       <ul>
         <li>First, start by <b>creating</b> a ED25519 <b>private key</b> and the associated <b>public key</b> on your
-          computer ;<br />
+          computer<br />
           This keypair should only be <b>dedicated</b> to the administration of your Keysas stations.
           To do so, open a <b>terminal</b> and use the following command:</li>
         <div class="terminal-left">
           <span class="textterminal">> ssh-keygen -m PEM -t ed25519 -f mykey</span>
         </div>
         <br>
-        <li class="doc">Then, <b>set the path</b> of both keys in the <b>"Admin configuration/SSH configuration"</b> menu ;</li>
+        <li class="doc">Then, <b>set the path</b> of both keys in the <b>"Admin configuration->SSH configuration"</b> menu</li>
       </ul>
       <br>
       <li><b>Generate a IKPQPKI</b></li>
