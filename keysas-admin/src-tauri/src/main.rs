@@ -558,7 +558,7 @@ async fn export_sshpubkey(ip: String) -> bool {
 /// This command test if a given station is connected or not
 /// The function returns a boolean indicating the station status or an error
 #[command]
-fn is_alive(name: String) -> Result<bool, String> {
+async fn is_alive(name: String) -> Result<bool, String> {
     if name.chars().count() == 0 {
         log::warn!(" is_alive: Name must not be empty");
         return Ok(false);
