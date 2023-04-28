@@ -23,7 +23,7 @@
 import { invoke } from "@tauri-apps/api";
 
 export default {
-  name: 'AddForm',
+  name: 'AddStation',
   props: {
     //message: String,
   },
