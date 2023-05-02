@@ -43,7 +43,7 @@ keysas_lib = { path = "../../keysas_lib" }
 [dependencies.oqs]
 version = "0.7"
 default-features = false
-features = ["dilithium"]
+features = ["std", "dilithium"]
 
 [features]
 # by default Tauri runs in production mode

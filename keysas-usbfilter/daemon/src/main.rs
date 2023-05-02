@@ -35,9 +35,6 @@ use crate::driver_interface::init_driver_com;
 
 use anyhow::anyhow;
 
-#[macro_use]
-extern crate serde_derive;
-
 fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger
     simple_logger::init()?;

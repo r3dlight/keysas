@@ -29,6 +29,8 @@ use der::asn1::SetOfVec;
 use der::oid::db::rfc4519;
 use der::Any;
 use der::Tag;
+use ed25519_dalek::Verifier;
+use oqs::sig::{Algorithm, Sig};
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::DecodePem;
@@ -47,6 +49,9 @@ use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 
+use crate::pki::DILITHIUM5_OID;
+use crate::pki::ED25519_OID;
+
 /// Structure containing informations to build the certificate
 #[derive(Debug, Clone, Serialize)]
 pub struct CertificateFields {
@@ -58,14 +63,82 @@ pub struct CertificateFields {
 }
 
 /// Validate a Certificate received in PEM format
-/// TODO: Check that the certificate is for signing and follows the allowed format
-pub fn validate_signing_certificate(pem: &str) -> Result<bool, anyhow::Error> {
-    Certificate::from_pem(pem)?;
+/// Check that
+///     - it can be parsed into a X509 certificate
+///     - it is used for signing
+///     - if there is a ca_cert supplied, it signed by the ca
+///
+/// # Arguments
+///
+/// * `pem` - Certificate in PEM format
+/// * `ca_cert` - CA certificate either ED25519 or Dilithium
+pub fn validate_signing_certificate(
+    pem: &str,
+    ca_cert: Option<&Certificate>,
+) -> Result<Certificate, anyhow::Error> {
+    // Parse the certificate
+    let cert = Certificate::from_pem(pem)?;
 
-    //TODO: Validate certificate signature
-    //TODO: Validate certificate policy
+    // If there is a CA, validate the certificate signature
+    if let Some(ca) = ca_cert {
+        match std::str::from_utf8(
+            ca.tbs_certificate
+                .subject_public_key_info
+                .algorithm
+                .oid
+                .as_bytes(),
+        )? {
+            ED25519_OID => {
+                // Extract the CA public key
+                let ca_key = ed25519_dalek::PublicKey::from_bytes(
+                    cert.tbs_certificate
+                        .subject_public_key_info
+                        .subject_public_key
+                        .raw_bytes(),
+                )?;
 
-    Ok(true)
+                // Verify the certificate signature
+                let sig = ed25519_dalek::Signature::from_bytes(
+                    cert.signature
+                        .as_bytes()
+                        .ok_or_else(|| anyhow!("Signature field is empty"))?,
+                )?;
+                ca_key.verify(&cert.tbs_certificate.to_der()?, &sig)?;
+                // If the signature is invalid an error is thrown
+            }
+            DILITHIUM5_OID => {
+                // Initialize liboqs
+                oqs::init();
+
+                // Extract the CA public key
+                let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+                let ca_key = pq_scheme
+                    .public_key_from_bytes(
+                        cert.tbs_certificate
+                            .subject_public_key_info
+                            .subject_public_key
+                            .raw_bytes(),
+                    )
+                    .ok_or_else(|| anyhow!("Invalid Dilithium key"))?;
+
+                // Verify the certificate signature
+                let sig = pq_scheme
+                    .signature_from_bytes(
+                        cert.signature
+                            .as_bytes()
+                            .ok_or_else(|| anyhow!("Signature field is empty"))?,
+                    )
+                    .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
+                pq_scheme.verify(&cert.tbs_certificate.to_der()?, sig, ca_key)?;
+                // If the signature is invalid an error is thrown
+            }
+            _ => {
+                return Err(anyhow!("Signature algorithm not supported"));
+            }
+        }
+    }
+
+    Ok(cert)
 }
 
 impl CertificateFields {

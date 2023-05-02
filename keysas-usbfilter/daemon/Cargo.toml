@@ -18,13 +18,7 @@ log = "0.4"
 wchar = "0.11"
 mbrman = "0.5"
 libc = "0.2"
-serde_derive = "1.0"
-serde = "1.0"
-serde_json = "1.0"
-x509-cert = "0.2"
-ed25519-dalek = "1.0"
-base64 = "0.21"
-pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
+keysas_lib = { path = "../../keysas_lib" }
 
 [dependencies.windows]
 version = "0.48.0"
@@ -38,8 +32,3 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Storage_FileSystem"
 ]
-
-[dependencies.oqs]
-version = "0.7"
-default-features = false
-features = ["dilithium"]

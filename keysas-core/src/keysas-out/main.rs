@@ -69,6 +69,9 @@ use keysas_lib::init_logger;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::sha256_digest;
+use keysas_lib::file_report::FileMetadata;
+use keysas_lib::file_report::generate_report_metadata;
+use keysas_lib::file_report::bind_and_sign;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -94,101 +97,13 @@ use time::OffsetDateTime;
 #[macro_use]
 extern crate serde_derive;
 
-/// Structure that holds a file metadata
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct FileMetadata {
-    /// Name of the file
-    filename: String,
-    /// SHA256 digest of the file
-    digest: String,
-    /// True if a file corruption as occured during processing
-    is_digest_ok: bool,
-    /// True if the file is toobig
-    is_toobig: bool,
-    /// Size of the file
-    size: u64,
-    /// True if the file type is valid
-    is_type_allowed: bool,
-    /// True if clamav tests pass
-    av_pass: bool,
-    /// Detailed report of clamav if the test failed
-    av_report: Vec<String>,
-    /// True if yara tests pass
-    yara_pass: bool,
-    /// Detailed report of yara if the test failed
-    yara_report: String,
-    /// Timestamp of the file entering the station
-    timestamp: String,
-    /// True if a file corruption occured during the processing
-    is_corrupted: bool,
-    /// Type of the file
-    file_type: String,
-}
-
 /// Structure representing a file and its metadata in the daemon
 #[derive(Debug)]
-struct FileData {
+pub struct FileData {
     /// File descriptor
     fd: i32,
     /// Associated file metadata
     md: FileMetadata,
-}
-
-/// Metadata object in the report.
-/// The structure can be serialized to JSON.
-#[derive(Serialize, Deserialize, Clone)]
-struct MetaData {
-    /// Name of the file
-    name: String,
-    /// Date of the report creation
-    date: String,
-    /// Type of the file
-    file_type: String,
-    /// True if the file is correct
-    is_valid: bool,
-    /// Object containing the detailled [FileReport]
-    report: FileReport,
-}
-
-/// Signature binding the file and the report.
-/// the structure can be serialized to JSON.
-#[derive(Serialize, Deserialize, Clone)]
-struct Bd {
-    /// SHA256 digest of the file encoded in base64
-    file_digest: String,
-    /// SHA256 digest of the [MetaData] associated to the file
-    metadata_digest: String,
-    /// Station certificates: concatenation of its ED25519 and Dilithium5 signing certificates with a '|' delimiter
-    station_certificate: String,
-    /// Report signature: concatenation of the ED25519 and Dilithium5 signatures in base64
-    report_signature: String,
-}
-
-/// Report that will be created for each file.
-/// The structure can be serialized to JSON.
-#[derive(Serialize, Deserialize, Clone)]
-struct Report {
-    /// [MetaData] of the file analysis
-    metadata: MetaData,
-    /// [Bd] binding of the file and the report with the station signature
-    binding: Bd,
-}
-
-/// Detailed report of the file checks.
-#[derive(Serialize, Deserialize, Clone)]
-struct FileReport {
-    /// Detailed report of the yara checks
-    yara: String,
-    /// Detailed report of the clamav checks
-    av: Vec<String>,
-    /// True if the file type is allowed
-    type_allowed: bool,
-    /// Size of the file
-    size: u64,
-    /// True if a file corruption occured during the file processing
-    corrupted: bool,
-    /// True if the file size is too big
-    toobig: bool,
 }
 
 /// Directory containing the station signing keys
@@ -311,84 +226,6 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             }
         })
         .collect()
-}
-
-/// Wrapper around the report metadata creation
-fn generate_report_metadata(f: &FileData) -> MetaData {
-    let timestamp = format!(
-        "{}-{}-{}_{}-{}-{}-{}",
-        OffsetDateTime::now_utc().day(),
-        OffsetDateTime::now_utc().month(),
-        OffsetDateTime::now_utc().year(),
-        OffsetDateTime::now_utc().hour(),
-        OffsetDateTime::now_utc().minute(),
-        OffsetDateTime::now_utc().second(),
-        OffsetDateTime::now_utc().nanosecond()
-    );
-
-    let new_file_report = FileReport {
-        yara: f.md.yara_report.clone(),
-        av: f.md.av_report.clone(),
-        type_allowed: f.md.is_type_allowed,
-        size: f.md.size,
-        corrupted: f.md.is_corrupted,
-        toobig: f.md.is_toobig,
-    };
-
-    MetaData {
-        name: f.md.filename.clone(),
-        date: timestamp,
-        file_type: f.md.file_type.clone(),
-        is_valid: f.md.av_pass
-            && f.md.yara_pass
-            && !f.md.is_toobig
-            && !f.md.is_corrupted
-            && f.md.is_digest_ok
-            && f.md.is_type_allowed,
-        report: new_file_report,
-    }
-}
-
-/// Bind the report to file by signing with ED25519 and Dilithium5 the concatenation
-/// of the file digest and the report metadata digest.
-/// The two signatures are concatenated (ED25519 first).
-/// All the fields of the binding are encoded in base64
-fn bind_and_sign(
-    f: &FileData,
-    report_meta: &MetaData,
-    sign_keys: &HybridKeyPair,
-    sign_cert: &str,
-) -> Result<Report, anyhow::Error> {
-    // Compute digest of report metadata
-    let json_string = serde_json::to_string(&report_meta)?;
-
-    let mut hasher = Sha256::new();
-    hasher.update(json_string.as_bytes());
-    let result = hasher.finalize();
-
-    let meta_digest = format!("{result:x}");
-
-    // Sign the report and the file
-    let concat = format!("{}-{}", f.md.digest, meta_digest);
-
-    let mut signature = Vec::new();
-
-    // Sign with ED25519
-    signature.append(&mut sign_keys.classic.message_sign(concat.as_bytes())?);
-
-    // Sign with Dilithium5
-    signature.append(&mut sign_keys.pq.message_sign(concat.as_bytes())?);
-
-    // Generate the final report
-    Ok(Report {
-        metadata: report_meta.clone(),
-        binding: Bd {
-            file_digest: general_purpose::STANDARD.encode(f.md.digest.clone()),
-            metadata_digest: general_purpose::STANDARD.encode(meta_digest),
-            station_certificate: sign_cert.to_string(),
-            report_signature: general_purpose::STANDARD.encode(signature),
-        },
-    })
 }
 
 /// This function output files and report received from transit
@@ -554,166 +391,5 @@ fn main() -> Result<()> {
 
         // Output file
         output_files(files, &config, &sign_keys, &sign_cert)?;
-    }
-}
-
-#[cfg(test)]
-mod tests_out {
-    use base64::{engine::general_purpose, Engine};
-    use ed25519_dalek::{self, Digest, Sha512};
-    use keysas_lib::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
-    use oqs::sig::{Algorithm, Sig};
-    use pkcs8::der::{DecodePem, EncodePem};
-    use x509_cert::Certificate;
-
-    use crate::{bind_and_sign, generate_report_metadata, FileData, FileMetadata};
-
-    #[test]
-    fn test_metadata_valid_file() {
-        // Generate dummy file data
-        let file_data = FileData {
-            fd: 2,
-            md: FileMetadata {
-                filename: "test.txt".to_string(),
-                digest: "00112233445566778899AABBCCDDEEFF".to_string(),
-                is_digest_ok: true,
-                is_toobig: false,
-                size: 42,
-                is_type_allowed: true,
-                av_pass: true,
-                av_report: Vec::new(),
-                yara_pass: true,
-                yara_report: "".to_string(),
-                timestamp: "timestamp".to_string(),
-                is_corrupted: false,
-                file_type: "txt".to_string(),
-            },
-        };
-
-        // Generate report metadata
-        let meta = generate_report_metadata(&file_data);
-
-        // Validate fields
-        assert_eq!(file_data.md.filename, meta.name);
-        assert_eq!(file_data.md.file_type, meta.file_type);
-        assert_eq!(meta.is_valid, true);
-    }
-
-    #[test]
-    fn test_bind_and_sign() {
-        // Generate temporary keys
-        let infos =
-            CertificateFields::from_fields(None, None, None, Some("Test_station"), Some("200"))
-                .unwrap();
-        let sign_keys = HybridKeyPair::generate_root(&infos).unwrap();
-
-        let mut sign_cert = String::new();
-        let pem_cl = sign_keys
-            .classic_cert
-            .to_pem(pkcs8::LineEnding::LF)
-            .unwrap();
-        sign_cert.push_str(&pem_cl);
-        // Add a delimiter between the two certificates
-        sign_cert.push('|');
-        let pem_pq = sign_keys.pq_cert.to_pem(pkcs8::LineEnding::LF).unwrap();
-        sign_cert.push_str(&pem_pq);
-
-        // Generate dummy file data
-        let file_data = FileData {
-            fd: 2,
-            md: FileMetadata {
-                filename: "test.txt".to_string(),
-                digest: "00112233445566778899AABBCCDDEEFF".to_string(),
-                is_digest_ok: true,
-                is_toobig: false,
-                size: 42,
-                is_type_allowed: true,
-                av_pass: true,
-                av_report: Vec::new(),
-                yara_pass: true,
-                yara_report: "".to_string(),
-                timestamp: "timestamp".to_string(),
-                is_corrupted: false,
-                file_type: "txt".to_string(),
-            },
-        };
-
-        let meta = generate_report_metadata(&file_data);
-
-        let report = bind_and_sign(&file_data, &meta, &sign_keys, &sign_cert).unwrap();
-        // Test the generated report
-        // Reconstruct the public keys from the binding certificates
-        let mut certs = report.binding.station_certificate.split('|');
-        let cert_cl = Certificate::from_pem(certs.next().unwrap()).unwrap();
-        let cert_pq = Certificate::from_pem(certs.remainder().unwrap()).unwrap();
-
-        let pub_cl = ed25519_dalek::PublicKey::from_bytes(
-            cert_cl
-                .tbs_certificate
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes(),
-        )
-        .unwrap();
-        oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
-        let pub_pq = pq_scheme
-            .public_key_from_bytes(
-                cert_pq
-                    .tbs_certificate
-                    .subject_public_key_info
-                    .subject_public_key
-                    .raw_bytes(),
-            )
-            .unwrap();
-
-        // Verify the signature of the report
-        let signature = general_purpose::STANDARD
-            .decode(report.binding.report_signature)
-            .unwrap();
-        let concat = format!(
-            "{}-{}",
-            String::from_utf8(
-                general_purpose::STANDARD
-                    .decode(report.binding.file_digest)
-                    .unwrap()
-            )
-            .unwrap(),
-            String::from_utf8(
-                general_purpose::STANDARD
-                    .decode(report.binding.metadata_digest)
-                    .unwrap()
-            )
-            .unwrap()
-        );
-
-        let mut prehashed = Sha512::new();
-        prehashed.update(&concat);
-        assert_eq!(
-            true,
-            pub_cl
-                .verify_prehashed(
-                    prehashed,
-                    None,
-                    &ed25519_dalek::Signature::from_bytes(
-                        &signature[0..ed25519_dalek::SIGNATURE_LENGTH]
-                    )
-                    .unwrap()
-                )
-                .is_ok()
-        );
-
-        assert_eq!(
-            true,
-            pq_scheme
-                .verify(
-                    concat.as_bytes(),
-                    pq_scheme
-                        .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
-                        .unwrap(),
-                    pub_pq
-                )
-                .is_ok()
-        );
     }
 }

@@ -27,7 +27,6 @@
 
 use anyhow::anyhow;
 use libc::c_void;
-use std::ffi::OsStr;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -35,6 +34,8 @@ use std::mem::size_of;
 use std::path::PathBuf;
 use std::path::{Component, Path};
 use std::thread;
+use std::os::windows::ffi::OsStrExt;
+use std::ffi::{OsStr, OsString};
 use widestring::U16CString;
 use windows::core::{PCSTR, PCWSTR};
 use windows::s;
@@ -53,11 +54,8 @@ use windows::Win32::Storage::InstallableFileSystems::{
 use windows::Win32::System::Ioctl::VOLUME_DISK_EXTENTS;
 use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use base64::{engine::general_purpose, Engine as _};
-use x509_cert::Certificate;
-use ed25519_dalek::{self, Digest, Sha512};
-use pkcs8::der::{DecodePem, EncodePem};
-use oqs::sig::{Algorithm, Sig};
+
+use keysas_lib::file_report::parse_report;
 
 // Operation code for the request to userland
 #[derive(Debug)]
@@ -87,63 +85,6 @@ struct UserReply {
 #[derive(Debug, Copy, Clone)]
 pub struct WindowsDriverInterface {
     handle: HANDLE,
-}
-
-/// Metadata object in the report.
-/// The structure can be serialized to JSON.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct MetaData {
-    /// Name of the file
-    name: String,
-    /// Date of the report creation
-    date: String,
-    /// Type of the file
-    file_type: String,
-    /// True if the file is correct
-    is_valid: bool,
-    /// Object containing the detailled [FileReport]
-    report: FileReport,
-}
-
-/// Signature binding the file and the report.
-/// the structure can be serialized to JSON.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Bd {
-    /// SHA256 digest of the file encoded in base64
-    file_digest: String,
-    /// SHA256 digest of the [MetaData] associated to the file
-    metadata_digest: String,
-    /// Station certificates: concatenation of its ED25519 and Dilithium5 signing certificates with a '|' delimiter
-    station_certificate: String,
-    /// Report signature: concatenation of the ED25519 and Dilithium5 signatures in base64
-    report_signature: String,
-}
-
-/// Report that will be created for each file.
-/// The structure can be serialized to JSON.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Report {
-    /// [MetaData] of the file analysis
-    metadata: MetaData,
-    /// [Bd] binding of the file and the report with the station signature
-    binding: Bd,
-}
-
-/// Detailed report of the file checks.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct FileReport {
-    /// Detailed report of the yara checks
-    yara: String,
-    /// Detailed report of the clamav checks
-    av: Vec<String>,
-    /// True if the file type is allowed
-    type_allowed: bool,
-    /// Size of the file
-    size: u64,
-    /// True if a file corruption occured during the file processing
-    corrupted: bool,
-    /// True if the file size is too big
-    toobig: bool,
 }
 
 /// Name of the communication port with the driver
@@ -381,7 +322,7 @@ fn authorize_usb(content: &str) -> Result<bool, anyhow::Error> {
 }
 
 fn authorize_file(op: KeysasFilterOperation, content: &str) -> Result<bool, anyhow::Error> {
-    let file_path = Path::new(content.trim_matches(char::from(0)));
+    let mut file_path = Path::new(content.trim_matches(char::from(0)));
 
     // Try to get the parent directory
     let mut components = file_path.components();
@@ -391,7 +332,7 @@ fn authorize_file(op: KeysasFilterOperation, content: &str) -> Result<bool, anyh
     // If the second directory is "System Volume Information" then it is internal to windows, skip it
     loop {
         let c = components.next();
-        if c == Some(Component::RootDir) {
+        if None == c || c == Some(Component::RootDir) {
             break;
         }
     }
@@ -421,136 +362,44 @@ fn authorize_file(op: KeysasFilterOperation, content: &str) -> Result<bool, anyh
 
 fn validate_file(path: &Path) -> Result<bool, anyhow::Error> {
     // Test if the file is a station report
-    if path
+    if Path::new(path)
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("krp"))
     {
         // If yes validate it alone
-        return validate_report_alone(path);
+        if let Err(e) = parse_report(Path::new(path), None, None, None) {
+            println!("Failed to parse report: {e}");
+        }
+        return Ok(true);
     }
 
     // If not try to find the corresponding report
     // It should be in the same directory with the same name + '.krp'
-    let report_path = path.to_path_buf().join(".krp");
-    match File::open(report_path.as_path()) {
-        Ok(report) => {
-            // If a corresponding report is found then validate both the file and the report
-            return validate_file_and_report(path, report_path.as_path());
+    let mut path_report = PathBuf::from(path);
+    match path_report.extension() {
+        Some(ext) => {
+            let mut ext = ext.to_os_string();
+            ext.push(".krp");
+            path_report.set_extension(ext);
+        },
+        _ => {
+            path_report.set_extension(".krp");
         }
-        Err(_) => {
+    }
+    match path_report.is_file() {
+        true => {
+            // If a corresponding report is found then validate both the file and the report
+            if let Err(e) = parse_report(path_report.as_path(), Some(path), None, None) {
+                println!("Failed to parse file and report: {e}");
+            }
+            return Ok(true);
+        }
+        false => {
             // There is no corresponding report for validating the file
+            println!("No report found at {:?}", path_report);
             return Ok(false);
         }
     }
-}
-
-fn parse_report(report_path: &Path) -> Result<Report, anyhow::Error> {
-    let report_content = match std::fs::read_to_string(report_path) {
-        Ok(ct) => ct,
-        Err(_) => {
-            println!("Failed to read report content");
-            return Err(anyhow!("Failed to read report content"));
-        }
-    };
-    let report: Report = serde_json::from_str(report_content.as_str())?;
-
-    println!("Report: {:?}", report);
-
-    let mut certs = report.binding.station_certificate.split('|');
-    // TODO: remove unwraps
-    let cert_cl = Certificate::from_pem(certs.next().unwrap())?;
-    let cert_pq = Certificate::from_pem(certs.remainder().unwrap())?;
-
-    let pub_cl = ed25519_dalek::PublicKey::from_bytes(
-        cert_cl
-            .tbs_certificate
-            .subject_public_key_info
-            .subject_public_key
-            .raw_bytes(),
-    )?;
-
-    oqs::init();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
-    let pub_pq = pq_scheme
-        .public_key_from_bytes(
-            cert_pq
-                .tbs_certificate
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes(),
-        )
-        .unwrap();
-
-    // Verify the signature of the report
-    let signature = general_purpose::STANDARD
-        .decode(&report.binding.report_signature)?;
-    let concat = format!(
-        "{}-{}",
-        String::from_utf8(
-            general_purpose::STANDARD
-                .decode(&report.binding.file_digest)?
-        )?,
-        String::from_utf8(
-            general_purpose::STANDARD
-                .decode(&report.binding.metadata_digest)?
-        )?
-    );
-
-    let mut prehashed = Sha512::new();
-    prehashed.update(&concat);
-    /*
-    assert_eq!(
-        true,
-        pub_cl
-            .verify_prehashed(
-                prehashed,
-                None,
-                &ed25519_dalek::Signature::from_bytes(
-                    &signature[0..ed25519_dalek::SIGNATURE_LENGTH]
-                )
-                .unwrap()
-            )
-            .is_ok()
-    );
-
-    assert_eq!(
-        true,
-        pq_scheme
-            .verify(
-                concat.as_bytes(),
-                pq_scheme
-                    .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
-                    .unwrap(),
-                pub_pq
-            )
-            .is_ok()
-    );
-    */
-    Ok(report)
-}
-
-fn validate_report_alone(report_path: &Path) -> Result<bool, anyhow::Error> {
-    let report = match parse_report(report_path) {
-        Ok(rp) => rp,
-        Err(e) => {
-            println!("Failed to parse report");
-            return Ok(false);
-        }
-    };
-    Ok(true)
-}
-
-fn validate_file_and_report(file: &Path, report_path: &Path) -> Result<bool, anyhow::Error> {
-    let report = match parse_report(report_path) {
-        Ok(rp) => rp,
-        Err(e) => {
-            println!("Failed to parse report");
-            return Ok(false);
-        }
-    };
-
-    // Compute hash of the file
-    Ok(true)
 }
 
 fn user_authorize_file(path: &Path) -> Result<bool, anyhow::Error> {
