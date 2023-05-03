@@ -32,6 +32,7 @@ use ed25519_dalek::PublicKey;
 use ed25519_dalek::Sha512;
 use ed25519_dalek::Signature as SignatureDalek;
 use ed25519_dalek::Verifier;
+use ed25519_dalek::Signer;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey as PqPublicKey;
 use oqs::sig::SecretKey;
@@ -325,9 +326,7 @@ impl KeysasKey<Keypair> for Keypair {
     }
 
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-        let mut prehashed = Sha512::new();
-        prehashed.update(message);
-        let signature = self.sign_prehashed(prehashed, None)?;
+        let signature = self.sign(message);
         Ok(signature.to_bytes().to_vec())
     }
 

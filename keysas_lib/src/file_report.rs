@@ -299,12 +299,9 @@ pub fn parse_report(
 
         // Compute digest of the report metadata section
         let mut hasher = Sha256::new();
-        println!("Meta content: {:?}", report.metadata);
-        hasher.update(serde_json::to_string_pretty(&report.metadata)?);
-        let meta_digest: String = format!("{:X}", hasher.finalize());
+        hasher.update(serde_json::to_string(&report.metadata)?.as_bytes());
+        let meta_digest: String = format!("{:x}", hasher.finalize());
         // Validate that it corresponds to the reference in the binding
-        println!("Report meta: {:?}", report.binding.metadata_digest);
-        println!("Meta raw: {:?}", general_purpose::STANDARD.encode(&meta_digest));
         if general_purpose::STANDARD.encode(&meta_digest) != report.binding.metadata_digest {
             return Err(anyhow!("Metadata reference is invalid"));
         }
@@ -362,23 +359,20 @@ mod tests_out {
     #[test]
     fn test_metadata_valid_file() {
         // Generate dummy file data
-        let file_data = FileData {
-            fd: 2,
-            md: FileMetadata {
-                filename: "test.txt".to_string(),
-                digest: "00112233445566778899AABBCCDDEEFF".to_string(),
-                is_digest_ok: true,
-                is_toobig: false,
-                size: 42,
-                is_type_allowed: true,
-                av_pass: true,
-                av_report: Vec::new(),
-                yara_pass: true,
-                yara_report: "".to_string(),
-                timestamp: "timestamp".to_string(),
-                is_corrupted: false,
-                file_type: "txt".to_string(),
-            },
+        let file_data = FileMetadata {
+            filename: "test.txt".to_string(),
+            digest: "00112233445566778899AABBCCDDEEFF".to_string(),
+            is_digest_ok: true,
+            is_toobig: false,
+            size: 42,
+            is_type_allowed: true,
+            av_pass: true,
+            av_report: Vec::new(),
+            yara_pass: true,
+            yara_report: "".to_string(),
+            timestamp: "timestamp".to_string(),
+            is_corrupted: false,
+            file_type: "txt".to_string(),
         };
 
         // Generate report metadata
@@ -410,23 +404,20 @@ mod tests_out {
         sign_cert.push_str(&pem_pq);
 
         // Generate dummy file data
-        let file_data = FileData {
-            fd: 2,
-            md: FileMetadata {
-                filename: "test.txt".to_string(),
-                digest: "00112233445566778899AABBCCDDEEFF".to_string(),
-                is_digest_ok: true,
-                is_toobig: false,
-                size: 42,
-                is_type_allowed: true,
-                av_pass: true,
-                av_report: Vec::new(),
-                yara_pass: true,
-                yara_report: "".to_string(),
-                timestamp: "timestamp".to_string(),
-                is_corrupted: false,
-                file_type: "txt".to_string(),
-            },
+        let file_data = FileMetadata {
+            filename: "test.txt".to_string(),
+            digest: "00112233445566778899AABBCCDDEEFF".to_string(),
+            is_digest_ok: true,
+            is_toobig: false,
+            size: 42,
+            is_type_allowed: true,
+            av_pass: true,
+            av_report: Vec::new(),
+            yara_pass: true,
+            yara_report: "".to_string(),
+            timestamp: "timestamp".to_string(),
+            is_corrupted: false,
+            file_type: "txt".to_string(),
         };
 
         let meta = generate_report_metadata(&file_data);

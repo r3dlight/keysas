@@ -194,8 +194,6 @@ impl WindowsDriverInterface {
                         continue;
                     }
                 }
-
-                println!("Sent response");
             }
         });
         Ok(())
@@ -326,7 +324,6 @@ fn authorize_file(op: KeysasFilterOperation, content: &str) -> Result<bool, anyh
 
     // Try to get the parent directory
     let mut components = file_path.components();
-    println!("Path components: {:?}", components);
 
     // First component is the Root Directory
     // If the second directory is "System Volume Information" then it is internal to windows, skip it
@@ -369,6 +366,7 @@ fn validate_file(path: &Path) -> Result<bool, anyhow::Error> {
         // If yes validate it alone
         if let Err(e) = parse_report(Path::new(path), None, None, None) {
             println!("Failed to parse report: {e}");
+            return Ok(false);
         }
         return Ok(true);
     }
@@ -391,6 +389,7 @@ fn validate_file(path: &Path) -> Result<bool, anyhow::Error> {
             // If a corresponding report is found then validate both the file and the report
             if let Err(e) = parse_report(path_report.as_path(), Some(path), None, None) {
                 println!("Failed to parse file and report: {e}");
+                return Ok(false);
             }
             return Ok(true);
         }
