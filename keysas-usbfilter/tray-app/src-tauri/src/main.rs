@@ -25,12 +25,30 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{SystemTray, CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem, SystemTrayEvent};
+//mod service_if;
+mod app_controler;
+mod filter_store;
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+use tauri::{
+    App, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+};
+use tauri_plugin_positioner::{Position, WindowExt};
+
+use crate::app_controler::AppControler;
+
+/// Command call to open the USB device window
+///
+/// # Arguments
+///
+/// * 'app' - Handle to the tauri app, supplied by tauri
+/// * 'name' - Name of the USB device selected, supplied by the frontend
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+fn show_usb_device(app: tauri::AppHandle, name: &str) {
+    tauri::WindowBuilder::new(
+        &app,
+        "usbDetails",
+        tauri::WindowUrl::App("usb_details.html".into())
+    ).build().unwrap();
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -50,7 +68,10 @@ fn init_tauri() -> Result<(), anyhow::Error> {
         .add_item(hide);
     let tray = SystemTray::new().with_menu(tray_menu);
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_positioner::init())
+        .manage(AppControler::init())
+        .invoke_handler(tauri::generate_handler![show_usb_device])
         .system_tray(tray)
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick {
@@ -59,6 +80,17 @@ fn init_tauri() -> Result<(), anyhow::Error> {
                 ..
             } => {
                 println!("Left click event");
+                let window = app.get_window("main").unwrap();
+                match window.is_visible() {
+                    Ok(false) => {
+                        window.move_window(Position::BottomRight);
+                        window.show();
+                    }
+                    Ok(true) => {
+                        window.hide();
+                    }
+                    _ => {}
+                }
             }
             SystemTrayEvent::RightClick {
                 position: _,
@@ -74,24 +106,25 @@ fn init_tauri() -> Result<(), anyhow::Error> {
             } => {
                 println!("Double click event");
             }
-            SystemTrayEvent::MenuItemClick {
-                id,
-                ..
-            } => {
-                match id.as_str() {
-                    "quit" => {
-                        println!("Quit selected");
-                    },
-                    "hide" => {
-                        println!("Hide selected");
-                    },
-                    _ => {}
+            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+                "quit" => {
+                    println!("Quit selected");
                 }
-            }
+                "hide" => {
+                    println!("Hide selected");
+                }
+                _ => {}
+            },
             _ => {}
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())?;
+
+    app.run(|_app_handle, event| match event {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            api.prevent_exit();
+        }
+        _ => {}
+    });
 
     Ok(())
 }

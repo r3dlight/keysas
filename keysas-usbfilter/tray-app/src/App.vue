@@ -1,25 +1,44 @@
 <script setup lang="ts">
-// This starter template is using Vue 3 <script setup> SFCs
-// Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
-import Greet from "./components/Greet.vue";
+import "bootstrap/dist/css/bootstrap.min.css"
+import "bootstrap"
+import 'bootstrap-icons/font/bootstrap-icons.css'
+
+import {invoke} from "@tauri-apps/api"
+
+let usb_list: {name: string, path: string}[] = [
+  {"name": "Kingstong USB", "path": "D:"}
+];
+
+function showUsbDevice(name: string) {
+  invoke('show_usb_device', {name: name});
+}
 </script>
 
 <template>
   <div class="container">
-    <h1>Keysas USB Firewall console</h1>
-
-    <p>Manage the USB firewall from here!</p>
-
-    <Greet />
+    <ul class="list-group">
+      <li class="list-group-item" v-for="usb in usb_list">
+        <div class="container">
+          <div class="row">
+            <div class="col-sm">
+              <button class="btn btn-outline-dark btn-lg shadow" @click="showUsbDevice(usb.name)">
+                {{ usb.name }}
+              </button>
+            </div>
+            <div class="col-sm">
+              <p>
+                {{ usb.path }}
+              </p>
+            </div>
+            <div class="col-sm">
+              Authorization status
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
   </div>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
 </style>

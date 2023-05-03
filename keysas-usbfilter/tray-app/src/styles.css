@@ -106,4 +106,8 @@ button {
   button:active {
     background-color: #0f0f0f69;
   }
+
+  container, row {
+    background-color: #0f0f0f69;
+  }
 }

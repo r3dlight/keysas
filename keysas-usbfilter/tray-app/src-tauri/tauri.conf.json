@@ -21,14 +21,15 @@
     "bundle": {
       "active": true,
       "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
+        "icons/logo-keysas-short.ico",
+        "icons/logo-keysas-short-16.png",
+        "icons/logo-keysas-short-32.png",
+        "icons/logo-keysas-short-48.png",
+        "icons/logo-keysas-short-256.png"
       ],
-      "identifier": "com.tauri.dev",
-      "targets": "all"
+      "identifier": "com.keysas.usbfirewall",
+      "targets": "all",
+      "category": "Utility"
     },
     "security": {
       "csp": null
@@ -37,8 +38,16 @@
       "active": false
     },
     "systemTray": {
-        "iconPath": "icons/icon.png",
+        "iconPath": "./icons/logo-keysas-short.ico",
         "iconAsTemplate": true
-    }
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Keysas USB Firewall",
+        "url": "index.html",
+        "visible": false
+      }
+    ]
   }
 }
