@@ -223,8 +223,8 @@ Return Value:
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	NTSTATUS result = FLT_PREOP_SUCCESS_WITH_CALLBACK;
-	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
 	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
+	BOOLEAN isDirectory = FALSE;
 
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext = NULL);
@@ -236,7 +236,16 @@ Return Value:
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
-	// Don't filter call to directories
+	// Don't filter call to directories or volumes
+	status = FltIsDirectory(Data->Iopb->TargetFileObject, FltObjects->Instance, &isDirectory);
+
+	if (((Data->Iopb->TargetFileObject->Flags & FO_VOLUME_OPEN) == TRUE) ||
+		((Data->Iopb->TargetFileObject->FileName.Length == 0) && (Data->Iopb->TargetFileObject->RelatedFileObject == NULL)) ||
+		isDirectory)
+	{
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
 	if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DIRECTORY_FILE)) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
@@ -285,28 +294,6 @@ Return Value:
 	}
 	ReleaseResource(instanceContext->Resource);
 	FltReleaseContext(instanceContext);
-
-	// Check if the file is of interest
-	status = FltGetFileNameInformation(
-		Data,
-		FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT,
-		&nameInfo
-	);
-	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: FltGetFileNameInformation failed with status: %0x8x\n",
-			status));
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
-
-	FltParseFileNameInformation(nameInfo);
-
-	if (0 == nameInfo->FinalComponent.Length) {
-		// Not a file but a directory
-		// No need to intercept POST operation
-		result = FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
-
-	FltReleaseFileNameInformation(nameInfo);
 
 	return result;
 }

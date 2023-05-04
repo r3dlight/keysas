@@ -14,7 +14,6 @@
 #![warn(dead_code)]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
-#![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
@@ -24,8 +23,8 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
+
 #![feature(vec_into_raw_parts)]
-#![feature(is_some_and)]
 #![feature(str_split_remainder)]
 
 pub mod driver_interface;
@@ -47,7 +46,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Driver interface OK");
 
-    loop {}
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(10));
+    }
 }
 
 // Initialize the driver interface and register the callbacks

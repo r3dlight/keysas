@@ -14,7 +14,6 @@
 #![warn(dead_code)]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
-#![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
@@ -43,6 +42,6 @@ pub fn init_driver_com() -> Result<WindowsDriverInterface, anyhow::Error> {
         Ok(driver_interface)
     } else {
         log::error!("OS not supported");
-        return Err(anyhow!("Failed to open driver interface: OS not supported"));
+        Err(anyhow!("Failed to open driver interface: OS not supported"))
     }
 }
