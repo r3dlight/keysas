@@ -360,7 +360,7 @@ fn bind_and_sign(
     sign_cert: &str,
 ) -> Result<Report, anyhow::Error> {
     // Compute digest of report metadata
-    let json_string = serde_json::to_string_pretty(&report_meta)?;
+    let json_string = serde_json::to_string(&report_meta)?;
 
     let mut hasher = Sha256::new();
     hasher.update(json_string.as_bytes());
