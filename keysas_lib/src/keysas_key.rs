@@ -33,6 +33,8 @@ use ed25519_dalek::Sha512;
 use ed25519_dalek::Signature as SignatureDalek;
 use ed25519_dalek::Verifier;
 use ed25519_dalek::Signer;
+use ed25519_dalek::Signature as SignatureDalek;
+use ed25519_dalek::Verifier;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey as PqPublicKey;
 use oqs::sig::SecretKey;

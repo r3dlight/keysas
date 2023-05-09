@@ -35,7 +35,6 @@ use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
-use serde::Serialize;
 use std::time::Duration;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
