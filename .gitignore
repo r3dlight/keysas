@@ -50,3 +50,4 @@ keysas-usbfilter/minifilter/runsdvui.cmd
 keysas-usbfilter/minifilter/SDV-default.xml
 keysas-usbfilter/minifilter/sdv-user.sdv
 keysas-usbfilter/minifilter/smvstats.txt
+keysas-usbfilter/tray-app/package-lock.json

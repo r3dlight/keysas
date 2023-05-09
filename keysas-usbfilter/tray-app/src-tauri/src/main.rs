@@ -30,93 +30,51 @@ mod app_controler;
 mod filter_store;
 
 use tauri::{
-    App, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    AppHandle, Manager, SystemTray, SystemTrayEvent, State
 };
 use tauri_plugin_positioner::{Position, WindowExt};
 
 use crate::app_controler::AppControler;
 
-/// Command call to open the USB device window
-///
-/// # Arguments
-///
-/// * 'app' - Handle to the tauri app, supplied by tauri
-/// * 'name' - Name of the USB device selected, supplied by the frontend
-#[tauri::command]
-fn show_usb_device(app: tauri::AppHandle, name: &str) {
-    tauri::WindowBuilder::new(
-        &app,
-        "usbDetails",
-        tauri::WindowUrl::App("usb_details.html".into())
-    ).build().unwrap();
+use anyhow::anyhow;
+
+/// Payload for the init event sent to the usb_details window
+#[derive(Clone, serde::Serialize)]
+struct InitPayload {
+    /// Name of the USB device
+    usb_name: String
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    // Initialize the logger
+    simple_logger::init()?;
+
     // Launch the tauri application
     init_tauri()?;
 
     Ok(())
 }
 
-// Initialize the tauri application as a system tray app
+/// Initialize the tauri application as a system tray app
 fn init_tauri() -> Result<(), anyhow::Error> {
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(quit)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(hide);
-    let tray = SystemTray::new().with_menu(tray_menu);
-
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_positioner::init())
         .manage(AppControler::init())
-        .invoke_handler(tauri::generate_handler![show_usb_device])
-        .system_tray(tray)
+        .system_tray(SystemTray::new())
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick {
                 position: _,
                 size: _,
                 ..
             } => {
-                println!("Left click event");
-                let window = app.get_window("main").unwrap();
-                match window.is_visible() {
-                    Ok(false) => {
-                        window.move_window(Position::BottomRight);
-                        window.show();
-                    }
-                    Ok(true) => {
-                        window.hide();
-                    }
-                    _ => {}
+                if let Err(e) = open_usb_view(app) {
+                    log::error!("Failed to open main view: {e}");
+                    app.exit(1);
                 }
             }
-            SystemTrayEvent::RightClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                println!("Right click event");
-            }
-            SystemTrayEvent::DoubleClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                println!("Double click event");
-            }
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "quit" => {
-                    println!("Quit selected");
-                }
-                "hide" => {
-                    println!("Hide selected");
-                }
-                _ => {}
-            },
             _ => {}
         })
+        .invoke_handler(tauri::generate_handler![get_file_list])
         .build(tauri::generate_context!())?;
 
     app.run(|_app_handle, event| match event {
@@ -127,4 +85,49 @@ fn init_tauri() -> Result<(), anyhow::Error> {
     });
 
     Ok(())
+}
+
+/// Toggle the USB view when the tray icon is clicked
+/// 
+/// # Arguments
+/// 
+/// * 'app' - The tauri application
+fn open_usb_view(app: &AppHandle) -> Result<(), anyhow::Error> {
+    // Get the window
+    match app.get_window("main") {
+        Some(w) => {
+            // If the window exists, toggle its visibility
+            match w.is_visible()? {
+                false => {
+                    w.move_window(Position::BottomRight)?;
+                    w.set_focus()?;
+                    w.show()?;
+                }
+                true => {
+                    w.hide()?;
+                }
+            }
+        },
+        None => {
+            // If the window does not exists, create a new one
+            let w = tauri::WindowBuilder::new(
+                app,
+                "main",
+                tauri::WindowUrl::App("index.html".into())
+            ).build()?;
+            w.move_window(Position::BottomRight)?;
+            w.set_decorations(false)?;
+            w.set_focus()?;
+        }
+    };
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn get_file_list(usb_name: String, app_ctrl: State<AppControler>) -> Result<String, String> {
+    match app_ctrl.store.get_files(&usb_name) {
+        Ok(files) => Ok(String::from("Found files")),
+        Err(e) => Err(String::from("Failed to get files"))
+    }
 }

@@ -25,8 +25,6 @@
 
 use crate::filter_store::{FilterStore, KeysasAuthorization, USBDevice};
 
-use tauri::App;
-
 pub struct AppControler {
     pub store: FilterStore
 }

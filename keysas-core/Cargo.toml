@@ -13,7 +13,7 @@ nix = "0.26"
 keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
-regex = "1.7"
+regex = "1.8"
 infer = "0.13"
 clamav-tcp = "0.2"
 itertools ="0.10"
@@ -26,7 +26,7 @@ pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
 landlock = "0.2"
 syscallz = "0.16"
-yara = "0.17"
+yara = "0.19"
 
 [dependencies.oqs]
 version = "0.7"
