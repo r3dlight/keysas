@@ -133,7 +133,7 @@ export default {
         '.forbidden': 'guichet_OUT.files.error.reason.forbidden',
         '.yara': 'guichet_OUT.files.error.reason.yara',
         '.toobig': 'guichet_OUT.files.error.reason.toobig',
-        '.failed': 'guichet_OUT.files.error.reason.failed',
+        '.ioerror': 'guichet_OUT.files.error.reason.ioerror',
       };
 
       if(this.type === 'IN') {
@@ -145,13 +145,13 @@ export default {
         }
 
         val.forEach(element => {
-          let failed = element.endsWith('.failed');
-          let slicedElement = failed ? element.substring(0, element.indexOf('.failed')) : element;
+          let failed = element.endsWith('.ioerror');
+          let slicedElement = failed ? element.substring(0, element.indexOf('.ioerror')) : element;
 
           if(!this.listInBackup.map(x => x.filename).includes(slicedElement)) {
             this.listInBackup.push({
               filename: slicedElement,
-              error: failed ? errorsMessages['.failed'] : null
+              error: failed ? errorsMessages['.ioerror'] : null
             });
           }
         });
@@ -169,14 +169,41 @@ export default {
             return;
           }
 
-          // handling Yara case
-          if (element.endsWith('.yara')) {
-            let slicedElement = element.substring(0, element.indexOf('.yara'));
+          // handling Keysas reports
+          if (element.endsWith('.krp')) {
+            let slicedElement = element.substring(0, element.indexOf('.krp'));
             let list = val.includes(slicedElement) ? this.listOutOK : this.listOutError;
             if (!list.map(x => x.filename).includes(slicedElement)) {
-              list.push({
-                filename: slicedElement,
-                error: errorsMessages['.yara']
+              fetch(element)
+              .then(response => response.json())
+              .then(data =>{
+                if (data.metadata.report.yara === true) {
+                  list.push({
+                    filename: slicedElement,
+                    error: errorsMessages['.yara']
+                  });
+                }
+                if (data.metadata.report.av === true) {
+                  list.push({
+                    filename: slicedElement,
+                    error: errorsMessages['.antivirus']
+                  });
+                }
+                if (data.metadata.report.type_allowed === false) {
+                  list.push({
+                    filename: slicedElement,
+                    error: errorsMessages['.forbidden']
+                  });
+                }
+                if (data.metadata.report.toobig === true) {
+                  list.push({
+                    filename: slicedElement,
+                    error: errorsMessages['.toobig']
+                  });
+                }
+              })
+              .catch(error => {
+                console.log('An unknown error appened');
               });
             }
             return;

@@ -38,7 +38,7 @@
           "forbidden": "extension interdite",
           "yara": "virus potentiel détecté",
           "toobig": "fichier trop gros",
-          "failed": "erreur de transfert",
+          "ioerror": "erreur de transfert",
           "unknown": "erreur inconnue"
         }
       }
