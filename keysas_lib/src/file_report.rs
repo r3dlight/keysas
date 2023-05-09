@@ -349,12 +349,12 @@ pub fn parse_report(
 mod tests_out {
     use base64::{engine::general_purpose, Engine};
     use ed25519_dalek::{self, Digest, Sha512};
-    use keysas_lib::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
+    use crate::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
     use oqs::sig::{Algorithm, Sig};
     use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
 
-    use crate::{bind_and_sign, generate_report_metadata, FileData, FileMetadata};
+    use crate::file_report::{bind_and_sign, generate_report_metadata, FileMetadata};
 
     #[test]
     fn test_metadata_valid_file() {
@@ -379,8 +379,8 @@ mod tests_out {
         let meta = generate_report_metadata(&file_data);
 
         // Validate fields
-        assert_eq!(file_data.md.filename, meta.name);
-        assert_eq!(file_data.md.file_type, meta.file_type);
+        assert_eq!(file_data.filename, meta.name);
+        assert_eq!(file_data.file_type, meta.file_type);
         assert_eq!(meta.is_valid, true);
     }
 

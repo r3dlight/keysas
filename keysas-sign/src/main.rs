@@ -175,7 +175,7 @@ fn generate_signing_keypair(
 
 /// Save a certificate on the station
 fn save_certificate(cert_type: &str, cert: &str) -> Result<()> {
-    if validate_signing_certificate(cert).is_ok_and(|r| r) {
+    if validate_signing_certificate(cert, None).is_ok() {
         let path = match cert_type {
             "usb-cl" => USB_CERT_CL_PATH,
             "usb-pq" => USB_CERT_PQ_PATH,

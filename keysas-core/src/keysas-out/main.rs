@@ -62,12 +62,10 @@
 #![feature(str_split_remainder)]
 
 use anyhow::Result;
-use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::append_ext;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
-use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::sha256_digest;
 use keysas_lib::file_report::FileMetadata;
 use keysas_lib::file_report::generate_report_metadata;
@@ -79,8 +77,6 @@ use landlock::{
 use log::{error, info, warn};
 use nix::unistd;
 use pkcs8::der::EncodePem;
-use sha2::Digest;
-use sha2::Sha256;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -92,10 +88,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str;
-use time::OffsetDateTime;
-
-#[macro_use]
-extern crate serde_derive;
 
 /// Structure representing a file and its metadata in the daemon
 #[derive(Debug)]
@@ -250,10 +242,10 @@ fn output_files(
         }
 
         // Generate a report
-        let report_meta = generate_report_metadata(&f);
+        let report_meta = generate_report_metadata(&f.md);
 
         // Bind the report to the file and sign it
-        let new_report = bind_and_sign(&f, &report_meta, sign_keys, sign_cert)?;
+        let new_report = bind_and_sign(&f.md, &report_meta, sign_keys, sign_cert)?;
 
         // Write the report to disk
         let mut path = PathBuf::new();
