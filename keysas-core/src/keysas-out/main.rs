@@ -64,12 +64,12 @@
 use anyhow::Result;
 use clap::{crate_version, Arg, ArgAction, Command};
 use keysas_lib::append_ext;
+use keysas_lib::file_report::bind_and_sign;
+use keysas_lib::file_report::generate_report_metadata;
+use keysas_lib::file_report::FileMetadata;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::sha256_digest;
-use keysas_lib::file_report::FileMetadata;
-use keysas_lib::file_report::generate_report_metadata;
-use keysas_lib::file_report::bind_and_sign;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -225,7 +225,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
 fn output_files(
     files: Vec<FileData>,
     conf: &Configuration,
-    sign_keys: &HybridKeyPair,
+    sign_keys: Option<&HybridKeyPair>,
     sign_cert: &str,
 ) -> Result<()> {
     for mut f in files {
@@ -316,33 +316,35 @@ fn main() -> Result<()> {
         Path::new(KEY_FILE_DIR),
         KEY_PASSWD,
     ) {
-        Ok(k) => k,
+        Ok(k) => Some(k),
         Err(e) => {
-            error!("Failed to load station signing keys {e}");
-            process::exit(1);
+            warn!("Failed to load station signing keys {e}");
+            None
         }
     };
 
     // Convert certificates to PEM string so that it can be placed in the reports
     let mut sign_cert = String::new();
-    let pem_cl = match sign_keys.classic_cert.to_pem(pkcs8::LineEnding::LF) {
-        Ok(p) => p,
-        Err(e) => {
-            error!("Failed to convert certificate to string {e}");
-            process::exit(1);
-        }
-    };
-    sign_cert.push_str(&pem_cl);
-    // Add a delimiter between the two certificates
-    sign_cert.push('|');
-    let pem_pq = match sign_keys.pq_cert.to_pem(pkcs8::LineEnding::LF) {
-        Ok(p) => p,
-        Err(e) => {
-            error!("Failed to convert certificate to string {e}");
-            process::exit(1);
-        }
-    };
-    sign_cert.push_str(&pem_pq);
+    if let Some(ref keys) = sign_keys {
+        let pem_cl = match keys.classic_cert.to_pem(pkcs8::LineEnding::LF) {
+            Ok(p) => p,
+            Err(e) => {
+                error!("Failed to convert certificate to string {e}");
+                process::exit(1);
+            }
+        };
+        sign_cert.push_str(&pem_cl);
+        // Add a delimiter between the two certificates
+        sign_cert.push('|');
+        let pem_pq = match keys.pq_cert.to_pem(pkcs8::LineEnding::LF) {
+            Ok(p) => p,
+            Err(e) => {
+                error!("Failed to convert certificate to string {e}");
+                process::exit(1);
+            }
+        };
+        sign_cert.push_str(&pem_pq);
+    }
 
     // Open socket with keysas-transit
     let addr_out = SocketAddr::from_abstract_name(&config.socket_out)?;
@@ -382,6 +384,6 @@ fn main() -> Result<()> {
         let files = parse_messages(ancillary_in.messages(), &buf_in);
 
         // Output file
-        output_files(files, &config, &sign_keys, &sign_cert)?;
+        output_files(files, &config, sign_keys.as_ref(), &sign_cert)?;
     }
 }
