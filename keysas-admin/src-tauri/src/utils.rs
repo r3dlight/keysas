@@ -30,6 +30,7 @@ pub fn cmd_generate_key_and_get_csr(
     };
 
     let cert_req = String::from_utf8(cmd_res)?;
+    log::debug!("{cert_req:?}");
 
     // Recover the CSR from the session command
     let mut csrs = cert_req.split('|');

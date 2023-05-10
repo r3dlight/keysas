@@ -192,7 +192,7 @@ pub fn generate_report_metadata(f: &FileMetadata) -> MetaData {
 pub fn bind_and_sign(
     f: &FileMetadata,
     report_meta: &MetaData,
-    sign_keys: &HybridKeyPair,
+    sign_keys: Option<&HybridKeyPair>,
     sign_cert: &str,
 ) -> Result<Report, anyhow::Error> {
     // Compute digest of report metadata
@@ -214,11 +214,16 @@ pub fn bind_and_sign(
 
     let mut signature = Vec::new();
 
-    // Sign with ED25519
-    signature.append(&mut sign_keys.classic.message_sign(concat.as_bytes())?);
+    match sign_keys {
+        Some(keys) => {
+            // Sign with ED25519
+            signature.append(&mut keys.classic.message_sign(concat.as_bytes())?);
 
-    // Sign with Dilithium5
-    signature.append(&mut sign_keys.pq.message_sign(concat.as_bytes())?);
+            // Sign with Dilithium5
+            signature.append(&mut keys.pq.message_sign(concat.as_bytes())?);
+        }
+        None => (),
+    }
 
     // Generate the final report
     Ok(Report {
@@ -347,9 +352,9 @@ pub fn parse_report(
 
 #[cfg(test)]
 mod tests_out {
-    use base64::{engine::general_purpose, Engine};
-    use ed25519_dalek::{self, Digest, Sha512};
     use crate::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
+    use base64::{engine::general_purpose, Engine};
+    use ed25519_dalek::{self, Verifier};
     use oqs::sig::{Algorithm, Sig};
     use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
@@ -422,7 +427,7 @@ mod tests_out {
 
         let meta = generate_report_metadata(&file_data);
 
-        let report = bind_and_sign(&file_data, &meta, &sign_keys, &sign_cert).unwrap();
+        let report = bind_and_sign(&file_data, &meta, Some(&sign_keys), &sign_cert).unwrap();
         // Test the generated report
         // Reconstruct the public keys from the binding certficates
         let mut certs = report.binding.station_certificate.split('|');
@@ -468,15 +473,11 @@ mod tests_out {
             )
             .unwrap()
         );
-
-        let mut prehashed = Sha512::new();
-        prehashed.update(&concat);
         assert_eq!(
             true,
             pub_cl
-                .verify_prehashed(
-                    prehashed,
-                    None,
+                .verify(
+                    concat.as_bytes(),
                     &ed25519_dalek::Signature::from_bytes(
                         &signature[0..ed25519_dalek::SIGNATURE_LENGTH]
                     )
