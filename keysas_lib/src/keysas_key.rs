@@ -395,6 +395,8 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
+        log::debug!("Read done: {path:?}");
+
         let enc_pk = match EncryptedPrivateKeyInfo::try_from(cipher.as_slice()) {
             Ok(ep) => ep,
             Err(e) => {
