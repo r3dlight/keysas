@@ -55,11 +55,11 @@ const USB_CA_KEY_NAME: &str = "usb";
 const PKI_ROOT_KEY_NAME: &str = "root";
 
 const _CA_DIR: &str = "/CA";
-const ST_CA_SUB_DIR: &str = "/CA/st";
-const USB_CA_SUB_DIR: &str = "/CA/usb";
+const ST_CA_SUB_DIR: &str = "./CA/st";
+const USB_CA_SUB_DIR: &str = "./CA/usb";
 const PKI_ROOT_SUB_DIR: &str = "/CA/root";
 const _CRL_DIR: &str = "/CRL";
-const CERT_DIR: &str = "/CERT";
+const CERT_DIR: &str = "/CERT/";
 
 fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
     if !Path::new(path).is_dir() {
@@ -310,6 +310,7 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
         ST_CA_KEY_NAME,
         Path::new(ST_CA_SUB_DIR),
         Path::new(ST_CA_SUB_DIR),
+        Path::new(&pki_dir),
         &ca_pwd,
     ) {
         Ok(k) => k,
@@ -325,6 +326,7 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
         USB_CA_KEY_NAME,
         Path::new(USB_CA_SUB_DIR),
         Path::new(USB_CA_SUB_DIR),
+        Path::new(&pki_dir),
         &ca_pwd,
     ) {
         Ok(k) => k,
@@ -356,6 +358,7 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
 
     // Save certificates
     let path_cl = pki_dir.clone() + CERT_DIR + &name + "-cl.pem";
+    log::debug!("path_cl ST-PEM: {path_cl}");
     if let Err(e) = save_certificate(&cert_cl, Path::new(&path_cl)) {
         log::error!("Failed to save station certificate: {e}");
         session.close();
@@ -363,6 +366,8 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
     }
 
     let path_pq = pki_dir + CERT_DIR + &name + "-pq.pem";
+    log::debug!("path_pq ST-PEM: {path_pq}");
+
     if let Err(e) = save_certificate(&cert_cl, Path::new(&path_pq)) {
         log::error!("Failed to save station certificate: {e}");
         session.close();
@@ -740,7 +745,7 @@ async fn generate_pki_in_dir(
             return Err(String::from("Invalid user input"));
         }
     };
-    // Validate pki_dir path and create directory hierachy
+    // Validate pki_dir path and directory hierachy
     if let Err(e) = create_pki_dir(&pki_dir) {
         log::error!("Failed to create PKI directory: {e}");
         return Err(String::from("Invalid PKI directory path"));

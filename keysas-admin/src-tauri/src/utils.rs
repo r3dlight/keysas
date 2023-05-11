@@ -37,28 +37,29 @@ pub fn cmd_generate_key_and_get_csr(
     let csr_cl = match csrs.next().and_then(|pem| match CertReq::from_pem(pem) {
         Ok(c) => Some(c),
         Err(e) => {
-            log::error!("Failed to parse certification request: {e}");
+            log::error!("Failed to parse classic certification request (1): {e}");
             None
         }
     }) {
         Some(csr) => csr,
         None => {
-            return Err(anyhow!("Failed to parse certification request"));
+            return Err(anyhow!("Failed to parse classic certification request (2)"));
         }
     };
 
-    let csr_pq = match csrs
-        .remainder()
-        .and_then(|pem| match CertReq::from_pem(pem) {
+    let csr_pq = match csrs.remainder().and_then(|pem| {
+        match CertReq::from_pem(pem.trim_end_matches("\n\n")) {
             Ok(c) => Some(c),
             Err(e) => {
-                log::error!("Failed to parse certification request: {e}");
+                log::debug!("{pem:?}");
+                log::error!("Failed to parse PQC certification request (1): {e}");
                 None
             }
-        }) {
+        }
+    }) {
         Some(csr) => csr,
         None => {
-            return Err(anyhow!("Failed to parse certification request"));
+            return Err(anyhow!("Failed to parse PQC certification request (2)"));
         }
     };
 
@@ -80,11 +81,31 @@ pub fn send_cert_to_station(
 
     let command = format!(
         "{}{}{}{}",
-        "sudo /usr/bin/keysas-sign --load --certtype ", kind, " --cert ", output
+        "sudo /usr/bin/keysas-sign --load --certtype ",
+        kind,
+        " --cert=",
+        "\"".to_owned() + &output + "\"",
     );
 
     if let Err(e) = session_exec(session, &command) {
         log::error!("Failed to load certificate on the station: {e}");
+        return Err(anyhow!("Connection error"));
+    }
+
+    let command = format!(
+        "{}",
+        "sudo /bin/chown keysas-out:keysas-out /etc/keysas/file-sign-cl.p8 /etc/keysas/file-sign-cl.pem /etc/keysas/file-sign-pq.p8 /etc/keysas/file-sign-pq.pem /etc/keysas/usb-ca-cl.pem /etc/keysas/usb-ca-pq.pem",
+    );
+
+    if let Err(e) = session_exec(session, &command) {
+        log::error!("Failed to chown files: {e}");
+        return Err(anyhow!("Connection error"));
+    }
+
+    let command = format!("{}", "sudo /bin/systemctl restart keysas-out",);
+
+    if let Err(e) = session_exec(session, &command) {
+        log::error!("Failed to restart Keysas: {e}");
         return Err(anyhow!("Connection error"));
     }
 

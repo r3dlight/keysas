@@ -49,6 +49,7 @@ use x509_cert::spki::ObjectIdentifier;
 use crate::certificate_field::CertificateFields;
 use crate::keysas_key::KeysasKey;
 use crate::keysas_key::KeysasPQKey;
+use crate::pki;
 use crate::pki::generate_cert_from_csr;
 use crate::pki::DILITHIUM5_OID;
 use crate::pki::ED25519_OID;
@@ -192,21 +193,36 @@ impl HybridKeyPair {
         name: &str,
         keys_path: &Path,
         certs_path: &Path,
+        pki_dir: &Path,
         pwd: &str,
     ) -> Result<HybridKeyPair, anyhow::Error> {
         // Load keys
-        let cl_key_path = keys_path.join(name.to_owned() + "-cl.p8");
-        let classic = Keypair::load_keys(&cl_key_path, pwd)?;
+        log::debug!("PKI dir: {pki_dir:?}");
 
-        let pq_key_path = keys_path.join(name.to_owned() + "-pq.p8");
+        let keys_dir = pki_dir.join(keys_path);
+        log::debug!("Keys dir: {keys_dir:?}");
+
+        let cl_key_path = keys_dir.join(name.to_owned() + "-cl.p8");
+        log::debug!("Classic: {cl_key_path:?}");
+
+        let classic = Keypair::load_keys(&cl_key_path, pwd)?;
+        let pq_key_path = keys_dir.join(name.to_owned() + "-pq.p8");
+        log::debug!("PQ: {pq_key_path:?}");
+
         let pq = KeysasPQKey::load_keys(&pq_key_path, pwd)?;
 
         // Load certificates
-        let cl_cert_path = certs_path.join(name.to_owned() + "-cl.pem");
+        let certs_dir = pki_dir.join(certs_path);
+
+        let cl_cert_path = certs_dir.join(name.to_owned() + "-cl.pem");
+        log::debug!("cl_cert_path: {cl_cert_path:?}");
+
         let cl_cert_pem = fs::read_to_string(cl_cert_path)?;
         let classic_cert = Certificate::from_pem(cl_cert_pem)?;
 
-        let pq_cert_path = certs_path.join(name.to_owned() + "-pq.pem");
+        let pq_cert_path = certs_dir.join(name.to_owned() + "-pq.pem");
+        log::debug!("pq_cert_path: {pq_cert_path:?}");
+
         let pq_cert_pem = fs::read_to_string(pq_cert_path)?;
         let pq_cert = Certificate::from_pem(pq_cert_pem)?;
 
