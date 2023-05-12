@@ -7,7 +7,7 @@ edition = "2021"
 
 
 [dependencies]
-tungstenite = "0.19"
+tungstenite = "0.18"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -31,6 +31,7 @@ yubico_manager = "0.9"
 walkdir = "2.3"
 landlock = "0.2" 
 flexi_logger = "0.25"
+http = "0.2"
 
 [dev-dependencies]
 criterion = "0.4"
