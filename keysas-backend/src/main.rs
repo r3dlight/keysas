@@ -10,6 +10,7 @@
 use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
+use http::header::HeaderValue;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -178,22 +179,27 @@ fn main() -> Result<()> {
     landlock_sandbox()?;
     let server = TcpListener::bind("127.0.0.1:3012")?;
     for stream in server.incoming() {
+        println!("keysas-backend: Received a new websocket handshake.");
+        let stream = match stream {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Failed to accept client connection: {}", e);
+                continue;
+            }
+        };
         spawn(move || -> Result<()> {
             let callback = |_req: &Request, mut response: Response| {
-                println!("keysas-backend: Received a new websocket handshake.");
-                //println!("The request's path is: {}", req.uri().path());
-                //println!("The request's headers are:");
-                //for (ref header, _value) in req.headers() {
-                //    println!("* {}", header);
-                //}
-
-                // Let's add an additional header to our response to the client.
-                let headers = response.headers_mut();
-                headers.append("Keysas-backend", "true".parse().unwrap());
-
+                log::info!("keysas-backend: Received a new websocket handshake.");
+                //let headers = response.headers_mut();
+                //headers.append("KeysasBackend", "true".parse().unwrap());
+                response.headers_mut().append(
+                    "Sec-WebSocket-Protocol",
+                    HeaderValue::from_static("websocket"),
+                );
+                //println!("Response: {response:?}");
                 Ok(response)
             };
-            let mut websocket = accept_hdr(stream?, callback)?;
+            let mut websocket = accept_hdr(stream, callback)?;
 
             loop {
                 let files_in = list_files("/var/local/in");
