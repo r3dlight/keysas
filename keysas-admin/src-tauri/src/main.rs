@@ -55,8 +55,8 @@ const USB_CA_KEY_NAME: &str = "usb";
 const PKI_ROOT_KEY_NAME: &str = "root";
 
 const _CA_DIR: &str = "/CA";
-const ST_CA_SUB_DIR: &str = "./CA/st";
-const USB_CA_SUB_DIR: &str = "./CA/usb";
+const ST_CA_SUB_DIR: &str = "/./CA/st";
+const USB_CA_SUB_DIR: &str = "/./CA/usb";
 const PKI_ROOT_SUB_DIR: &str = "/CA/root";
 const _CRL_DIR: &str = "/CRL";
 const CERT_DIR: &str = "/CERT/";
@@ -801,6 +801,7 @@ async fn generate_pki_in_dir(
             }
         };
     // Save keys
+    log::debug!("{:?}", Path::new(&(pki_dir.to_owned() + ST_CA_SUB_DIR)));
     if let Err(e) = st_ca_keys.save(
         ST_CA_KEY_NAME,
         Path::new(&(pki_dir.to_owned() + ST_CA_SUB_DIR)),
@@ -836,6 +837,7 @@ async fn generate_pki_in_dir(
         }
     };
     // Save keys
+    log::debug!("{:?}", Path::new(&(pki_dir.to_owned() + "/" + USB_CA_SUB_DIR + "/")));
     if let Err(e) = usb_keys.save(
         USB_CA_KEY_NAME,
         Path::new(&(pki_dir.to_owned() + USB_CA_SUB_DIR)),
