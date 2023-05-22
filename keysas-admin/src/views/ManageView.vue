@@ -63,16 +63,16 @@
       <li class="list-group-item list-group-item-action list-group-item-light">
         <span>IP:</span> {{ current_ip }}
       </li>
-      <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive == 'true'">
+      <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === true">
         <span>Status: </span>
         <span class="bi bi-check-square text-success"> Online</span>
       </li>
-      <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive == 'false'">
+      <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === false">
         <span>Status: </span>
         <span class="bi bi-x-square text-danger"> Offline</span>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light"
-        v-if="KeysasAlive != 'false' && KeysasAlive != 'true'">
+        v-if="KeysasAlive != false && KeysasAlive != true">
         <span>Status: </span>
         <span class="bi bi-x-square text-dark"> Unknown</span>
       </li>
@@ -115,8 +115,7 @@
               </span>
               <br><br>
               <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
-              <span class="tip-text">This action will sign the CSRs automatically generated at first boot
-                on this Keysas station.</span>
+              <span class="tip-text">This action will create private keys and CSRs on this Keysas station. Then, it will sign the CSRs with the PKi. This may be long !</span>
             </div>
           </div>
           <div class="col-sm">
@@ -126,8 +125,11 @@
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
                 <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Enroll it</i></button>
+                <!--TODO: to be fixed to show when processing and done-->
+                <h3 v-if="confirmed" class="validate animate__animated animate__zoomIn text-success">Processing...</h3>
+                <h3 v-if="!confirmed && init_status" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
+                <h3 v-else class="validate animate__animated animate__zoomIn text-success"></h3>
                 <br><br>
-                <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
               </div>
             </form>
           </div>
@@ -196,6 +198,7 @@ export default {
       ShowPasswordSign: false,
       reboot_status: undefined,
       update_status: undefined,
+      init_status: undefined,
       shutdown_status: undefined,
       export_ssh_status: undefined,
       create_keypair_status: undefined,
@@ -324,10 +327,8 @@ export default {
     async onSubmitInit() {
       await this.getKeysasIP(this.current_keysas);
       this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
-      var password = prompt("Enter PKI password");
-      if (this.confirmed == true) {
-        //TODO 
-        this.update_status = await init(this.current_ip, this.current_keysas,password);
+      if (this.confirmed === true) {
+        this.init_status = await init(this.current_ip, this.current_keysas, this.password);
         this.confirmed = false;
       } else {
         this.ShowUpdateKeysas = false;
