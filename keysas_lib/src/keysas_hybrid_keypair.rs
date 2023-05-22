@@ -202,7 +202,7 @@ impl HybridKeyPair {
         // Load keys
         log::debug!("PKI dir: {pki_dir:?}");
 
-        let keys_dir = pki_dir.join(keys_path);
+        let keys_dir = pki_dir.join(".".to_owned() + &keys_path.to_string_lossy());
         log::debug!("Keys dir: {keys_dir:?}");
 
         let cl_key_path = keys_dir.join(name.to_owned() + "-cl.p8");
@@ -215,7 +215,7 @@ impl HybridKeyPair {
         let pq = KeysasPQKey::load_keys(&pq_key_path, pwd)?;
 
         // Load certificates
-        let certs_dir = pki_dir.join(certs_path);
+        let certs_dir = pki_dir.join(".".to_owned() + &certs_path.to_string_lossy());
 
         let cl_cert_path = certs_dir.join(name.to_owned() + "-cl.pem");
         log::debug!("cl_cert_path: {cl_cert_path:?}");
