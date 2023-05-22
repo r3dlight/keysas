@@ -49,7 +49,6 @@ use x509_cert::spki::ObjectIdentifier;
 use crate::certificate_field::CertificateFields;
 use crate::keysas_key::KeysasKey;
 use crate::keysas_key::KeysasPQKey;
-use crate::pki;
 use crate::pki::generate_cert_from_csr;
 use crate::pki::DILITHIUM5_OID;
 use crate::pki::ED25519_OID;

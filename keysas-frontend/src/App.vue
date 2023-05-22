@@ -79,7 +79,7 @@ export default {
   },
   data() {
     return {
-      debug: (process.env.NODE_ENV === 'development'),
+      debug: (process.env.NODE_ENV === 'production'),
       appStarted: false,
       StatusIn: undefined,
       StatusTransit: undefined,
@@ -113,11 +113,11 @@ export default {
       this.$refs.GuichetIn.clearAllLists();
       this.$refs.GuichetOut.clearAllLists();
     },
-    wsUdev() {
-      this.connection_udev = new WebSocket("ws://127.0.0.1:3013/socket");
+    async wsUdev() {
+      this.connection_udev = await new WebSocket("ws://127.0.0.1:3013");
       this.connection_udev.onopen = function (event) {
+        console.log("Successfully connected to websocket server keysas-io");
         console.log(event);
-        console.log("Successfully connected to websocket server udev");
       };
       var self = this;
       this.connection_udev.onmessage = function (event) {
@@ -143,11 +143,11 @@ export default {
         };
       }
     },
-    wsBackend() {
-      this.connection_backend = new WebSocket("ws://127.0.0.1:3012/socket");
+    async wsBackend() {
+      this.connection_backend = await new WebSocket("ws://127.0.0.1:3012");
       this.connection_backend.onopen = function (event) {
+        console.log("Successfully connected to websocket server keysas-backend");
         console.log(event);
-        console.log("Successfully connected to websocket server backend");
       };
       var self = this;
       this.connection_backend.onmessage = function (event) {
@@ -200,7 +200,7 @@ export default {
         this.StatusIn = true;
         this.StatusTransit = true;
         this.StatusOut = true;
-      }, 2000);
+      }, 5000);
     // <<< For Dev Only <<<
     }
 
