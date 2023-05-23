@@ -331,11 +331,13 @@ export default {
       if (this.confirmed === true) {
         //console.log("confirmed2:" + this.confirmed);
         this.init_status = await init(this.current_ip, this.current_keysas, this.password);
+        this.password = undefined;
         //console.log("init_status:" + this.init_status);
         //console.log("global:" + (this.confirmed === true && this.init_status == 'true' ));
         // Set this.confirmed = true for 5s showing the success message
         this.ShowTwoSec();
       } else {
+        this.password = undefined;
         this.confirmed = false;
       }
     },
