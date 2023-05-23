@@ -125,11 +125,11 @@
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
                 <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Enroll it</i></button>
-                <!--TODO: to be fixed to show when processing and done-->
-                <h3 v-if="confirmed" class="validate animate__animated animate__zoomIn text-success">Processing...</h3>
-                <h3 v-if="!confirmed && init_status" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
-                <h3 v-else class="validate animate__animated animate__zoomIn text-success"></h3>
                 <br><br>
+                <p v-if="confirmed === true && !init_status" class="validate animate__animated animate__zoomIn">Processing  <span class="spinner-border text-info"></span></p>
+                <p v-else-if="confirmed === true && init_status == 'true' " class="validate animate__animated animate__zoomIn text-success">Done !</p>
+                <span v-else></span>
+                <br>
               </div>
             </form>
           </div>
@@ -327,11 +327,16 @@ export default {
     async onSubmitInit() {
       await this.getKeysasIP(this.current_keysas);
       this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
+      //console.log("confirmed1:" + this.confirmed);
       if (this.confirmed === true) {
+        //console.log("confirmed2:" + this.confirmed);
         this.init_status = await init(this.current_ip, this.current_keysas, this.password);
-        this.confirmed = false;
+        //console.log("init_status:" + this.init_status);
+        //console.log("global:" + (this.confirmed === true && this.init_status == 'true' ));
+        // Set this.confirmed = true for 5s showing the success message
+        this.ShowTwoSec();
       } else {
-        this.ShowUpdateKeysas = false;
+        this.confirmed = false;
       }
     },
     async onSubmitSign() {
@@ -362,6 +367,12 @@ export default {
           console.error(error);
           this.KeysasAlive = false;
         })
+    },
+    ShowTwoSec() {
+      this.confirmed = true;
+      setTimeout(() => {
+        this.confirmed = false
+      }, 5000)
     }
   },
   beforeUnmount() {
