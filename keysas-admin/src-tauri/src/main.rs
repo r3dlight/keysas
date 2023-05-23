@@ -174,7 +174,7 @@ async fn save_sshkeys(public: String, private: String) -> bool {
 /// The first returned value is a boolean indicating if an error occured during
 /// the execution (true: result is ok, false: error)
 #[command]
-fn get_sshkeys() -> Result<(String, String), String> {
+async fn get_sshkeys() -> Result<(String, String), String> {
     match get_ssh() {
         Ok((public, private)) => Ok((public, private)),
         Err(e) => {
@@ -215,7 +215,7 @@ async fn remove_station(name: String) -> bool {
 /// The returned value contains a boolean indicating if an error occured during
 /// the execution (true: result is ok, false: error)
 #[command]
-fn get_station_ip(name: String) -> Result<String, String> {
+async fn get_station_ip(name: String) -> Result<String, String> {
     match get_station_ip_by_name(&name) {
         Ok(res) => Ok(res),
         Err(e) => {
@@ -228,7 +228,7 @@ fn get_station_ip(name: String) -> Result<String, String> {
 /// This functions returns a list of all the station name and IP address stored
 /// The list is a JSON of the form "[{name, ip}]"
 #[command]
-fn list_stations() -> Result<String, String> {
+async fn list_stations() -> Result<String, String> {
     match get_station_list() {
         Ok(res) => {
             let result = match serde_json::to_string(&res) {
@@ -255,7 +255,7 @@ fn list_stations() -> Result<String, String> {
 ///  4. Export the created certificate on the station
 ///  5. Finally it loads the admin USB signing certificate on the station
 #[command]
-fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, String> {
+async fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, String> {
     /* Get admin configuration from the store */
     // Get SSH key
     let ssh_key = match get_ssh() {
@@ -402,7 +402,7 @@ fn init_keysas(ip: String, name: String, ca_pwd: String) -> Result<String, Strin
 
     session.close();
 
-    Ok(String::from("OK"))
+    Ok(String::from("true"))
 }
 
 /// This function update a Keysas station using apt
@@ -837,7 +837,10 @@ async fn generate_pki_in_dir(
         }
     };
     // Save keys
-    log::debug!("{:?}", Path::new(&(pki_dir.to_owned() + "/" + USB_CA_SUB_DIR + "/")));
+    log::debug!(
+        "{:?}",
+        Path::new(&(pki_dir.to_owned() + "/" + USB_CA_SUB_DIR + "/"))
+    );
     if let Err(e) = usb_keys.save(
         USB_CA_KEY_NAME,
         Path::new(&(pki_dir.to_owned() + USB_CA_SUB_DIR)),
