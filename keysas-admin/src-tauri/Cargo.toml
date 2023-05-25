@@ -25,7 +25,7 @@ nom = "7.1"
 sha2 ="0.10"
 regex="1.8"
 sqlite = "0.30"
-simple_logger = "4.1"
+simple_logger = "3"
 log = "0.4"
 pkcs8 = {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
