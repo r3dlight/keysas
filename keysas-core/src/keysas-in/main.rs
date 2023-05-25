@@ -48,6 +48,7 @@ use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
 use time::OffsetDateTime;
+mod tests;
 
 #[macro_use]
 extern crate serde_derive;
@@ -194,7 +195,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 base_path
             })
             .filter_map(|f| {
-                // FD is opened in read-only mode
+                // FD is opened in read-write mode
                 let fh = match File::open(&f) {
                     Ok(f) => f,
                     Err(e) => {
