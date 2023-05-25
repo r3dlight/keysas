@@ -181,7 +181,7 @@ impl CertificateFields {
 
         // Add country name
         if let Some(cn) = &self.country {
-            rdn.add(AttributeTypeAndValue {
+            rdn.insert(AttributeTypeAndValue {
                 oid: rfc4519::C,
                 value: Any::new(Tag::PrintableString, cn.as_bytes())?,
             })?;
@@ -189,7 +189,7 @@ impl CertificateFields {
 
         // Add organisation name
         if let Some(oa) = &self.org_name {
-            rdn.add(AttributeTypeAndValue {
+            rdn.insert(AttributeTypeAndValue {
                 oid: rfc4519::O,
                 value: Any::new(Tag::PrintableString, oa.as_bytes())?,
             })?;
@@ -197,7 +197,7 @@ impl CertificateFields {
 
         // Add organisational unit
         if let Some(ou) = &self.org_unit {
-            rdn.add(AttributeTypeAndValue {
+            rdn.insert(AttributeTypeAndValue {
                 oid: rfc4519::OU,
                 value: Any::new(Tag::PrintableString, ou.as_bytes())?,
             })?;
@@ -205,7 +205,7 @@ impl CertificateFields {
 
         // Add common name
         if let Some(co) = &self.common_name {
-            rdn.add(AttributeTypeAndValue {
+            rdn.insert(AttributeTypeAndValue {
                 oid: rfc4519::CN,
                 value: Any::new(Tag::PrintableString, co.as_bytes())?,
             })?;
