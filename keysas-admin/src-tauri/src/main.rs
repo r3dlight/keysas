@@ -49,17 +49,39 @@ use crate::utils::*;
 mod usb_sign;
 use crate::usb_sign::*;
 
-// TODO: place constant paths in constants
+// Key names won't change
 const ST_CA_KEY_NAME: &str = "st-ca";
 const USB_CA_KEY_NAME: &str = "usb";
 const PKI_ROOT_KEY_NAME: &str = "root";
 
+// Define PKI paths for GNU/Linux
+#[cfg(target_os = "linux")]
 const _CA_DIR: &str = "/CA";
+#[cfg(target_os = "linux")]
 const ST_CA_SUB_DIR: &str = "/./CA/st";
+#[cfg(target_os = "linux")]
 const USB_CA_SUB_DIR: &str = "/./CA/usb";
+#[cfg(target_os = "linux")]
 const PKI_ROOT_SUB_DIR: &str = "/CA/root";
+#[cfg(target_os = "linux")]
 const _CRL_DIR: &str = "/CRL";
+#[cfg(target_os = "linux")]
 const CERT_DIR: &str = "/CERT/";
+
+// Define PKI paths for windows
+// TODO: test it on windows !
+#[cfg(target_os = "windows")]
+const _CA_DIR: &str = "\\CA";
+#[cfg(target_os = "windows")]
+const ST_CA_SUB_DIR: &str = "\\.\\CA\\st";
+#[cfg(target_os = "windows")]
+const USB_CA_SUB_DIR: &str = "\\.\\CA\\usb";
+#[cfg(target_os = "windows")]
+const PKI_ROOT_SUB_DIR: &str = "\\CA\\root";
+#[cfg(target_os = "windows")]
+const _CRL_DIR: &str = "\\CRL";
+#[cfg(target_os = "windows")]
+const CERT_DIR: &str = "\\CERT\\";
 
 fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
     if !Path::new(path).is_dir() {
