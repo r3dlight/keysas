@@ -26,12 +26,15 @@ pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
 landlock = "0.2"
 syscallz = "0.16"
-yara = "0.19"
+yara = "0.20"
 
 [dependencies.oqs]
 version = "0.7"
 default-features = false
 features = ["dilithium"]
+
+[dev-dependencies]
+tempfile = "3.5"
 
 [[bin]]
 name = "keysas-in"
