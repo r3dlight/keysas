@@ -314,6 +314,7 @@ fn main() -> Result<()> {
         "file-sign",
         Path::new(KEY_FILE_DIR),
         Path::new(KEY_FILE_DIR),
+        Path::new("."),
         KEY_PASSWD,
     ) {
         Ok(k) => Some(k),
