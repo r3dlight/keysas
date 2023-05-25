@@ -11,7 +11,7 @@ anyhow = "1.0"
 clap = "4.2"
 walkdir = "2.3"
 regex ="1.8"
-simple_logger = "4.1"
+simple_logger = "3"
 log = "0.4"
 pkcs8 = {version = "0.10", default-features = false, features = ["encryption", "pem"] }
 x509-cert = "0.2"
