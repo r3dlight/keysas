@@ -221,9 +221,14 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let buf_str = String::from_utf8(buf)?;
 
     let mut signatures = buf_str.split('|');
-    //TODO: handle these unwrap
-    let s_cl = signatures.next().unwrap();
-    let s_pq = signatures.remainder().unwrap();
+    let s_cl = match signatures.next() {
+        Some(cl) => cl,
+        None => return Err(anyhow!("Cannot parse Classic signature from bytes")),
+    };
+    let s_pq = match signatures.remainder() {
+        Some(pq) => pq,
+        None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
+    };
     let sig_dalek = SignatureDalek::from_bytes(s_cl.as_bytes())
         .context("Cannot parse classic signature from bytes")?;
     oqs::init();
