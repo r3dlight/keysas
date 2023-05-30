@@ -186,6 +186,7 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             get_pki_config,
             get_pki_path,
             revoke_usb,
+            del_pki,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -213,6 +214,20 @@ async fn save_sshkeys(public: String, private: String) -> bool {
 async fn get_sshkeys() -> Result<(String, String), String> {
     match get_ssh() {
         Ok((public, private)) => Ok((public, private)),
+        Err(e) => {
+            log::error!("Failed to get ssh keys: {e}");
+            Err(String::from("Store error"))
+        }
+    }
+}
+
+/// This functions drop the ca_table from the DB to remove the PKI configuration
+/// The first returned value is a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
+#[command]
+async fn del_pki() -> Result<(), String> {
+    match drop_pki().await {
+        Ok(()) => Ok(()),
         Err(e) => {
             log::error!("Failed to get ssh keys: {e}");
             Err(String::from("Store error"))

@@ -36,6 +36,7 @@
           }}</span></li>
         </ul>
       </div>
+      <button class="btn btn-outline-danger btn-lg shadow" @click="removePKI">Delete PKI</button>
     </div>
   </div>
   <div v-else>
@@ -79,7 +80,16 @@ export default {
         this.pkiPath = dir;
       })
       .catch((error) => console.error(error));      
-    }
+    },
+    async removePKI(keysas) {
+      this.confirmed = await confirm('This cannot be reverted, please confirm', { title: 'Remove this PKI ?', type: 'warning' });
+      if (this.confirmed == true) {
+        await invoke('del_pki', {})
+                .then((res) => console.log("PKI deleted"))
+                .catch((error) => console.error(error));
+        this.confirmed = false;
+      }
+    },
   }
 }
 </script>
