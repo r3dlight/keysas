@@ -102,7 +102,7 @@ pub fn send_cert_to_station(
         return Err(anyhow!("Connection error"));
     }
 
-    let command = format!("{}", "sudo /bin/systemctl restart keysas-out",);
+    let command = format!("{}", "sudo /bin/systemctl restart keysas",);
 
     if let Err(e) = session_exec(session, &command) {
         log::error!("Failed to restart Keysas: {e}");
