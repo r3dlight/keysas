@@ -17,7 +17,6 @@ udev = "0.7"
 regex = "1.8"
 libc = "0.2"
 nom = "7"
-minisign = "0.7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 crossbeam-utils = "0.8"
 nix = "0.26"
