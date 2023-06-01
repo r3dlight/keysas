@@ -223,11 +223,11 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let mut signatures = buf_str.split('|');
     let s_cl = match signatures.next() {
         Some(cl) => cl,
-        None => return Err(anyhow!("Cannot parse Classic signature from bytes")),
+        None => return Err(anyhow!("Cannot parse Classic signature from USB device")),
     };
     let s_pq = match signatures.remainder() {
         Some(pq) => pq,
-        None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
+        None => return Err(anyhow!("Cannot parse PQ signature from USB device")),
     };
     let sig_dalek = SignatureDalek::from_bytes(s_cl.as_bytes())
         .context("Cannot parse classic signature from bytes")?;
