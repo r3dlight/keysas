@@ -167,6 +167,7 @@ fn get_ip() -> Result<Vec<String>> {
         if let Some(address) = ifaddr.address {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
+            //TODO: should be fixed to match other eth names
             if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
                 ips.push(ip.to_string());
             }
@@ -205,31 +206,21 @@ fn main() -> Result<()> {
                 let files_in = list_files("/var/local/in");
                 let files_out = list_files("/var/local/out");
 
-                let mut diode_in = PathBuf::new();
-                diode_in.push("/run/diode-in");
-                let mut diode_out = PathBuf::new();
-                diode_out.push("/run/diode-out/");
-                let is_empty_in = diode_in.read_dir()?.next().is_none();
                 let mut fs_in = PathBuf::new();
                 fs_in.push("/var/local/in");
                 let is_empty_fs_in = fs_in.read_dir()?.next().is_none();
 
-                let is_empty_out = diode_out.read_dir()?.next().is_none();
                 let mut fs_transit = PathBuf::new();
                 fs_transit.push("/var/local/transit");
                 let is_empty_fs_transit = fs_transit.read_dir()?.next().is_none();
 
-                let working_in = !is_empty_in
-                    || Path::new("/var/lock/keysas/keysas-in").exists()
-                    || !is_empty_fs_in;
+                let working_in =
+                    Path::new("/var/lock/keysas/keysas-in").exists() || !is_empty_fs_in;
 
-                let working_out = !is_empty_out
-                    || Path::new("/var/lock/keysas/keysas-out").exists()
-                    || !is_empty_fs_transit;
+                let working_out =
+                    Path::new("/var/lock/keysas/keysas-out").exists() || !is_empty_fs_transit;
 
-                let working_transit = !(is_empty_out
-                    && is_empty_in
-                    && !Path::new("/var/lock/keysas/keysas-transit").exists());
+                let working_transit = Path::new("/var/lock/keysas/keysas-transit").exists();
 
                 let health: Daemons = Daemons {
                     status_in: daemon_status()?[0],
