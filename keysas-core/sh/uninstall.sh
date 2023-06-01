@@ -33,6 +33,7 @@ main() {
 		/etc/apparmor.d/usr.bin.keysas-out
 		/etc/apparmor.d/local/usr.sbin.clamd
 		/etc/systemd/system/clamav-daemon.socket
+		/etc/sudoers.d/010_keysas
 	"
 
 	dirs="
