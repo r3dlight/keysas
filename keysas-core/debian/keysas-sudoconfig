@@ -1,0 +1,11 @@
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/keysas-sign
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/keysas-manage-yubikey
+keysas ALL=(root) EXEC,NOPASSWD: /bin/systemctl reboot
+keysas ALL=(root) EXEC,NOPASSWD: /bin/systemctl poweroff
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/apt update
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/apt -y dist-upgrade
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/keysas-sign
+keysas ALL=(root) EXEC,NOPASSWD: /usr/bin/sed -i s/.*PasswordAuthentication.*/PasswordAuthentication no/ /etc/ssh/sshd_config
+keysas ALL=(root) EXEC,NOPASSWD: /bin/systemctl restart sshd
+keysas ALL=(root) EXEC,NOPASSWD: /bin/systemctl restart keysas
+keysas ALL=(root) EXEC,NOPASSWD: /bin/chown keysas-out\:keysas-out /etc/keysas/file-sign-cl.p8 /etc/keysas/file-sign-cl.pem /etc/keysas/file-sign-pq.p8 /etc/keysas/file-sign-pq.pem /etc/keysas/usb-ca-cl.pem /etc/keysas/usb-ca-pq.pem
