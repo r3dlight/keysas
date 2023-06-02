@@ -107,10 +107,11 @@ fn sign_device(
     let classic_sig = classic_struct.message_sign(data.as_bytes())?;
     let pq_sig = pq_pub_struct.message_sign(data.as_bytes())?;
     let hybrid_sig = format!(
-        "{}-{}",
+        "{}|{}",
         general_purpose::STANDARD.encode(classic_sig.as_slice()),
         general_purpose::STANDARD.encode(pq_sig.as_slice())
     );
+    log::debug!("{}", hybrid_sig);
     Ok(hybrid_sig)
 }
 
@@ -235,8 +236,7 @@ pub fn sign_usb(
         .get_maximum_partition_size()
         .context("No more space available in the USB device")?;
 
-    let starting_lba_i32 = 4096;
-    let starting_lba = starting_lba_i32;
+    let starting_lba = 8192;
 
     mbr[1] = mbrman::MBRPartitionEntry {
         boot: mbrman::BOOT_INACTIVE,     // boot flag
@@ -270,6 +270,7 @@ pub fn sign_usb(
         vendor, model, revision, serial, direction, path_cl, path_pq, password,
     )?;
     let size_u32 = attrs.len() as u32;
+    log::info!("Signature size is {}", size_u32);
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
     f.write_all(attrs.as_bytes())?;
