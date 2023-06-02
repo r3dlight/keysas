@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::is_corrupted;
-    use tempfile::tempdir;
     use std::fs::File;
+    use tempfile::tempdir;
 
     #[test]
     fn test_is_corrupted() {

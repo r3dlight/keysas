@@ -33,8 +33,6 @@ use async_std::task;
 use keysas_lib::certificate_field::CertificateFields;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::pki::generate_cert_from_csr;
-use nom::bytes::complete::take_until;
-use nom::IResult;
 use std::fs;
 use std::path::Path;
 use tauri::command;
@@ -98,6 +96,7 @@ fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
 /// |   |--usb
 /// |--CRL
 /// |--CERT
+#[cfg(target_os = "linux")]
 fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
     // Test if the directory path is valid
     if !Path::new(&pki_dir.trim()).is_dir() {
@@ -108,10 +107,24 @@ fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
     create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/root"))?;
     create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/st"))?;
     create_dir_if_not_exist(&(pki_dir.to_owned() + "/CA/usb"))?;
-
     create_dir_if_not_exist(&(pki_dir.to_owned() + "/CRL"))?;
     create_dir_if_not_exist(&(pki_dir.to_owned() + "/CERT"))?;
+    Ok(())
+}
 
+#[cfg(target_os = "windows")]
+fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
+    // Test if the directory path is valid
+    if !Path::new(&pki_dir.trim()).is_dir() {
+        return Err(anyhow!("Invalid PKI directory path"));
+    }
+
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CA"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CA\\root"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CA\\st"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CA\\usb"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CRL"))?;
+    create_dir_if_not_exist(&(pki_dir.to_owned() + "\\CERT"))?;
     Ok(())
 }
 
@@ -159,7 +172,6 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             export_sshpubkey,
             is_alive,
             sign_key,
-            revoke_key,
             validate_privatekey,
             validate_rootkey,
             generate_pki_in_dir,
@@ -172,6 +184,7 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             get_pki_config,
             get_pki_path,
             revoke_usb,
+            del_pki,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -199,6 +212,20 @@ async fn save_sshkeys(public: String, private: String) -> bool {
 async fn get_sshkeys() -> Result<(String, String), String> {
     match get_ssh() {
         Ok((public, private)) => Ok((public, private)),
+        Err(e) => {
+            log::error!("Failed to get ssh keys: {e}");
+            Err(String::from("Store error"))
+        }
+    }
+}
+
+/// This functions drop the ca_table from the DB to remove the PKI configuration
+/// The first returned value is a boolean indicating if an error occured during
+/// the execution (true: result is ok, false: error)
+#[command]
+async fn del_pki() -> Result<(), String> {
+    match drop_pki().await {
+        Ok(()) => Ok(()),
         Err(e) => {
             log::error!("Failed to get ssh keys: {e}");
             Err(String::from("Store error"))
@@ -648,77 +675,6 @@ async fn sign_key(password: String) -> bool {
             return false;
         }
     };
-    true
-}
-
-fn parser(s: &str) -> IResult<&str, &str> {
-    take_until("keysas-sign")(s)
-}
-
-fn parser_revoke(s: &str) -> IResult<&str, &str> {
-    take_until("--sign")(s)
-}
-
-// TODO: to be modified to work locally
-#[command]
-async fn revoke_key(ip: String) -> bool {
-    let private_key = match get_ssh() {
-        Ok((_, private)) => private,
-        Err(e) => {
-            log::error!("Failed to get private key: {e}");
-            return false;
-        }
-    };
-
-    // Connect to the host
-    let host = format!("{}{}", ip.trim(), ":22");
-    let mut session = match connect_key(&ip, &private_key) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to open ssh connection with station: {e}");
-            return false;
-        }
-    };
-
-    let command = "sudo /usr/bin/keysas-sign --watch".to_string();
-    let stdout = match session_exec(&mut session, &command) {
-        Ok(stdout) => stdout,
-        Err(e) => {
-            log::error!("Error while revoking a USB storage: {:?}", e);
-            session.close();
-            return false;
-        }
-    };
-
-    let command = match String::from_utf8(stdout) {
-        Ok(signme) => {
-            let signme = signme.trim();
-            let (command, _) = parser(signme).unwrap();
-            let (_, command) = parser_revoke(command).unwrap();
-            let command = format!("{}{}{}", "sudo /usr/bin/", command.trim(), " --revoke");
-            log::debug!("{}", command);
-            command
-        }
-        Err(e) => {
-            log::error!("Error while revoking a USB storage: {:?}", e);
-            session.close();
-            return false;
-        }
-    };
-
-    log::debug!("Going to revoke a USB device on keysas: {}", host);
-    match session_exec(&mut session, &command) {
-        Ok(_) => {
-            log::info!("USB storage successfully revoked !");
-        }
-        Err(e) => {
-            log::error!("Error while revoking a USB storage: {:?}", e);
-            session.close();
-            return false;
-        }
-    }
-
-    session.close();
     true
 }
 

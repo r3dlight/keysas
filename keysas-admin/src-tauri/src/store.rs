@@ -167,6 +167,22 @@ pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
     }
 }
 
+/// Drop the current PKI
+pub async fn drop_pki() -> Result<(), anyhow::Error> {
+    match STORE_HANDLE.lock() {
+        Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
+        Ok(hdl) => match hdl.as_ref() {
+            Some(connection) => {
+                let query = format!("DROP TABLE ca_table; CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);");
+                log::debug!("Query: {}", query);
+                connection.execute(query)?;
+                Ok(())
+            }
+            None => Err(anyhow!("Store is not initialized")),
+        },
+    }
+}
+
 /// Get the station IP address by name
 /// Returns an error if the station does not exist or in case of trouble accessing
 /// the database

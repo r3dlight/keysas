@@ -124,11 +124,8 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .expect("failed to get status for keysas-in");
     let status_in = String::from_utf8_lossy(&output.stdout);
     let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[0] = true;
-    } else {
-        state[0] = false;
-    }
+    state[0] = re.is_match(&status_in);
+
     let output = Command::new("systemctl")
         .arg("status")
         .arg("keysas-transit.service")
@@ -136,11 +133,8 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .expect("failed to get status for keysas-transit");
     let status_in = String::from_utf8_lossy(&output.stdout);
     let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[1] = true;
-    } else {
-        state[1] = false;
-    }
+    state[1] = re.is_match(&status_in);
+
     let output = Command::new("systemctl")
         .arg("status")
         .arg("keysas-out.service")
@@ -148,11 +142,8 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .expect("failed to get status for keysas-out");
     let status_in = String::from_utf8_lossy(&output.stdout);
     let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[2] = true;
-    } else {
-        state[2] = false;
-    }
+    state[2] = re.is_match(&status_in);
+
     Ok(state)
 }
 
@@ -162,11 +153,12 @@ fn parse_ip(s: &str) -> IResult<&str, &str> {
 
 fn get_ip() -> Result<Vec<String>> {
     let mut ips = Vec::new();
-    let addrs = nix::ifaddrs::getifaddrs().unwrap();
+    let addrs = nix::ifaddrs::getifaddrs()?;
     for ifaddr in addrs {
         if let Some(address) = ifaddr.address {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
+            //TODO: should be fixed to match other eth names
             if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
                 ips.push(ip.to_string());
             }
@@ -205,31 +197,16 @@ fn main() -> Result<()> {
                 let files_in = list_files("/var/local/in");
                 let files_out = list_files("/var/local/out");
 
-                let mut diode_in = PathBuf::new();
-                diode_in.push("/run/diode-in");
-                let mut diode_out = PathBuf::new();
-                diode_out.push("/run/diode-out/");
-                let is_empty_in = diode_in.read_dir()?.next().is_none();
                 let mut fs_in = PathBuf::new();
                 fs_in.push("/var/local/in");
                 let is_empty_fs_in = fs_in.read_dir()?.next().is_none();
 
-                let is_empty_out = diode_out.read_dir()?.next().is_none();
-                let mut fs_transit = PathBuf::new();
-                fs_transit.push("/var/local/transit");
-                let is_empty_fs_transit = fs_transit.read_dir()?.next().is_none();
+                let working_in =
+                    Path::new("/var/lock/keysas/keysas-in").exists() || !is_empty_fs_in;
 
-                let working_in = !is_empty_in
-                    || Path::new("/var/lock/keysas/keysas-in").exists()
-                    || !is_empty_fs_in;
+                let working_out = Path::new("/var/lock/keysas/keysas-out").exists();
 
-                let working_out = !is_empty_out
-                    || Path::new("/var/lock/keysas/keysas-out").exists()
-                    || !is_empty_fs_transit;
-
-                let working_transit = !(is_empty_out
-                    && is_empty_in
-                    && !Path::new("/var/lock/keysas/keysas-transit").exists());
+                let working_transit = Path::new("/var/lock/keysas/keysas-transit").exists();
 
                 let health: Daemons = Daemons {
                     status_in: daemon_status()?[0],
@@ -251,13 +228,6 @@ fn main() -> Result<()> {
                 if !Path::new("/usr/share/keysas/neversigned").exists() {
                     has_signed = true;
                 }
-                let mut keypair_ok = false;
-
-                if Path::new("/etc/keysas/keysas.priv").exists()
-                    && Path::new("/etc/keysas/keysas.pub").exists()
-                {
-                    keypair_ok = true;
-                }
 
                 let orders = GlobalStatus {
                     health,
@@ -265,7 +235,7 @@ fn main() -> Result<()> {
                     guichettransit: working_transit,
                     guichetout: guichet_state_out,
                     has_signed_once: has_signed,
-                    keypair_generated: keypair_ok,
+                    keypair_generated: true,
                     ip: get_ip()?,
                 };
 

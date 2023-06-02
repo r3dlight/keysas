@@ -15,6 +15,7 @@ extern crate regex;
 extern crate udev;
 
 use anyhow::anyhow;
+use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, Command as Clap_Command};
 use log::{debug, error, info, warn};
 use regex::Regex;
@@ -215,20 +216,51 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
         .read(true)
         .open(device)
         .context("Cannot open the USB device to verify the signature.")?;
-    let mut buf = Vec::new();
+    // Seeking for hybrid signature
+    let mut buf = [0u8; 4];
     f.seek(SeekFrom::Start(offset))?;
     f.read_exact(&mut buf)?;
-    let buf_str = String::from_utf8(buf)?;
+    let signature_size = u32::from_be_bytes(buf);
+    // Size must not be > 7684 bytes LBA-MBR (8196-512)
+    if signature_size > 7684 as u32 {
+        return Err(anyhow!("Invalid length for signature"));
+    }
+    // Now read the signature size only
+    let mut buffer = vec![0u8; signature_size.try_into()?];
+    log::debug!("Allocated buffer size for signature is {}", buf.len());
+    f.read_exact(&mut buffer)?;
+    let buf_str = String::from_utf8(buffer.to_vec())?;
 
     let mut signatures = buf_str.split('|');
-    //TODO: handle these unwrap
-    let s_cl = signatures.next().unwrap();
-    let s_pq = signatures.remainder().unwrap();
-    let sig_dalek = SignatureDalek::from_bytes(s_cl.as_bytes())
+    let s_cl = match signatures.next() {
+        Some(cl) => general_purpose::STANDARD.decode(cl)?,
+        None => return Err(anyhow!("Cannot parse Classic signature from USB device")),
+    };
+
+    let s_cl_decoded = match general_purpose::STANDARD.decode(s_cl) {
+        Ok(cl) => cl,
+        Err(e) => {
+            return Err(anyhow!(
+                "Cannot decode base64 Classic signature from bytes: {e}"
+            ))
+        }
+    };
+
+    let s_pq = match signatures.remainder() {
+        Some(pq) => pq,
+        None => return Err(anyhow!("Cannot parse PQ signature from USB device")),
+    };
+
+    let s_pq_decoded = match general_purpose::STANDARD.decode(s_pq) {
+        Ok(pq) => pq,
+        Err(e) => return Err(anyhow!("Cannot decode base64 PQ signature from bytes: {e}")),
+    };
+
+    let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded)
         .context("Cannot parse classic signature from bytes")?;
     oqs::init();
     let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-    let sig_pq = match pq_scheme.signature_from_bytes(s_pq.as_bytes()) {
+    let sig_pq = match pq_scheme.signature_from_bytes(&s_pq_decoded) {
         Some(sig) => sig,
         None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
     };
