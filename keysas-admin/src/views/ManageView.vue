@@ -128,6 +128,7 @@
                 <br><br>
                 <p v-if="confirmed === true && !init_status" class="validate animate__animated animate__zoomIn">Processing  <span class="spinner-border text-info"></span></p>
                 <p v-else-if="confirmed === true && init_status == 'true' " class="validate animate__animated animate__zoomIn text-success">Done !</p>
+                <p v-else-if="init_status == false" class="validate animate__animated animate__zoomIn text-danger">PKI error !</p>
                 <span v-else></span>
                 <br>
               </div>
@@ -325,7 +326,7 @@ export default {
      */
     async onSubmitInit() {
       await this.getKeysasIP(this.current_keysas);
-      this.confirmed = await confirm('This action cannot be reverted. Are you sure?', { title: 'Ready to initialize this Keysas', type: 'warning' });
+      this.confirmed = await confirm('Are you sure ?', { title: 'Ready to initialize this Keysas', type: 'warning' });
       //console.log("confirmed1:" + this.confirmed);
       if (this.confirmed === true) {
         //console.log("confirmed2:" + this.confirmed);
