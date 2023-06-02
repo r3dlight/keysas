@@ -33,8 +33,6 @@ use async_std::task;
 use keysas_lib::certificate_field::CertificateFields;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::pki::generate_cert_from_csr;
-use nom::bytes::complete::take_until;
-use nom::IResult;
 use std::fs;
 use std::path::Path;
 use tauri::command;
@@ -678,14 +676,6 @@ async fn sign_key(password: String) -> bool {
         }
     };
     true
-}
-
-fn parser(s: &str) -> IResult<&str, &str> {
-    take_until("keysas-sign")(s)
-}
-
-fn parser_revoke(s: &str) -> IResult<&str, &str> {
-    take_until("--sign")(s)
 }
 
 #[command]
