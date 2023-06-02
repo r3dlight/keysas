@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "Keysas stations administration application"
 authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
-repository = ""
+repository = "https://github.com/r3dlight/keysas"
 default-run = "keysas-admin"
 edition = "2021"
 rust-version = "1.57"
@@ -21,11 +21,10 @@ tauri = { version = "1.2.5", features = ["api-all", "updater"] }
 ssh-rs = "0.3.2" 
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
-nom = "7.1"
 sha2 ="0.10"
 regex="1.8"
 sqlite = "0.30"
-simple_logger = "3"
+simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
