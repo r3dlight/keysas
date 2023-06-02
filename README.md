@@ -41,7 +41,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Keysas-fido: Manage Yubikeys 5 enrollment
  - Keysas-backend: Create a websocket server to send different json values to the keysas-frontend
  - Keysas-frontend: Readonly VueJS3 Frontend for the final user
- - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS3). It also provides a PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
+ - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS). It also provides an hybrid post-quantum PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
 
 ## Installation
 
@@ -50,15 +50,17 @@ On Debian stable:
 echo "deb http://deb.debian.org/debian bullseye-backports main contrib non-free" > /etc/apt/sources.list.d/backports.list
 apt-get update -yq
 apt -qy -t bullseye-backports install libyara-dev libyara9
-apt-get install -y wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev
+apt -qy install -y wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
 git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
+rustup toolchain install nightly-2023-05-20 --force
+rustup default nightly-2023-05-20
 make help
 make build
 make install
 ```
 ## User documentation
 
-User documentation can be found here : [https://keysas.fr](https://keysas.fr)
+User documentation (deprecated for now) can be found here : [https://keysas.fr](https://keysas.fr)
 
