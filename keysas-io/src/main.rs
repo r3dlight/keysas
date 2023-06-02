@@ -233,7 +233,7 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
 
     let mut signatures = buf_str.split('|');
     let s_cl = match signatures.next() {
-        Some(cl) => general_purpose::STANDARD.decode(cl)?,
+        Some(cl) => cl,
         None => return Err(anyhow!("Cannot parse Classic signature from USB device")),
     };
 
