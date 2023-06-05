@@ -2,9 +2,7 @@
 <img  src ="img/logo-keysas-github.png"  alt="Keysas"  width=300px/>
 </div>
 
-# USB virus cleaning station (WIP)
-
-Warning: This is only a work in progress for now.
+# USB virus cleaning station
 
 # Main features
 - Retrieve untrusted files from USB (via keysas-io) or over the network
@@ -62,5 +60,5 @@ make install
 ```
 ## User documentation
 
-User documentation (deprecated for now) can be found here : [https://keysas.fr](https://keysas.fr)
+User documentation (outdated for now) can be found here : [https://keysas.fr](https://keysas.fr)
 
