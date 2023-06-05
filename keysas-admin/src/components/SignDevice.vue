@@ -35,7 +35,7 @@
         <span v-else-if="signUsbStatus === false" class="animate__animated animate__flash textterm text-danger">
           Error while signing the new device !</span>
         <div v-else> 
-          Please plug a new USB device...<br> 
+          Please plug a new USB device and wait<br> 
           <span class="textterm spinner-border text-info"></span>
         </div>
       </div>

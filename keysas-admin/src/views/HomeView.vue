@@ -33,7 +33,9 @@
       <ul>
         <li>You can now start <b>adding</b> new keysas stations in the <b>"Add a new Keysas"</b> menu
           providing a name and an IP address</li>
-        <li>When done, <b>export</b> the public key by clicking the <b>"Export SSH pubkey"</b> button for each station added</li>
+        <li>When done, <b>export</b> the public SSH key by clicking the <b>"Export SSH pubkey"</b> button for each station added</li>
+        <li>In the menu, go to <b>"Manage your registred stations"</b>, click on <b>more</b>, provide your IKPQPKI password then click on <b>"Enroll"</b></li>
+        <li>Be patient, this may take some time &#x2615;</li>
       </ul>
       <br>
       <li><b class="text-info">Sign your outgoing USB keys</b></li>
