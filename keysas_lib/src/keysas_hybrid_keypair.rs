@@ -24,6 +24,7 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
+use anyhow::anyhow;
 use anyhow::Context;
 use ed25519_dalek::Digest;
 use ed25519_dalek::Keypair;
@@ -115,8 +116,14 @@ fn generate_root_dilithium(
     infos: &CertificateFields,
 ) -> Result<(SecretKey, oqs::sig::PublicKey, Certificate), anyhow::Error> {
     // Create the root CA Dilithium key pair
-    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-    let (pk, sk) = pq_scheme.keypair()?;
+    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        Ok(pq_s) => pq_s,
+        Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+    };
+    let (pk, sk) = match pq_scheme.keypair() {
+        Ok((public, secret)) => (public, secret),
+        Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+    };
 
     // OID value for dilithium-sha512 from IBM's networking OID range
     let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
@@ -137,7 +144,10 @@ fn generate_root_dilithium(
 
     let content = tbs.to_der()?;
 
-    let signature = pq_scheme.sign(&content, &sk)?;
+    let signature = match pq_scheme.sign(&content, &sk) {
+        Ok(sig) => sig,
+        Err(e) => return Err(anyhow!("Cannot sign message: {e}")),
+    };
 
     let cert = Certificate {
         tbs_certificate: tbs,
@@ -276,8 +286,14 @@ impl HybridKeyPair {
 
         // Generate Dilithium key and certificate
         // Create the Dilithium key pair
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let (pk_dl, sk_dl) = pq_scheme.keypair()?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        let (pk_dl, sk_dl) = match pq_scheme.keypair() {
+            Ok((public, secret)) => (public, secret),
+            Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+        };
         let kp_pq = KeysasPQKey {
             private_key: sk_dl,
             public_key: pk_dl,

@@ -11,7 +11,7 @@ anyhow = "1.0"
 clap = "4.2"
 walkdir = "2.3"
 regex ="1.8"
-simple_logger = "3"
+simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", default-features = false, features = ["encryption", "pem"] }
 x509-cert = "0.2"
@@ -31,4 +31,4 @@ base64 = "0.21"
 [dependencies.oqs]
 version = "0.7"
 default-features = false
-features = ["std", "dilithium"]
+features = ["dilithium"]

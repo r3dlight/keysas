@@ -119,7 +119,10 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
                 .raw_bytes(),
         )?;
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct Dilithium algorithm: {e}")),
+        };
         let pub_pq = match pq_scheme.public_key_from_bytes(
             cert_pq
                 .tbs_certificate
@@ -146,10 +149,14 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
             .verify(message, &signatures.classic)
             .context("Invalid Ed25519 signature")?;
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        pq_scheme
-            .verify(message, &signatures.pq, &pubkeys.pq)
-            .context("Invalid Dilithium5 signature")?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        match pq_scheme.verify(message, &signatures.pq, &pubkeys.pq) {
+            Ok(_) => log::info!("Dilithium scheme is verified"),
+            Err(e) => return Err(anyhow!("Dilithium scheme is not verified: {e}")),
+        };
         // If no error has been returned then the signature is valid
         Ok(())
     }
@@ -380,8 +387,14 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         // Important load oqs:
         oqs::init();
 
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let (pk_dl, sk_dl) = pq_scheme.keypair()?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        let (pk_dl, sk_dl) = match pq_scheme.keypair() {
+            Ok((public, secret)) => (public, secret),
+            Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+        };
         let kp_pq = KeysasPQKey {
             private_key: sk_dl,
             public_key: pk_dl,
@@ -489,8 +502,14 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         };
 
         let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let signature = pq_scheme.sign(&content, &self.private_key)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        let signature = match pq_scheme.sign(&content, &self.private_key) {
+            Ok(sig) => sig,
+            Err(e) => return Err(anyhow!("Cannot sign message: {e}")),
+        };
 
         let csr = CertReq {
             info,
@@ -506,21 +525,33 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let signature = pq_scheme.sign(message, &self.private_key)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        let signature = match pq_scheme.sign(message, &self.private_key) {
+            Ok(sig) => sig,
+            Err(e) => return Err(anyhow!("Cannot sign message: {e}")),
+        };
         Ok(signature.into_vec())
     }
 
     fn message_verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, anyhow::Error> {
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
         let sig = match pq_scheme.signature_from_bytes(signature) {
             Some(s) => s,
             None => {
                 return Err(anyhow!("Invalid signature input"));
             }
         };
-        pq_scheme.verify(message, sig, &self.public_key)?;
+        match pq_scheme.verify(message, sig, &self.public_key) {
+            Ok(_) => log::info!("Dilithium scheme verified"),
+            Err(e) => return Err(anyhow!("Dilithium scheme not verified: {e}")),
+        }
         // If no error then the signature is valid
         Ok(true)
     }
@@ -549,8 +580,14 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
 
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
-        let signature = pq_scheme.sign(&content, &self.private_key)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
+        let signature = match pq_scheme.sign(&content, &self.private_key) {
+            Ok(sig) => sig,
+            Err(e) => return Err(anyhow!("Cannot sign message: {e}")),
+        };
 
         let cert = Certificate {
             tbs_certificate: tbs,

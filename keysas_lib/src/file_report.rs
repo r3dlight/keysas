@@ -331,7 +331,10 @@ pub fn parse_report(
 
     // Validate the signature with Dilithium
     oqs::init();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        Ok(pq_s) => pq_s,
+        Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+    };
     let pub_pq = pq_scheme
         .public_key_from_bytes(
             cert_pq
@@ -344,9 +347,11 @@ pub fn parse_report(
     let sig_pq = pq_scheme
         .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
         .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
-    pq_scheme.verify(message.as_bytes(), sig_pq, pub_pq)?;
+    match pq_scheme.verify(message.as_bytes(), sig_pq, pub_pq) {
+        Ok(_) => log::info!("Dilithium scheme is now verified"),
+        Err(e) => return Err(anyhow!("Dilithium scheme is not verified: {e}")),
+    }
     // If the signature is invalid an error is thrown
-
     Ok(report)
 }
 

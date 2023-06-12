@@ -187,7 +187,10 @@ pub fn generate_cert_from_csr(
     {
         // Validate CSR authenticity
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+            Ok(pq_s) => pq_s,
+            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        };
         if pq_scheme
             .verify(
                 &csr.info.to_der()?,

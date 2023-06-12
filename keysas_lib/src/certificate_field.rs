@@ -110,7 +110,10 @@ pub fn validate_signing_certificate(
                 oqs::init();
 
                 // Extract the CA public key
-                let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+                let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+                    Ok(pq_s) => pq_s,
+                    Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+                };
                 let ca_key = pq_scheme
                     .public_key_from_bytes(
                         cert.tbs_certificate
@@ -128,7 +131,10 @@ pub fn validate_signing_certificate(
                             .ok_or_else(|| anyhow!("Signature field is empty"))?,
                     )
                     .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
-                pq_scheme.verify(&cert.tbs_certificate.to_der()?, sig, ca_key)?;
+                match pq_scheme.verify(&cert.tbs_certificate.to_der()?, sig, ca_key) {
+                    Ok(_) => log::info!("Certificate is verified"),
+                    Err(e) => return Err(anyhow!("Certificate is not verified: {e}")),
+                }
                 // If the signature is invalid an error is thrown
             }
             _ => {
