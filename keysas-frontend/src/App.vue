@@ -19,7 +19,7 @@
     <div class="container">
       <div class="row">
         <div class="col-sm-5 panel panel-left">
-          <AppGuichet 
+          <AppKeysas
           type="IN"
           ref="GuichetIn"
           :working="analysingIN || analysingTRANSIT || analysingOUT"
@@ -29,7 +29,7 @@
           />
         </div>
         <div class="col-sm-7 panel panel-right">
-          <AppGuichet 
+          <AppKeysas
           type="OUT"
           ref="GuichetOut"
           :working="false"
@@ -67,14 +67,14 @@
 
 <script>
 import AppHeader from "./components/AppHeader.vue";
-import AppGuichet from "./components/AppGuichet.vue";
+import AppKeysas from "./components/AppKeysas.vue";
 import AppWizard from "./components/AppWizard-fr.vue";
 
 export default {
   //name: 'app',
   components: {
     AppHeader,
-    AppGuichet,
+    AppKeysas,
     AppWizard
   },
   data() {
