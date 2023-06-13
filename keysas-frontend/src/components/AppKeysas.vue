@@ -97,7 +97,7 @@
 
 <script>
 export default {
-  name: "AppGuichet",
+  name: "AppKeysas",
   props: [
     "type",
     "working",
@@ -165,9 +165,9 @@ export default {
         }
 
         val.forEach(element => {
-          if(element.endsWith('.sha256')) {
-            return;
-          }
+        //  if(element.endsWith('.sha256')) {
+        //    return;
+        //  }
 
           // handling Keysas reports
           if (element.endsWith('.krp')) {
