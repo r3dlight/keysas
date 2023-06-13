@@ -19,6 +19,6 @@
     "@rollup/plugin-alias": "^4.0.2",
     "@vitejs/plugin-vue": "^4.0.0",
     "sass": "^1.56.2",
-    "vite": "^4.3.5"
+    "vite": "^4.3.9"
   }
 }
