@@ -3,43 +3,35 @@
     <div class="row">
       <div class="col-sm-12">
       <section id="no-signed-key">
-<h1>Félicitations et bienvenue sur <b>Keysas</b> !</h1>
+<h1>Félicitations et bienvenue sur <b>Keysas</b></h1>
 <p> Mon ip est {{ ip[0] }}.</p>
 <div class="callout callout-info">
-Si c'est la première fois que vous utilisez la station blanche <b>Keysas</b>, vous devez commencer par signer un périphérique USB. <br>
+Si c'est la première fois que vous utilisez la station blanche <b>Keysas</b>, vous devez commencer par signer un périphérique USB de sortie. <br>
 Ce tutoriel va vous montrer coment procéder. Vous pourrez le ré-afficher à tout moment en utilisant le menu en haut à droite.
 </div>
 <h2>Comment créer un périphérique USB de sortie ?</h2>
 <section id="connexion-a-la-station-blanche">
-<h3>1 - Connexion à votre Station blanche Keysas</h3>
-<p>L’image fournie est basée sur une distribution GNU/Linux Debian 11 (Bullseye) durcie. Le DHCP est activé par défaut: l’adresse IP obtenue est normalement affichée plus haut.</p>
+<h3>1 - Utilisez Keysas-admin</h3>
+<p>L’image fournie est basée sur une distribution GNU/Linux Debian 12 (Bookworm) durcie. Le DHCP est activé par défaut: l’adresse IP obtenue est normalement affichée plus haut.</p>
 <p>Afin de prémunir la station blanche d’attaques de type BadUSB, seuls les périphériques USB de type “stockage de masse” comme les clés ou disques durs USB sont reconnus par la station blanche. Les claviers USB et les souris ne peuvent donc pas fonctionner.</p>
 <div class="callout callout-info">
-Pour signer un périphérique USB de sortie, vous pouvez choisir de télécharger l'application <b>keysas-admin</b> sur le site keysas.fr et vous référez à la documentation de l'application. Cette application est pour le moment uniquement disponible 
+Pour signer un périphérique USB de sortie, vous devez d'abord télécharger et installer l'application <b>keysas-admin</b> depuis le site keysas.fr et vous référez à la documentation de l'application. Cette application est pour le moment uniquement disponible 
 au format <i>.deb</i> et <i>.appimage</i> (GNU/Linux) et .msi (Windows).
 </div> 
-<p>Vous pouvez également choisir de vous connecter en utilisant le protocole SSH sur la station blanche:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh keysas-sign@{{ ip[0] }} (IP obtenue via DHCP)</span>
-</code></pre></div>
-<div class="callout callout-warning">
-Le mot de passe par defaut est Changeme. Il conviendra de modifier ce dernier dès la première utilisation en le remplacant par un mot de passe robuste.
-</div>
+
 </section>
 <section id="generation-des-cles-de-signature">
-<h3>2 - Génération des clés de signature</h3>
-<p>Pour signer une clé USB "à la main", nous allons d'abord générer une paire de clés asymétriques qui servira à signer et vérifier les périphériques sortants:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">sudo /usr/bin/keysas-sign --generate --password=Toto007</span>
-<span class="go">sudo chmod 600 /etc/keysas/keysas.priv</span>
-<span class="go">sudo chattr +i /etc/keysas/keysas.priv</span>
-</code></pre></div>
+<h3>2 - Génération de la PKI de signature</h3>
+<p>Pour signer les périphériques USB de confiance et pour que la station blanche puisse signer les rapports d'analyse, vous devez créer une <b>IKPQPKI</b> depuis <b>Keysas-admin</b></p>
+<p>Allez dans le menu d'administration puis cliquez sur <b>IKPQPKI</b> et créer une nouvelle <b>IKPQPKI</b></p>
+
 <div class="callout callout-warning">
-Il est très important de remplacer le mot de passe dans la ligne de commande par le votre :)<br>
-Ce mot de passe sera nécessaire pour chaque signature d'un nouveau périphérique USB.
+Le mot de passe de cette PKI doit être suffisement complexe et il conviendra de le sauvegarder en suivant les recommendations en vigueur.<br>
+Toute perte de ce mot de passe rendra la PKI définitivement inutilisable.
 </div>
 <div class="callout callout-danger">
-Cette bi-clé doit être générée une seule fois à l’initialisation de la station blanche. Le remplacement de cette bi-clé
-entrainera l’échec de la vérification de la signature de toutes les périphériques USB déjà signés. Par défaut, les clés privées
-et publiques sont enregistrées dans /etc/keysas/. Il est important de sauvegarder ces clés dans un endroit sécurisé.
+Par défaut, les clés privées sont stockées au format <b>PKCS#8</b> et les clés publiques au format PEM. <br>
+Sur les stations blanches, l'ensemble des clés sont enregistrées dans /etc/keysas/.
 </div>
 </section>
 <section id="signature-d-un-peripherique-usb">
