@@ -72,9 +72,9 @@
       <a @click="this.displayErrors = false" :class="(this.displayErrors ? null : 'AppGuichet-switcher-active') + ' AppGuichet-switcher-first'">
         {{ $tc('guichet_OUT.files.x_files_verified_available', this.listOutOK.length) }}
       </a>
-      <a @click="this.displayErrors = true" :class="this.displayErrors ? 'AppGuichet-switcher-active' : null">
+      <!--<a @click="this.displayErrors = true" :class="this.displayErrors ? 'AppGuichet-switcher-active' : null">
         {{ $tc('guichet_OUT.files.x_files_refused', this.listOutError.length) }}
-      </a>
+      </a>-->
     </h5>
 
     <!-- List Detail -->
@@ -85,7 +85,7 @@
       <li class="list-group-item list-out" v-for="(file, index) in this.listOutOK" v-bind:key="index">{{ file.filename }}<span class="file-error">{{ file.error ? $t(file.error) : '' }}</span></li>
     </ul>
     <ul v-if="this.type === 'OUT' && this.listOutError.length > 0 && this.displayErrors" class="AppGuichet-list list-group">
-      <li class="list-group-item list-out-error" v-for="(file, index) in this.listOutError" v-bind:key="index">{{ file.filename }}<span class="file-error">{{ $t(file.error) }}</span></li>
+      <li class="list-group-item list-out-error" v-for="(file, index) in this.listOutError" v-bind:key="index">{{ file.filename }}<!--<span class="file-error">{{ $t(file.error) }}</span>--></li>
     </ul>
 
     <!-- USB IN Help placeholder -->
@@ -129,10 +129,6 @@ export default {
   watch: {
     files(val, oldVal) {
       let errorsMessages = {
-        '.antivirus': 'guichet_OUT.files.error.reason.antivirus',
-        '.forbidden': 'guichet_OUT.files.error.reason.forbidden',
-        '.yara': 'guichet_OUT.files.error.reason.yara',
-        '.toobig': 'guichet_OUT.files.error.reason.toobig',
         '.ioerror': 'guichet_OUT.files.error.reason.ioerror',
       };
 
@@ -165,47 +161,7 @@ export default {
         }
 
         val.forEach(element => {
-        //  if(element.endsWith('.sha256')) {
-        //    return;
-        //  }
-
-          // handling Keysas reports
-          if (element.endsWith('.krp')) {
-            let slicedElement = element.substring(0, element.indexOf('.krp'));
-            let list = val.includes(slicedElement) ? this.listOutOK : this.listOutError;
-            if (!list.map(x => x.filename).includes(slicedElement)) {
-              fetch(element)
-              .then(response => response.json())
-              .then(data =>{
-                if (data.metadata.report.yara === true) {
-                  list.push({
-                    filename: slicedElement,
-                    error: errorsMessages['.yara']
-                  });
-                }
-                if (data.metadata.report.av === true) {
-                  list.push({
-                    filename: slicedElement,
-                    error: errorsMessages['.antivirus']
-                  });
-                }
-                if (data.metadata.report.type_allowed === false) {
-                  list.push({
-                    filename: slicedElement,
-                    error: errorsMessages['.forbidden']
-                  });
-                }
-                if (data.metadata.report.toobig === true) {
-                  list.push({
-                    filename: slicedElement,
-                    error: errorsMessages['.toobig']
-                  });
-                }
-              })
-              .catch(error => {
-                console.log('An unknown error appened');
-              });
-            }
+          if(element.endsWith('.krp')) {
             return;
           }
 
