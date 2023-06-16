@@ -15,7 +15,7 @@ Si c'est la première fois que vous utilisez une station blanche <b>Keysas</b>, 
 <p>En effet, toutes les clés non signées seront considérées comme des clés d'entrée et les clés signées par <b>Keysas-admin</b> seront considérées comme clés de sortie par la station blanche. Seules les clés de sortie permettent la récupération des fichiers signés.
 Ce tutoriel va vous montrer comment procéder. Vous pourrez le ré-afficher à tout moment en utilisant le menu en haut à droite.</p>
 <h2>Keysas-admin</h2>
-<section id="connexion-a-la-station-blanche">
+<section id="creation-pki">
 <h3>1 - Création de la PKI de signature</h3>
 Cette procédure vous permettra de générer une PKI hybride Ed25519-Dilithium5 (IKPQPKI) pour la signatures des clés de sortie et la signature des documents passés dans une station blanche <b>Keysas</b>.
 <div class="callout callout-info">
