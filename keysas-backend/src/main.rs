@@ -165,7 +165,6 @@ fn get_ip() -> Result<Vec<String>> {
         if let Some(address) = ifaddr.address {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
-            //TODO: should be fixed to match other eth names
             let re = Regex::new(r"eth|enp")?;
             if re.is_match(&ifaddr.interface_name) && ip.parse::<Ipv4Addr>().is_ok() {
                 ips.push(ip.to_string());
