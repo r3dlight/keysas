@@ -39,6 +39,13 @@ extern crate libc;
 extern crate regex;
 mod errors;
 
+const SAS_IN: &str = "/var/local/in";
+const SAS_OUT: &str = "/var/local/out";
+const LOCK_IN: &str = "/var/lock/keysas/keysas-in";
+const LOCK_TRANSIT: &str = "/var/lock/keysas/keysas-transit";
+const LOCK_OUT: &str = "/var/lock/keysas/keysas-out";
+const NEVER_SIGNED: &str = "/usr/share/keysas/neversigned";
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GlobalStatus {
     health: Daemons,
@@ -123,7 +130,7 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .output()
         .expect("failed to get status for keysas-in");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
+    let re = Regex::new(r"Active:")?;
     state[0] = re.is_match(&status_in);
 
     let output = Command::new("systemctl")
@@ -132,7 +139,7 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .output()
         .expect("failed to get status for keysas-transit");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
+    let re = Regex::new(r"Active:")?;
     state[1] = re.is_match(&status_in);
 
     let output = Command::new("systemctl")
@@ -141,7 +148,7 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .output()
         .expect("failed to get status for keysas-out");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
+    let re = Regex::new(r"Active:")?;
     state[2] = re.is_match(&status_in);
 
     Ok(state)
@@ -159,7 +166,10 @@ fn get_ip() -> Result<Vec<String>> {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
             //TODO: should be fixed to match other eth names
-            if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
+            let re = Regex::new(r"^\.enp")?;
+            if (ifaddr.interface_name == "eth0" || re.is_match(&ifaddr.interface_name))
+                && ip.parse::<Ipv4Addr>().is_ok()
+            {
                 ips.push(ip.to_string());
             }
         }
@@ -194,19 +204,18 @@ fn main() -> Result<()> {
             let mut websocket = accept_hdr(stream, callback)?;
 
             loop {
-                let files_in = list_files("/var/local/in");
-                let files_out = list_files("/var/local/out");
+                let files_in = list_files(SAS_IN);
+                let files_out = list_files(SAS_OUT);
 
                 let mut fs_in = PathBuf::new();
-                fs_in.push("/var/local/in");
+                fs_in.push(SAS_IN);
                 let is_empty_fs_in = fs_in.read_dir()?.next().is_none();
 
-                let working_in =
-                    Path::new("/var/lock/keysas/keysas-in").exists() || !is_empty_fs_in;
+                let working_in = Path::new(LOCK_IN).exists() || !is_empty_fs_in;
 
-                let working_out = Path::new("/var/lock/keysas/keysas-out").exists();
+                let working_out = Path::new(LOCK_OUT).exists();
 
-                let working_transit = Path::new("/var/lock/keysas/keysas-transit").exists();
+                let working_transit = Path::new(LOCK_TRANSIT).exists();
 
                 let health: Daemons = Daemons {
                     status_in: daemon_status()?[0],
@@ -225,7 +234,7 @@ fn main() -> Result<()> {
                 };
                 let mut has_signed = false;
 
-                if !Path::new("/usr/share/keysas/neversigned").exists() {
+                if !Path::new(NEVER_SIGNED).exists() {
                     has_signed = true;
                 }
 
@@ -241,7 +250,7 @@ fn main() -> Result<()> {
 
                 let serialized = serde_json::to_string(&orders)?;
                 websocket.write_message(Message::Text(serialized))?;
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_millis(300));
             }
         });
     }
