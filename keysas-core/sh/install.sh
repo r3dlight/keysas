@@ -173,6 +173,7 @@ enable_systemd() {
 	systemctl enable keysas-out.service
 	systemctl enable keysas-transit.service
 	systemctl enable keysas.service --now | true
+	systemctl restart clamav-daemon
 }
 
 main() {
