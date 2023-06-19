@@ -42,24 +42,24 @@ add_users() {
 # Install ELF binaries in /usr/bin/.
 install_bin() {
 	if [ -d "/usr/bin" ]; then
-		if [ -f "target/release/keysas-in" ]; then
-			install -v -o $U_KEYSAS_IN -g $U_KEYSAS_IN -m 0500 target/release/keysas-in /usr/bin/
+		if [ -f "../bin/keysas-in" ]; then
+			install -v -o $U_KEYSAS_IN -g $U_KEYSAS_IN -m 0500 ../bin/keysas-in /usr/bin/
 		else
-			echo "Binary ./target/release/keysas-in cannot be found !"
+			echo "Binary ../bin/keysas-in cannot be found !"
 		fi
 	fi
 	if [ -d "/usr/bin" ]; then
-		if [ -f "target/release/keysas-transit" ]; then
-			install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0500 target/release/keysas-transit /usr/bin/
+		if [ -f "../bin/keysas-transit" ]; then
+			install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0500 ../bin/keysas-transit /usr/bin/
 		else
-			echo "Binary ./target/release/keysas-transit cannot be found !"
+			echo "Binary ../bin/keysas-transit cannot be found !"
 		fi
 	fi
 	if [ -d "/usr/bin" ]; then
-		if [ -f "target/release/keysas-out" ]; then
-			install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0500 target/release/keysas-out /usr/bin/
+		if [ -f "../bin/keysas-out" ]; then
+			install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0500 ../bin/keysas-out /usr/bin/
 		else
-			echo "Binary ./target/release/keysas-out cannot be found !"
+			echo "Binary ../bin/keysas-out cannot be found !"
 		fi
 	fi
 }
