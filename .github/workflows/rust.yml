@@ -33,7 +33,7 @@ jobs:
           libayatana-appindicator3-dev \
           librsvg2-dev \
           libyara-dev \
-          libyara8 \
+          libyara9 \
           make \
           lsb-release \
           software-properties-common \
