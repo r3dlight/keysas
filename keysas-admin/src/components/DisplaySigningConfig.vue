@@ -1,46 +1,52 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
+    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
-    <span class="tip-text">You must provide the application a dedicated root 
-      Certificate Authority keypair to setup the PKI.</span>
-    <span class="tip-text"> ED25519 or ED448 keys are accepted in PKCS#12 format.<br> 
-      To generate this new keypair on your local machine, open a terminal and 
-      enter to following commands:</span>
-    <br>
-    <div class="terminal-left">
-      <span class="textterminal"># Generate private key for the root CA</span><br>
-      <span class="textterminal">> openssl genpkey -algorithm ed25519 -out root-priv.pem</span><br>
-      <span class="textterminal"># Generate corresponding certificate</span><br>
-      <span class="textterminal">> openssl req -new x509 -nodes -days 3650 -key root-priv.pem -out root-cert.pem</span><br>
-      <span class="textterminal"># Generate PKCS#12 file with the two keys</span><br>
-      <span class="textterminal">> openssl pkcs12 -export -out root-store.p12 -inkey root-priv.pem -in root-cert.pem</span><br>
-      <span class="textterminal"># Clean private key file</span><br>
-      <span class="textterminal">> rm ./root-priv.pem</span>
-    </div>
+    <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
+      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture (IKPQPKI).
+      Click on <b>Create a new IKPQPKI</b>.</span>
+    <span class="tip-text"> Then, provide all the requested information to allow us to create a new IKPQPKI for you.<br> 
+    When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.<br> 
+    </span>
+    <span class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></span>
+
   </div>
   <br>
-  <div v-if="!hide" class="custom-li tip">
+  <div v-if="!hide" class="box-custom">
     <div class="text-center">
-      <button class="send btn btn-light shadow" @click="hide = true; getRootKey()"><span class="bi bi-caret-up-fill"> Hide
-          registred Root CA key</span></button>
+      <button class="send btn btn-light shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
+        IKPQPKI configuration</span></button>
       <br><br>
       <div class="List">
         <ul class="list-group-item">
-          <li class="list-group-item list-group-item-light">Registred Root CA key:<br><span class="text-secondary">{{
-            pubKey
+          <li class="list-group-item list-group-item-light">IKPQPKI directory: <span class="text-secondary">{{
+            pkiPath
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Country: <span class="text-secondary">{{
+            pkiConfig.country
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Organization name: <span class="text-secondary">{{
+            pkiConfig.org_name
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Organization unit: <span class="text-secondary">{{
+            pkiConfig.org_unit
+          }}</span></li>
+          <li class="list-group-item list-group-item-light">Validity: <span class="text-secondary">{{
+            pkiConfig.validity
           }}</span></li>
         </ul>
       </div>
+      <button class="btn btn-outline-danger btn-lg shadow" @click="removePKI">Delete PKI</button>
     </div>
   </div>
   <div v-else>
-    <button class="send btn btn-light shadow" @click="hide = false; getRootKey()"><span class="bi bi-caret-down-fill">
-        Show registred Root CA key</span></button>
+    <button class="send btn btn-light shadow" @click="hide = false; getPKIConfig()"><span class="bi bi-caret-down-fill">
+        Show current PKI configuration</span></button>
   </div>
 </template>
 
 <script>
+import { invoke } from "@tauri-apps/api";
 
 export default {
   name: 'DisplaySigningConfig',
@@ -50,6 +56,8 @@ export default {
     return {
       rootKey: '',
       hide: true,
+      pkiConfig: '',
+      pkiPath: '',
     }
   },
   mounted() {
@@ -57,12 +65,31 @@ export default {
   },
 
   methods: {
-    getRootKey() {
-      let paths = localStorage.getItem('rootCA');
+    async getPKIConfig() {
+      //let paths = localStorage.getItem('rootCA');
       //console.log("Path: "+ paths);
-      this.rootKey = JSON.parse(paths).pub;
-      console.log("Path: " + this.rootKey);
-    }
+      invoke('get_pki_config')
+      .then((config) => {
+        console.log(config);
+        this.pkiConfig = config;
+      })
+      .catch((error) => console.error(error));
+      invoke('get_pki_path')
+      .then((dir) => {
+        console.log(dir);
+        this.pkiPath = dir;
+      })
+      .catch((error) => console.error(error));      
+    },
+    async removePKI(keysas) {
+      this.confirmed = await confirm('This cannot be reverted, please confirm', { title: 'Remove this PKI ?', type: 'warning' });
+      if (this.confirmed == true) {
+        await invoke('del_pki', {})
+                .then((res) => console.log("PKI deleted"))
+                .catch((error) => console.error(error));
+        this.confirmed = false;
+      }
+    },
   }
 }
 </script>
@@ -75,6 +102,18 @@ label {
   margin: 25px 0 15px;
   font-size: 1.1em;
   text-transform: uppercase;
+  font-weight: bold;
+}
+
+.box-custom {
+  max-width: 1000px;
+  margin: 10px auto;
+  background: white;
+  color: white;
+  text-align: left;
+  padding: 10px;
+  border-radius: 15px;
+  font-size: 1.1em;
   font-weight: bold;
 }
 
@@ -133,5 +172,9 @@ button {
   font-weight: normal;
   color: rgb(158, 161, 163);
   font-size: 1em;
+}
+h3 {
+  margin: 45px 0 0;
+  color: #fff;
 }
 </style>

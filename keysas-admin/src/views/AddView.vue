@@ -2,11 +2,11 @@
   <NavBar />
   <div class="container">
     <div class="row">
-      <h2>Add a new Keysas station !</h2>
+      <h1>Add a new Keysas station !</h1>
     </div>
     <div class="row">
       <div class="col-sm">
-        <AddForm />
+        <AddStation />
       </div>
       <div class="col-sm">
         <DisplayKeysas />
@@ -19,7 +19,7 @@
 "use strict";
 
 import NavBar from '../components/NavBar.vue'
-import AddForm from '../components/AddForm.vue'
+import AddStation from '../components/AddStation.vue'
 import DisplayKeysas from '../components/DisplayKeysas.vue'
 
 
@@ -27,7 +27,7 @@ export default {
   name: 'AddView',
   components: {
     NavBar,
-    AddForm,
+    AddStation,
     DisplayKeysas
   },
   computed: {

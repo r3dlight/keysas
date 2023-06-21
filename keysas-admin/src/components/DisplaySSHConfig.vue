@@ -1,6 +1,6 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> Help</i></h5>
+    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
     <span class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
       stations.</span>
@@ -123,7 +123,7 @@ button {
 .tip {
   max-width: 1000px;
   text-align: left;
-  margin: 30px auto;
+  margin: 40px auto;
   background: white;
   padding: 40px;
   border-radius: 10px;

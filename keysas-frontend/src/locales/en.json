@@ -37,7 +37,7 @@
           "forbidden": "extension forbidden",
           "yara": "potential virus detected",
           "toobig": "file too big",
-          "failed": "I/O error",
+          "ioerror": "I/O error",
           "unknown": "unknown error"
         }
       }

@@ -1,33 +1,34 @@
 <template>
-  <div class="row align-items-start">
+  <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow"
+      <button class="send btn btn-outline-info btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
-        Load PKI
+        Load from local IKPQPKI
       </button>
     </div>
-    <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow"
+    <!-- No pkcs11 for now-->
+    <!--<div class="col">
+      <button class="send btn btn-light btn-lg shadow"
               @click="showLoadPKIForm = false;
                       showRootKeyForm = !showRootKeyForm;
                       showPkiDirForm = false;">
         Generate from Root CA
       </button>      
-    </div>
+    </div>-->
     <div class="col">
-      <button class="send btn btn-outline-success btn-lg shadow" 
+      <button class="send btn btn-outline-info btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
-        Do it for me
+        Create a new IKPQPKI
       </button>      
     </div>
-  </div>
+  <!--</div>-->
   <div v-if="showLoadPKIForm">
     <form class="add-form" @submit.prevent="onSubmit">
-      <label type="text"> Path to your PKI folder:</label>
+      <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
@@ -47,7 +48,7 @@
   </div>
   <div v-if="showRootKeyForm">
     <form class="add-form" @submit.prevent="onSubmit">
-      <label type="text"> Path to your Root CA key file (PKCS#12):</label>
+      <label type="text"> Path to your Root CA key file (PKCS#8):</label>
       <input type="text" required v-model="rootKeyPath" id="rootKey"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
@@ -69,38 +70,42 @@
     <form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Organization name:</label>
       <input type="text" required v-model="orgName" id="orgName"/>
-      <label type="text"> PKI name:</label>
+      <label type="text"> IKPQPKI name:</label>
       <input type="text" required v-model="orgUnit" id="orgUnit"/>
       <label type="text"> Country (first two letters):</label>
       <input type="text" required v-model="country" id="country"/>
+      <div v-if="countryError" class="error"> {{ countryError }}</div>
       <label type="text"> Validity (days):</label>
       <input type="text" required v-model="validity" id="validity"/>
-      <label type="text"> Signature algorithm (default ed25519 / ed448):</label>
-      <input type="text" required v-model="sigAlgo" id="sigAlgo"/>
       <label type="text"> Select directory:</label>
       <input type="text" required v-model="pkiDir" id="pkiDir"/>
-      <label type="text"> Password:</label>
-      <input type="text" required v-model="adminPwd" id="adminPwd"/>
       <div class="text-center">
         <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIDir">Browse</button>
       </div>
-      <div v-if="keysError" class="error"> {{ keysError }}
+      <label type="text"> Password:</label>
+      <input type="password" required v-model="adminPwd" id="adminPwd"/>
+      <div v-if="passwordError" class="error"> {{ passwordError }}
       </div>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
-                @click="submitPKIDirForm">
+        <button v-if="!waiting" class="send btn btn-outline-success btn-lg shadow"
+                @click="submit();">
           <i class="bi bi-check-square"> Ok</i>
         </button>
-        <br><br>
-        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
+        <div v-if="waiting">
+          Wait while creating IKPQPKI... <span class="spinner-border text-info"></span>
+        </div>
+        <br>
+        <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">IKPQPKI successfully created !</h3>
       </div>
     </form>
   </div>
+</div>
+
 </template>
 
 <script>
-"use strict";
+//"use strict";
 
 import {getRootKeyPath, getPKIFolder, getPKIDir} from "../utils/utils";
 
@@ -118,14 +123,16 @@ export default {
       orgUnit: '',
       country: '',
       validity: '',
-      sigAlgo: '',
       adminPwd: '',
       pkiFolder: '',
       keysError: '',
       show: false,
+      waiting: false,
       showLoadPKIForm: false,
       showRootKeyForm: false,
-      showPkiDirForm: false
+      showPkiDirForm: false,
+      passwordError: '',
+      countryError: '',
     }
   },
 
@@ -148,26 +155,38 @@ export default {
     async submitRootCAForm() {
       console.log('Root CA form submission');
     },
+    async submit() {
+      await this.submitPKIDirForm();
+    },
     async submitPKIDirForm() {
       console.log('PKI Dir form submission');
-      invoke('generate_pki_in_dir', {
-            orgName: this.orgName,
-            orgUnit: this.orgUnit,
-            country: this.country,
-            validity: this.validity,
-            sigAlgo: this.sigAlgo,
-            adminPwd: this.adminPwd,
-            pkiDir: this.pkiDir
-
-        })
-        .then((res) => console.log(res))
+      this.passwordError = this.adminPwd.length > 7 ?
+        '' : "Password should have been created with at least 8 chars";
+        this.countryError = this.country.length < 3 ?
+        '' : "Country must be 2 chars long";
+      if (!this.passwordError && !this.countryError) {
+        this.waiting = true;
+        await invoke('generate_pki_in_dir', {
+             orgName: this.orgName,
+             orgUnit: this.orgUnit,
+             country: this.country,
+             validity: this.validity,
+             adminPwd: this.adminPwd,
+             pkiDir: this.pkiDir
+         })
+        .then((res) => this.pkiGenerated())
         .catch((error) => console.error(error));
+      } else {console.log("Password incorrect lengh !")}
     },
-    ShowTwoSec() {
+    async pkiGenerated(){
+      this.waiting = false;
+      this.ShowFiveSec();
+    },
+    ShowFiveSec() {
       this.show=true;
       setTimeout(() => {
         this.show = false
-        }, 2000)
+        }, 5000)
       }  
     }
 }

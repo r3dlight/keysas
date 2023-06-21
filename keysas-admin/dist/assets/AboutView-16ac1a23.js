@@ -1,0 +1,1 @@
+import{_ as t,N as a,g as s,o as n,c as r,h as _,F as c,a as e}from"./index-cbd18d6f.js";const l={name:"AboutView",components:{NavBar:a},data(){return{}},methods:{}},p=e("h2",null,"Version 0.2.0",-1),u=e("h3",null,"Copyright Keysas 2022-2023.",-1);function i(d,m,h,f,v,B){const o=s("NavBar");return n(),r(c,null,[_(o),p,u],64)}const V=t(l,[["render",i]]);export{V as default};

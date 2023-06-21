@@ -1,3 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-only
+/*
+ *
+ * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ *
+ * This file contains various utility functions
+ */
+
+//! This module contains utility functions for the rest of Keysas
+
+#![feature(str_split_remainder)]
 use anyhow::Result;
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -5,10 +16,21 @@ use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, IoSlice, Read};
-use std::os::unix::io::AsRawFd;
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
+#[cfg(target_os = "linux")]
+use std::io::IoSlice;
+#[cfg(target_os = "linux")]
+use std::os::unix::io::AsRawFd;
+
+#[macro_use]
+extern crate serde_derive;
+
+pub mod certificate_field;
+pub mod file_report;
+pub mod keysas_hybrid_keypair;
+pub mod keysas_key;
 pub mod pki;
 
 // Init logger
@@ -97,6 +119,7 @@ pub fn list_files(directory: &str) -> Result<Vec<String>> {
     Ok(names)
 }
 
+#[cfg(target_os = "linux")]
 pub fn convert_ioslice<'a>(
     files: &'a Vec<File>,
     input: &'a Vec<Vec<u8>>,

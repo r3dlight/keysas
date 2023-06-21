@@ -1,0 +1,59 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "keysas-minifilter",
+    "version": "0.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "notification": {
+        "all": true
+      },
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "icon": [
+        "icons/logo-keysas-short.ico",
+        "icons/logo-keysas-short-16.png",
+        "icons/logo-keysas-short-32.png",
+        "icons/logo-keysas-short-48.png",
+        "icons/logo-keysas-short-256.png"
+      ],
+      "identifier": "com.keysas.usbfirewall",
+      "targets": "all",
+      "category": "Utility"
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "systemTray": {
+        "iconPath": "./icons/logo-keysas-short.ico",
+        "iconAsTemplate": true
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Keysas USB Firewall",
+        "url": "index.html",
+        "visible": false,
+        "decorations": false,
+        "width": 600,
+        "height": 400
+      }
+    ]
+  }
+}

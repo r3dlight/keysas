@@ -8,13 +8,16 @@
  */
 
 #![feature(atomic_from_mut)]
+#![feature(str_split_remainder)]
 
 extern crate libc;
 extern crate regex;
 extern crate udev;
 
 use anyhow::anyhow;
+use base64::{engine::general_purpose, Engine as _};
 use clap::{crate_version, Arg, Command as Clap_Command};
+use log::{debug, error, info, warn};
 use regex::Regex;
 use std::fs::{self, create_dir_all};
 use std::path::PathBuf;
@@ -28,7 +31,6 @@ use tungstenite::{
 use udev::Event;
 use walkdir::WalkDir;
 
-extern crate minisign;
 extern crate proc_mounts;
 extern crate serde;
 extern crate serde_json;
@@ -39,18 +41,17 @@ extern crate serde_derive;
 
 use crate::errors::*;
 use crossbeam_utils::thread;
+use ed25519_dalek::Signature as SignatureDalek;
+use keysas_lib::init_logger;
+use keysas_lib::keysas_key::PublicKeys;
+use keysas_lib::keysas_key::{KeysasHybridPubKeys, KeysasHybridSignature};
 use kv::Config as kvConfig;
 use kv::*;
 use libc::{c_int, c_short, c_ulong, c_void};
-use minisign::PublicKeyBox;
-use minisign::SignatureBox;
-use nom::bytes::complete::take;
-use nom::error::Error;
-use nom::number::complete::be_u32;
+use oqs::sig::{Algorithm, Sig};
 use proc_mounts::MountIter;
 use std::fmt::Write;
 use std::fs::File;
-use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -122,19 +123,29 @@ impl StrExt for str {
     }
 }
 
+// Const because we do not want them to be modifyied
+const TMP_DIR: &str = "/var/local/tmp/";
+const SAS_IN: &str = "/var/local/in/";
+const SAS_OUT: &str = "/var/local/out/";
+const LOCK: &str = "/var/local/in/.lock";
+const FIDO_DB: &str = "/etc/keysas/fido_db";
+const VAR_LOCK_DIR: &str = "/var/lock/keysas/";
+const WORKING_IN_FILE: &str = "/var/lock/keysas/keysas-in";
+const WORKING_OUT_FILE: &str = "/var/lock/keysas/keysas-out";
+
 fn list_yubikey() -> Vec<String> {
     let mut yubi = Yubico::new();
     let mut yubikey_vector = Vec::new();
 
     if let Ok(device) = yubi.find_yubikey() {
-        //println!(
+        //info!(
         //    "Vendor ID: {:?} Product ID {:?}",
         //    device.vendor_id, device.product_id
         //);
         let concat = format!("{:?}/{:?}", device.vendor_id, device.product_id);
         yubikey_vector.push(concat);
     } else {
-        println!("Fido2: Yubikey not present !");
+        debug!("Fido2: Yubikey not present.");
     }
 
     yubikey_vector
@@ -142,12 +153,12 @@ fn list_yubikey() -> Vec<String> {
 
 fn hmac_challenge() -> Option<String> {
     // TODO: Must be improved to manage all cases
-    if Path::new("/etc/keysas/yubikey_db").is_dir() {
+    if Path::new(FIDO_DB).is_dir() {
         let mut yubi = Yubico::new();
 
         if let Ok(device) = yubi.find_yubikey() {
-            println!(
-                "Yubico found: Vendor ID is {:?}, Product ID is {:?}",
+            info!(
+                "New Yubico found: Vendor ID is {:?}, Product ID is {:?}",
                 device.vendor_id, device.product_id
             );
 
@@ -166,107 +177,156 @@ fn hmac_challenge() -> Option<String> {
                     let v: &[u8] = hmac_result.deref();
                     let hex_string = hex::encode(v);
 
-                    let cfg = kvConfig::new("/etc/keysas/yubikey_db");
+                    let cfg = kvConfig::new(FIDO_DB);
 
                     // Open the key/value store
                     match Store::new(cfg) {
                         Ok(store) => match store.bucket::<String, String>(Some("Keysas")) {
-                            Ok(enrolled_yubikeys) => {
-                                enrolled_yubikeys.get(&hex_string).unwrap().map(|name| name)
-                            }
+                            Ok(enrolled_yubikeys) => enrolled_yubikeys.get(&hex_string).unwrap(),
                             Err(why) => {
-                                println!("Error while accessing the Bucket: {why:?}");
+                                error!("Error while accessing the Bucket: {why:?}");
                                 None
                             }
                         },
+
                         Err(why) => {
-                            println!("Error while accessing the store: {why:?}");
+                            error!("Error while accessing the store: {why:?}");
                             None
                         }
                     }
                 }
                 Err(why) => {
-                    println!("Error while performing hmac challenge {why:?}");
+                    error!("Error while performing hmac challenge {why:?}");
                     None
                 }
             }
         } else {
-            println!("Yubikey not found, please insert a Yubikey.");
+            warn!("Yubikey not found, please insert a Yubikey.");
             None
         }
     } else {
-        println!("Error: Database /etc/keysas/yubikey_db wasn't found.");
+        error!("Error: Database Fido database wasn't found.");
         None
     }
 }
 
-fn get_signature(device: &str) -> Result<String> {
+fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let offset = 512;
     let mut f = File::options()
         .read(true)
         .open(device)
         .context("Cannot open the USB device to verify the signature.")?;
-    let mut buf = vec![0u8; 2048];
+    // Seeking for hybrid signature
+    let mut buf = [0u8; 4];
     f.seek(SeekFrom::Start(offset))?;
     f.read_exact(&mut buf)?;
+    let signature_size = u32::from_be_bytes(buf);
+    // Size must not be > 7684 bytes LBA-MBR (8196-512)
+    if signature_size > 7684 as u32 {
+        return Err(anyhow!("Invalid length for signature"));
+    }
+    // Now read the signature size only
+    let mut buffer = vec![0u8; signature_size.try_into()?];
+    log::debug!("Allocated buffer size for signature is {}", buf.len());
+    f.read_exact(&mut buffer)?;
+    let buf_str = String::from_utf8(buffer.to_vec())?;
 
-    let (i, len) = be_u32::<&[u8], nom::error::Error<&[u8]>>(&buf).map_err(|err| {
-        err.map(|err| Error::new(String::from_utf8(err.input.to_vec()), err.code))
-    })?;
-    let (_, signature) = take::<u32, &[u8], nom::error::Error<&[u8]>>(len)(i).map_err(|err| {
-        err.map(|err| Error::new(String::from_utf8(err.input.to_vec()), err.code))
-    })?;
-    let signature = str::from_utf8(signature)?;
-    //    match parser(&bufstr) {
-    //        Ok(signature) => {
-    //            println!("{}",signature);
-    //            signature},
-    //        Err(err) => err.to_string(),
-    //    };
-    Ok(signature.to_string())
+    let mut signatures = buf_str.split('|');
+    let s_cl = match signatures.next() {
+        Some(cl) => cl,
+        None => return Err(anyhow!("Cannot parse Classic signature from USB device")),
+    };
+
+    let s_cl_decoded = match general_purpose::STANDARD.decode(s_cl) {
+        Ok(cl) => cl,
+        Err(e) => {
+            return Err(anyhow!(
+                "Cannot decode base64 Classic signature from bytes: {e}"
+            ))
+        }
+    };
+
+    let s_pq = match signatures.remainder() {
+        Some(pq) => pq,
+        None => return Err(anyhow!("Cannot parse PQ signature from USB device")),
+    };
+
+    let s_pq_decoded = match general_purpose::STANDARD.decode(s_pq) {
+        Ok(pq) => pq,
+        Err(e) => return Err(anyhow!("Cannot decode base64 PQ signature from bytes: {e}")),
+    };
+
+    let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded)
+        .context("Cannot parse classic signature from bytes")?;
+    oqs::init();
+    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let sig_pq = match pq_scheme.signature_from_bytes(&s_pq_decoded) {
+        Some(sig) => sig,
+        None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
+    };
+    Ok(KeysasHybridSignature {
+        classic: sig_dalek,
+        pq: sig_pq.to_owned(),
+    })
 }
 
 fn is_signed(
     device: &str,
-    pubkey_path: &str,
+    ca_cert_cl: &str,
+    ca_cert_pq: &str,
     id_vendor_id: &str,
     id_model_id: &str,
     id_revision: &str,
     id_serial: &str,
 ) -> Result<bool> {
-    println!("Checking signature for device: {device}");
-    match get_signature(device.remove_last()) {
-        Ok(signature) => {
-            //println!("Read signature from key: {:?}", signature);
-            let pubkey_path = pubkey_path;
-
-            let pk_box_str = fs::read_to_string(pubkey_path)?;
-            let signature_box = SignatureBox::from_string(&signature)?;
-            // Load the public key from the string.
-            let pk_box = PublicKeyBox::from_string(&pk_box_str)?;
-            let pk = pk_box.into_public_key()?;
-            // And verify the data.
-            let data = format!(
-                "{}/{}/{}/{}/{}",
-                id_vendor_id, id_model_id, id_revision, id_serial, "out"
-            );
-            //println!("{data}");
-            let data_reader = Cursor::new(&data);
-            let verified = minisign::verify(&pk, &signature_box, data_reader, true, false, false);
-            println!("USB device is signed: {verified:?}");
-            match verified {
-                Ok(()) => Ok(true),
-                Err(_) => Ok(false),
-            }
+    debug!("Checking signature for device: {device}");
+    //Getting both pubkeys for certs
+    let opt_pubkeys = match KeysasHybridPubKeys::get_pubkeys_from_certs(ca_cert_cl, ca_cert_pq) {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Cannot get pubkeys from certs: {e}");
+            return Ok(false);
         }
-        Err(_) => Ok(false),
+    };
+    let pubkeys = match opt_pubkeys {
+        Some(p) => p,
+        None => {
+            error!("No pubkeys found in certificates, cannot build KeysasHybridPubKeys");
+            return Ok(false);
+        }
+    };
+
+    //Let's read the hybrid signature from the device
+    let signatures = match get_signature(device.remove_last()) {
+        Ok(signature) => {
+            info!("Reading signature from device: {:?}", device.remove_last());
+            signature
+        }
+        Err(e) => {
+            error!("Cannot parse signature on the device: {e}");
+            return Ok(false);
+        }
+    };
+    let data = format!(
+        "{}/{}/{}/{}/{}",
+        id_vendor_id, id_model_id, id_revision, id_serial, "out"
+    );
+    match KeysasHybridPubKeys::verify_key_signatures(data.as_bytes(), signatures, pubkeys) {
+        Ok(_) => {
+            info!("USB device is signed");
+            return Ok(true);
+        }
+        Err(e) => {
+            info!("Signatures are not matching on USB device: {e}");
+            return Ok(false);
+        }
     }
 }
 
 fn copy_device_in(device: &Path) -> Result<()> {
     let dir = tempfile::tempdir()?;
     let mount_point = dir.path();
-    println!("Unsigned USB device {device:?} will be mounted on path: {mount_point:?}");
+    info!("Unsigned USB device {device:?} will be mounted on path: {mount_point:?}");
     let supported = SupportedFilesystems::new()?;
     let mount_result = Mount::builder()
         .fstype(FilesystemType::from(&supported))
@@ -275,18 +335,18 @@ fn copy_device_in(device: &Path) -> Result<()> {
     match mount_result {
         Ok(mount) => {
             // Copying file to the mounted device.
-            println!("Unsigned device is mounted on: {mount_point:?}");
+            info!("Unsigned device is mounted on: {mount_point:?}");
             copy_files_in(&mount_point.to_path_buf())?;
             // Make the mount temporary, so that it will be unmounted on drop.
             let _mount = mount.into_unmount_drop(UnmountFlags::DETACH);
         }
         Err(why) => {
-            eprintln!("Failed to mount unsigned device: {why}");
+            error!("Failed to mount unsigned device: {why}");
             let reg = Regex::new(r"/tmp/\.tmp.*")?;
             for mount in MountIter::new()? {
                 let mnt = mount.as_ref().unwrap().dest.to_str().unwrap();
                 if reg.is_match(mnt) {
-                    println!("Will umount: {mnt}");
+                    debug!("Will umount: {mnt}");
                 }
             }
         }
@@ -297,7 +357,7 @@ fn copy_device_in(device: &Path) -> Result<()> {
 fn move_device_out(device: &Path) -> Result<PathBuf> {
     let dir = tempfile::tempdir()?;
     let mount_point = dir.path();
-    println!("Signed USB device {device:?} will be mounted on path: {mount_point:?}");
+    info!("Signed USB device {device:?} will be mounted on path: {mount_point:?}");
     let supported = SupportedFilesystems::new()?;
     let mount_result = Mount::builder()
         .fstype(FilesystemType::from(&supported))
@@ -306,48 +366,44 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
     match mount_result {
         Ok(mount) => {
             // Moving files to the mounted device.
-            println!("Temporary out mount point: {mount_point:?}");
+            info!("Temporary out mount point for signed key: {mount_point:?}");
             move_files_out(&mount_point.to_path_buf())?;
             // Make the mount temporary, so that it will be unmounted on drop.
             let _mount = mount.into_unmount_drop(UnmountFlags::DETACH);
         }
         Err(why) => {
-            eprintln!("Failed to mount device: {why}");
+            error!("Failed to mount signed device: {why}");
         }
     }
     Ok(mount_point.to_path_buf())
 }
 
 fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
-    File::create("/var/local/in/.lock")?;
+    File::create(LOCK)?;
     thread::scope(|s| {
              for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
                  if e.metadata().expect("Cannot get metadata for file.").is_file() {
              s.spawn(move |_| {
-                         println!("New entry path found: {}.", e.path().display());
+                         debug!("New entry path found: {}.", e.path().display());
                          let path_to_read = e.path().to_str().unwrap();
-                         //let entry_str = e.path().display();
-                         //Replacing any ? in case conversion failed
-                         //let path_to_read =
-                         //    format!("{}{}{}", &mount_point.to_string_lossy(), "/", &entry_str);
                          let entry = e.file_name().to_string_lossy();
                          let entry_cleaned = str::replace(&entry, "?", "-");
                          let path_to_write = format!(
                              "{}{}",
-                             "/var/local/in/",
+                             SAS_IN,
                              diacritics::remove_diacritics(&entry_cleaned)
                          );
                          let path_to_tmp = format!(
                              "{}{}",
-                             "/var/local/tmp/",
+                             TMP_DIR,
                              diacritics::remove_diacritics(&entry_cleaned)
                          );
                          // Create a tmp dir to be able to rename files later
-                         let tmp = Path::new("/var/local/tmp/");
+                         let tmp = Path::new(TMP_DIR);
                          if !tmp.exists() &&  !tmp.is_dir() {
                              match fs::create_dir(tmp) {
-                                 Ok(_)=> println!("Creating tmp directory for writing incoming files !"),
-                                 Err(e) => println!("Cannot create tmp directory: {e:?}"),
+                                 Ok(_)=> info!("Creating tmp directory for writing incoming files !"),
+                                 Err(e) => error!("Cannot create tmp directory: {e:?}"),
                              }
                          }
                          match fs::metadata(path_to_read) {
@@ -355,19 +411,19 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                  if Path::new(&path_to_read).exists() && !mtdata.is_dir() {
                                      match fs::copy(path_to_read, &path_to_tmp) {
                                          Ok(_) => {
-                                             println!("File {path_to_read} copied to {path_to_tmp}.");
-                                         if fs::rename(&path_to_tmp, path_to_write).is_ok() { println!("File {} moved to sas-in.", &path_to_tmp) }
+                                             info!("File {path_to_read} copied to {path_to_tmp}.");
+                                         if fs::rename(&path_to_tmp, path_to_write).is_ok() { info!("File {} moved to sas-in.", &path_to_tmp) }
                                      },
                                          Err(e) => {
-                                             println!(
+                                             error!(
                                                  "Error while copying file {path_to_read}: {e:?}"
                                              );
                                              let mut report =
-                                                 format!("{}{}", path_to_write, ".failed");
+                                                 format!("{}{}", path_to_write, ".ioerror");
                                              match File::create(&report) {
-                                                 Ok(_) => println!("io-error report file created."),
+                                                 Ok(_) => warn!("io-error report file created."),
                                                  Err(why) => {
-                                                     eprintln!(
+                                                     error!(
                                                          "Failed to create io-error report {report:?}: {why}"
                                                      );
                                                  }
@@ -376,21 +432,21 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                                  report,
                                                  "Error while copying file: {e:?}"
                                              ) {
-                                                 Ok(_) => println!("io-error report file created."),
+                                                 Ok(_) => info!("io-error report file updated."),
                                                  Err(why) => {
-                                                     eprintln!(
+                                                     error!(
                                                      "Failed to write into io-error report {report:?}: {why}"
                                                  );
                                                  }
                                              }
                                              match unmount(mount_point, UnmountFlags::DETACH) {
                                                  Ok(()) => {
-                                                     println!(
+                                                     debug!(
                                                          "Early removing mount point: {mount_point:?}"
                                                      )
                                                  }
                                                  Err(why) => {
-                                                     eprintln!(
+                                                     error!(
                                                          "Failed to unmount {mount_point:?}: {why}"
                                                      );
                                                  }
@@ -399,7 +455,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                      }
                                  }
                              }
-                             Err(why) => eprintln!(
+                             Err(why) => error!(
                                  "Thread error: Cannot get metadata for file {path_to_read:?}: {why:?}. Terminating thread..."
                              ),
                          };
@@ -408,18 +464,18 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
          }
      })
      .expect("Cannot scope threads !");
-    println!("Incoming files copied, unlocking.");
-    if Path::new("/var/local/in/.lock").exists() {
-        fs::remove_file("/var/local/in/.lock")?;
+    info!("Incoming files copied sucessfully, unlocking.");
+    if Path::new(LOCK).exists() {
+        fs::remove_file(LOCK)?;
     }
     Ok(())
 }
 
 fn move_files_out(mount_point: &PathBuf) -> Result<()> {
-    let dir = fs::read_dir("/var/local/out/")?;
+    let dir = fs::read_dir(SAS_OUT)?;
     for entry in dir {
         let entry = entry?;
-        println!("New entry found: {:?}.", entry.file_name());
+        debug!("New entry found: {:?}.", entry.file_name());
 
         let path_to_write = format!(
             "{}{}{}",
@@ -429,67 +485,72 @@ fn move_files_out(mount_point: &PathBuf) -> Result<()> {
         );
         let path_to_read = format!(
             "{}{}",
-            "/var/local/out/",
+            SAS_OUT,
             entry.file_name().to_string_lossy().into_owned()
         );
         if !fs::metadata(&path_to_read)?.is_dir() {
             match fs::copy(&path_to_read, path_to_write) {
-                Ok(_) => println!("Copying file: {path_to_read} to signed device."),
+                Ok(_) => info!("Copying file: {path_to_read} to signed device."),
                 Err(e) => {
-                    println!("Error while copying file to signed device {path_to_read}: {e:?}");
+                    error!("Error while copying file to signed device {path_to_read}: {e:?}");
                     match unmount(mount_point, UnmountFlags::DETACH) {
-                        Ok(()) => println!("Early removing mount point: {mount_point:?}"),
+                        Ok(()) => debug!("Early removing mount point: {mount_point:?}"),
                         Err(why) => {
-                            eprintln!("Failed to unmount {mount_point:?}: {why}");
+                            error!("Failed to unmount {mount_point:?}: {why}");
                         }
                     }
                 }
             }
             fs::remove_file(&path_to_read)?;
-            println!("Removing file: {path_to_read}.");
+            info!("Removing file: {path_to_read}.");
         }
     }
-    println!("Moving files to out device done.");
+    info!("Moving files to outgoing device done.");
     Ok(())
 }
+
+// Function done for keysas-backend daemon
+// Keysas-backend shows the final user
+// if the station is busy or not.
+// Simple files are created and are watched
+// as I do not want any communications
+// between these daemons.
 fn busy_in() -> Result<(), anyhow::Error> {
-    if !Path::new("/var/lock/keysas").exists() {
-        create_dir_all("/var/lock/keysas")?;
-    } else if Path::new("/var/lock/keysas/keysas-out").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-out")?;
-    } else if Path::new("/var/lock/keysas/keysas-transit").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-transit")?;
-    } else if !Path::new("/var/lock/keysas/keysas-in").exists() {
-        File::create("/var/lock/keysas/keysas-in")?;
+    if !Path::new(VAR_LOCK_DIR).exists() {
+        create_dir_all(VAR_LOCK_DIR)?;
+    } else if Path::new(WORKING_OUT_FILE).exists() {
+        fs::remove_file(WORKING_OUT_FILE)?;
+    } else if !Path::new(WORKING_IN_FILE).exists() {
+        File::create(WORKING_IN_FILE)?;
     } else {
+        debug!("No WORKING_FILES was found.")
     }
     Ok(())
 }
 
 fn busy_out() -> Result<(), anyhow::Error> {
-    if !Path::new("/var/lock/keysas").exists() {
-        create_dir_all("/var/lock/keysas")?;
-    } else if Path::new("/var/lock/keysas/keysas-in").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-in")?;
-    } else if Path::new("/var/lock/keysas/keysas-transit").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-transit")?;
-    } else if !Path::new("/var/lock/keysas/keysas-out").exists() {
-        File::create("/var/lock/keysas/keysas-out")?;
+    if !Path::new(VAR_LOCK_DIR).exists() {
+        create_dir_all(VAR_LOCK_DIR)?;
+    } else if Path::new(WORKING_IN_FILE).exists() {
+        fs::remove_file(WORKING_IN_FILE)?;
+    } else if !Path::new(WORKING_OUT_FILE).exists() {
+        File::create(WORKING_OUT_FILE)?;
     } else {
+        debug!("No WORKING_FILES was found.")
     }
     Ok(())
 }
 
 fn ready_in() -> Result<(), anyhow::Error> {
-    if Path::new("/var/lock/keysas/keysas-in").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-in")?;
+    if Path::new(WORKING_IN_FILE).exists() {
+        fs::remove_file(WORKING_IN_FILE)?;
     }
     Ok(())
 }
 
 fn ready_out() -> Result<(), anyhow::Error> {
-    if Path::new("/var/lock/keysas/keysas-out").exists() {
-        fs::remove_file("/var/lock/keysas/keysas-out")?;
+    if Path::new(WORKING_OUT_FILE).exists() {
+        fs::remove_file(WORKING_OUT_FILE)?;
     }
     Ok(())
 }
@@ -532,13 +593,22 @@ fn main() -> Result<()> {
         .author("Stephane N")
         .about("keysas-io for USB devices verification.")
         .arg(
-            Arg::new("pubkey")
-                .short('p')
-                .long("pubkey")
-                .value_name("/path/to/public.pub")
+            Arg::new("ca-cert-cl")
+                .short('c')
+                .long("classiccacert")
+                .value_name("/etc/keysas/usb-ca-cl.pem")
                 .value_parser(clap::value_parser!(String))
-                .default_value("/etc/keysas/keysas.pub")
-                .help("The path to public key (Default is /etc/keysas/keysas.pub)."),
+                .default_value("/etc/keysas/usb-ca-cl.pem")
+                .help("The path to Classic CA certificate (Default is /etc/keysas/usb-ca-cl.pem)."),
+        )
+        .arg(
+            Arg::new("ca-cert-pq")
+                .short('p')
+                .long("pqcacert")
+                .value_name("/etc/keysas/usb-ca-pq.pem")
+                .value_parser(clap::value_parser!(String))
+                .default_value("/etc/keysas/usb-ca-pq.pem")
+                .help("The path to post-quantum CA certificate (Default is /etc/keysas/usb-ca-pq.pem)."),
         )
         .arg(
             Arg::new("yubikey")
@@ -551,20 +621,25 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    let pubkey = matches.get_one::<String>("pubkey").unwrap();
-    let pubkey_path = pubkey.to_string();
-    let pubkey_path = Arc::new(pubkey_path);
+    let ca_cert_cl = matches.get_one::<String>("ca-cert-cl").unwrap();
+    let ca_cert_cl = ca_cert_cl.to_string();
+    let ca_cert_cl = Arc::new(ca_cert_cl);
+    let ca_cert_pq = matches.get_one::<String>("ca-cert-pq").unwrap();
+    let ca_cert_pq = ca_cert_pq.to_string();
+    let ca_cert_pq = Arc::new(ca_cert_pq);
     let yubikey = matches.get_one::<String>("yubikey").unwrap();
     let yubikey = yubikey
         .parse::<bool>()
         .context("Cannot convert YUBIKEY value string into boolean !")?;
 
+    init_logger();
     let server = TcpListener::bind("127.0.0.1:3013")?;
     for stream in server.incoming() {
-        let pubkey_path = Arc::clone(&pubkey_path);
+        let ca_cert_cl = Arc::clone(&ca_cert_cl);
+        let ca_cert_pq = Arc::clone(&ca_cert_pq);
         spawn(move || -> Result<()> {
             let callback = |_req: &Request, response: Response| {
-                println!("keysas-io: Received a new websocket handshake.");
+                info!("keysas-io: Received a new websocket handshake.");
                 Ok(response)
             };
             let mut websocket = accept_hdr(stream?, callback)?;
@@ -605,7 +680,7 @@ fn main() -> Result<()> {
                 };
 
                 if result < 0 {
-                    println!("Error: ppoll error, result is < 0.");
+                    error!("Error: ppoll error, result is < 0.");
                 }
 
                 let event = match socket.iter().next() {
@@ -616,7 +691,7 @@ fn main() -> Result<()> {
                     }
                 };
 
-                //println!("Event: {:?}", event.event_type());
+                debug!("Event type is: {:?}", event.event_type());
                 if event.action() == Some(OsStr::new("add"))
                     && event.property_value(
                         OsStr::new("DEVTYPE")
@@ -679,7 +754,7 @@ fn main() -> Result<()> {
                     //        //println!("{:?} = {:?}", property.name(), property.value());
                     //}
                     //    }
-                    println!("New USB device found: {}", device.to_string_lossy());
+                    info!("New USB device found: {}", device.to_string_lossy());
                     let product = format!(
                         "{}/{}/{}",
                         id_vendor_id.to_string_lossy(),
@@ -705,7 +780,8 @@ fn main() -> Result<()> {
 
                     let signed = is_signed(
                         device,
-                        &pubkey_path,
+                        &ca_cert_cl,
+                        &ca_cert_pq,
                         id_vendor_id,
                         id_model_id,
                         id_revision,
@@ -715,7 +791,7 @@ fn main() -> Result<()> {
                         Ok(value) => {
                             //Invalid Signature
                             if !value {
-                                println!("Device signature is not valid !");
+                                info!("Device signature is not valid !");
                                 let keys_in_iter: Vec<String> =
                                     keys_in.clone().into_iter().collect();
                                 if !keys_in_iter.contains(&product) {
@@ -736,27 +812,27 @@ fn main() -> Result<()> {
                                     if yubikey {
                                         match hmac_challenge() {
                                             Some(name) => {
-                                                println!(
+                                                info!(
                                                     "HMAC challenge successfull for user: {name} !"
                                                 );
                                                 copy_device_in(Path::new(&device))?;
-                                                println!("Unsigned USB device done.");
+                                                info!("Unsigned USB device done.");
                                                 ready_in()?;
                                             }
                                             None => {
-                                                println!("No user found during HMAC challenge !");
+                                                warn!("No user found during HMAC challenge !");
                                                 ready_in()?;
                                             }
                                         };
                                     } else {
                                         copy_device_in(Path::new(&device))?;
-                                        println!("Unsigned USB device done.");
+                                        info!("Unsigned USB device done.");
                                         ready_in()?;
                                     }
                                 }
                             //Signature ok so this is a out device
                             } else if value {
-                                println!("USB device is signed...");
+                                info!("USB device is signed.");
                                 let keys_out_iter: Vec<String> =
                                     keys_out.clone().into_iter().collect();
                                 if !keys_out_iter.contains(&product) {
@@ -777,7 +853,7 @@ fn main() -> Result<()> {
                                         .write_message(Message::Text(serialized))
                                         .expect("bunbun");
                                     move_device_out(Path::new(&device))?;
-                                    println!("Signed USB device done.");
+                                    info!("Signed USB device done.");
                                     ready_out()?;
                                 }
                             } else {
@@ -785,7 +861,7 @@ fn main() -> Result<()> {
                                     keys_undef.clone().into_iter().collect();
                                 if !keys_undef_iter.contains(&product) {
                                     keys_undef.push(product);
-                                    println!("Undefined USB device.");
+                                    warn!("Undefined USB device.");
                                     let yubi: Yubistruct = Yubistruct {
                                         active: yubikey,
                                         yubikeys: list_yubikey(),
@@ -802,7 +878,7 @@ fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            println!("USB device never signed: {e:?}");
+                            info!("USB device never signed: {e:?}");
                             let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
                             if !keys_in_iter.contains(&product) {
                                 // busy_in ?
@@ -823,18 +899,16 @@ fn main() -> Result<()> {
                                 if yubikey {
                                     match hmac_challenge() {
                                         Some(name) => {
-                                            println!(
-                                                "HMAC challenge successfull for user: {name} !"
-                                            );
+                                            info!("HMAC challenge successfull for user: {name} !");
                                             copy_device_in(Path::new(&device))?;
-                                            println!("Unsigned USB device done.");
+                                            info!("Unsigned USB device done.");
                                             ready_in()?;
                                         }
-                                        None => println!("No user found during HMAC challenge !"),
+                                        None => warn!("No user found during HMAC challenge !"),
                                     };
                                 } else {
                                     copy_device_in(Path::new(&device))?;
-                                    println!("Unsigned USB device done.");
+                                    info!("Unsigned USB device done.");
                                     ready_in()?;
                                 }
                             }

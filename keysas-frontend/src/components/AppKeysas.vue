@@ -72,9 +72,9 @@
       <a @click="this.displayErrors = false" :class="(this.displayErrors ? null : 'AppGuichet-switcher-active') + ' AppGuichet-switcher-first'">
         {{ $tc('guichet_OUT.files.x_files_verified_available', this.listOutOK.length) }}
       </a>
-      <a @click="this.displayErrors = true" :class="this.displayErrors ? 'AppGuichet-switcher-active' : null">
+      <!--<a @click="this.displayErrors = true" :class="this.displayErrors ? 'AppGuichet-switcher-active' : null">
         {{ $tc('guichet_OUT.files.x_files_refused', this.listOutError.length) }}
-      </a>
+      </a>-->
     </h5>
 
     <!-- List Detail -->
@@ -85,7 +85,7 @@
       <li class="list-group-item list-out" v-for="(file, index) in this.listOutOK" v-bind:key="index">{{ file.filename }}<span class="file-error">{{ file.error ? $t(file.error) : '' }}</span></li>
     </ul>
     <ul v-if="this.type === 'OUT' && this.listOutError.length > 0 && this.displayErrors" class="AppGuichet-list list-group">
-      <li class="list-group-item list-out-error" v-for="(file, index) in this.listOutError" v-bind:key="index">{{ file.filename }}<span class="file-error">{{ $t(file.error) }}</span></li>
+      <li class="list-group-item list-out-error" v-for="(file, index) in this.listOutError" v-bind:key="index">{{ file.filename }}<!--<span class="file-error">{{ $t(file.error) }}</span>--></li>
     </ul>
 
     <!-- USB IN Help placeholder -->
@@ -97,7 +97,7 @@
 
 <script>
 export default {
-  name: "AppGuichet",
+  name: "AppKeysas",
   props: [
     "type",
     "working",
@@ -129,11 +129,7 @@ export default {
   watch: {
     files(val, oldVal) {
       let errorsMessages = {
-        '.antivirus': 'guichet_OUT.files.error.reason.antivirus',
-        '.forbidden': 'guichet_OUT.files.error.reason.forbidden',
-        '.yara': 'guichet_OUT.files.error.reason.yara',
-        '.toobig': 'guichet_OUT.files.error.reason.toobig',
-        '.failed': 'guichet_OUT.files.error.reason.failed',
+        '.ioerror': 'guichet_OUT.files.error.reason.ioerror',
       };
 
       if(this.type === 'IN') {
@@ -145,13 +141,13 @@ export default {
         }
 
         val.forEach(element => {
-          let failed = element.endsWith('.failed');
-          let slicedElement = failed ? element.substring(0, element.indexOf('.failed')) : element;
+          let failed = element.endsWith('.ioerror');
+          let slicedElement = failed ? element.substring(0, element.indexOf('.ioerror')) : element;
 
           if(!this.listInBackup.map(x => x.filename).includes(slicedElement)) {
             this.listInBackup.push({
               filename: slicedElement,
-              error: failed ? errorsMessages['.failed'] : null
+              error: failed ? errorsMessages['.ioerror'] : null
             });
           }
         });
@@ -165,20 +161,7 @@ export default {
         }
 
         val.forEach(element => {
-          if(element.endsWith('.sha256')) {
-            return;
-          }
-
-          // handling Yara case
-          if (element.endsWith('.yara')) {
-            let slicedElement = element.substring(0, element.indexOf('.yara'));
-            let list = val.includes(slicedElement) ? this.listOutOK : this.listOutError;
-            if (!list.map(x => x.filename).includes(slicedElement)) {
-              list.push({
-                filename: slicedElement,
-                error: errorsMessages['.yara']
-              });
-            }
+          if(element.endsWith('.krp')) {
             return;
           }
 

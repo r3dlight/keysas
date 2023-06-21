@@ -1,10 +1,10 @@
 [package]
 name = "keysas-admin"
-version = "0.1.2"
+version = "2.0.0"
 description = "Keysas stations administration application"
 authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
-repository = ""
+repository = "https://github.com/r3dlight/keysas"
 default-run = "keysas-admin"
 edition = "2021"
 rust-version = "1.57"
@@ -12,31 +12,37 @@ rust-version = "1.57"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.2.1", features = [] }
+tauri-build = { version = "1.3.0", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.2.3", features = ["api-all", "updater"] }
+tauri = { version = "1.2.5", features = ["api-all", "updater"] }
 ssh-rs = "0.3.2" 
-tauri-plugin-store = { git="https://github.com/r3dlight/tauri-plugin-store", branch="dev" }
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
-nom = "7.1"
 sha2 ="0.10"
-regex="1.7"
+regex="1.8"
 sqlite = "0.30"
-simple_logger = "4.1"
+simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
 arbitrary = "1.3"
 ed25519-dalek = "1"
-rand_dl = {package = "rand", version = "0.7"}
+rand_dl = {package = "rand", version = "0.8"}
 rand_core = "0.6.4"
-oqs = "0.7"
-hex-literal = "0.3"
+hex-literal = "0.4"
+libc = "0.2"
+udev = "0.7"
+mbrman = "0.5"
+base64 = "0.21"
 keysas_lib = { path = "../../keysas_lib" }
+
+[dependencies.oqs]
+version = "0.7"
+default-features = false
+features = ["std", "dilithium"]
 
 [features]
 # by default Tauri runs in production mode

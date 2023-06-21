@@ -13,17 +13,14 @@ export default {
     return {
     }
   },
-
-  methods: {
-
-  }
 }
 
 </script>
 
 <template>
   <NavBar />
-  <h2>Version 0.1.2</h2>
+  <h2>Version 2.0.0</h2>
+  <h2>Please visit <a href="#https://keysas.fr" class="text-primary">keysas.fr</a> to learn more </h2>
   <h3>Copyright Keysas 2022-2023.</h3>
 </template>
 

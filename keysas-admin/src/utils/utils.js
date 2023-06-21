@@ -83,7 +83,8 @@ export async function init(ip, name, caPwd,
         return res;
     } catch(e) {
         console.log(e)
-        return Promise.reject(e);
+        //return Promise.reject(e);
+        return false;
     }
 }
 

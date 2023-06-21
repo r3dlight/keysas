@@ -7,4 +7,13 @@ members = [
     "keysas-sign/",
     "keysas-fido/",
     "keysas_lib/",
+    "keysas-admin/src-tauri"
 ]
+
+exclude = [
+    "keysas-usbfilter"
+]
+
+[patch.crates-io.loopdev]
+git = "https://github.com/mulkieran/loopdev"
+branch = "bump-bindgen-reduce-version"

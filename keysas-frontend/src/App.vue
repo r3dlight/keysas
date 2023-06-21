@@ -19,7 +19,7 @@
     <div class="container">
       <div class="row">
         <div class="col-sm-5 panel panel-left">
-          <AppGuichet 
+          <AppKeysas
           type="IN"
           ref="GuichetIn"
           :working="analysingIN || analysingTRANSIT || analysingOUT"
@@ -29,7 +29,7 @@
           />
         </div>
         <div class="col-sm-7 panel panel-right">
-          <AppGuichet 
+          <AppKeysas
           type="OUT"
           ref="GuichetOut"
           :working="false"
@@ -49,9 +49,9 @@
   <button :class="'btn btn-sm btn-'+ (this.StatusTransit ? 'primary' : 'secondary')" @click="this.StatusTransit = !this.StatusTransit">StatusTransit</button>
   <button :class="'btn btn-sm btn-'+ (this.StatusOut ? 'primary' : 'secondary')" @click="this.StatusOut = !this.StatusOut">StatusOut</button>
   <button :class="'btn btn-sm btn-'+ (this.analysingIN ? 'primary' : 'secondary')" @click="this.analysingIN = !this.analysingIN">analysingIN</button>
-  <button :class="'btn btn-sm btn-'+ (this.filesIN.length > 0 ? 'primary' : 'secondary')" @click="this.filesIN = (this.filesIN.length > 0 ? [] : ['foo.jpg', 'bar.png', 'baz.pdf', 'zab.docx.failed'])">filesIN</button>
+  <button :class="'btn btn-sm btn-'+ (this.filesIN.length > 0 ? 'primary' : 'secondary')" @click="this.filesIN = (this.filesIN.length > 0 ? [] : ['foo.jpg', 'bar.png', 'baz.pdf', 'zab.docx.ioerror'])">filesIN</button>
   <button :class="'btn btn-sm btn-'+ (this.analysingTRANSIT ? 'primary' : 'secondary')" @click="this.analysingTRANSIT = !this.analysingTRANSIT">analysingTRANSIT</button>
-  <button :class="'btn btn-sm btn-'+ (this.analysingOUT ? 'primary' : 'secondary')" @click="if(this.analysingOUT) {this.analysingOUT = false; this.filesOUT = ['oof.jpg.sha256', 'oof.jpg', 'rab.png.sha256', 'rab.png', 'zab.pdf.forbidden', 'toto.png', 'toto.png.yara', 'tutu.png.yara'] } else { this.analysingOUT = true }">analysingOUT</button>
+  <button :class="'btn btn-sm btn-'+ (this.analysingOUT ? 'primary' : 'secondary')" @click="if(this.analysingOUT) {this.analysingOUT = false; this.filesOUT = ['oof.jpg.sha256', 'oof.jpg', 'rab.png.sha256', 'rab.png', 'zab.pdf.krp', 'toto.png', 'toto.png.krp', 'tutu.png.krp'] } else { this.analysingOUT = true }">analysingOUT</button>
   <button :class="'btn btn-sm btn-'+ (this.filesOUT.length > 0 ? 'primary' : 'secondary')" @click="this.filesOUT = (this.filesOUT.length > 0 ? [] : ['oof.jpg', 'rab.png', 'zab.pdf'])">filesOUT</button>
   <button :class="'btn btn-sm btn-'+ (this.usb_in.length > 0 ? 'primary' : 'secondary')" @click="if(this.usb_in.length > 0) {this.usb_in = [];} else { this.analysingIN = true; this.filesIN = ['foo.jpg', 'bar.png', 'baz.pdf']; this.usb_in = ['NO-NAME', 'my_dongle']; }">usb_in</button>
   <button :class="'btn btn-sm btn-'+ (this.usb_out.length > 0 ? 'primary' : 'secondary')" @click="if(this.usb_out.length > 0) {this.usb_out = [];} else { this.usb_out = ['ma_cle_secure']; }">usb_out</button>
@@ -67,19 +67,19 @@
 
 <script>
 import AppHeader from "./components/AppHeader.vue";
-import AppGuichet from "./components/AppGuichet.vue";
+import AppKeysas from "./components/AppKeysas.vue";
 import AppWizard from "./components/AppWizard-fr.vue";
 
 export default {
   //name: 'app',
   components: {
     AppHeader,
-    AppGuichet,
+    AppKeysas,
     AppWizard
   },
   data() {
     return {
-      debug: (process.env.NODE_ENV === 'development'),
+      debug: (process.env.NODE_ENV === 'production'),
       appStarted: false,
       StatusIn: undefined,
       StatusTransit: undefined,
@@ -113,11 +113,11 @@ export default {
       this.$refs.GuichetIn.clearAllLists();
       this.$refs.GuichetOut.clearAllLists();
     },
-    wsUdev() {
-      this.connection_udev = new WebSocket("ws://127.0.0.1:3013/socket");
+    async wsUdev() {
+      this.connection_udev = await new WebSocket("ws://127.0.0.1:3013");
       this.connection_udev.onopen = function (event) {
+        console.log("Successfully connected to websocket server keysas-io");
         console.log(event);
-        console.log("Successfully connected to websocket server udev");
       };
       var self = this;
       this.connection_udev.onmessage = function (event) {
@@ -143,11 +143,11 @@ export default {
         };
       }
     },
-    wsBackend() {
-      this.connection_backend = new WebSocket("ws://127.0.0.1:3012/socket");
+    async wsBackend() {
+      this.connection_backend = await new WebSocket("ws://127.0.0.1:3012");
       this.connection_backend.onopen = function (event) {
+        console.log("Successfully connected to websocket server keysas-backend");
         console.log(event);
-        console.log("Successfully connected to websocket server backend");
       };
       var self = this;
       this.connection_backend.onmessage = function (event) {
@@ -200,7 +200,7 @@ export default {
         this.StatusIn = true;
         this.StatusTransit = true;
         this.StatusOut = true;
-      }, 2000);
+      }, 5000);
     // <<< For Dev Only <<<
     }
 

@@ -42,24 +42,24 @@ add_users() {
 # Install ELF binaries in /usr/bin/.
 install_bin() {
 	if [ -d "/usr/bin" ]; then
-		if [ -f "bin/keysas-in" ]; then
-			install -v -o $U_KEYSAS_IN -g $U_KEYSAS_IN -m 0500 bin/keysas-in /usr/bin/
+		if [ -f "../bin/keysas-in" ]; then
+			install -v -o $U_KEYSAS_IN -g $U_KEYSAS_IN -m 0500 ../bin/keysas-in /usr/bin/
 		else
-			echo "Binary ./bin/keysas-in cannot be found !"
+			echo "Binary ../bin/keysas-in cannot be found !"
 		fi
 	fi
 	if [ -d "/usr/bin" ]; then
-		if [ -f "bin/keysas-transit" ]; then
-			install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0500 bin/keysas-transit /usr/bin/
+		if [ -f "../bin/keysas-transit" ]; then
+			install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0500 ../bin/keysas-transit /usr/bin/
 		else
-			echo "Binary ./bin/keysas-transit cannot be found !"
+			echo "Binary ../bin/keysas-transit cannot be found !"
 		fi
 	fi
 	if [ -d "/usr/bin" ]; then
-		if [ -f "bin/keysas-out" ]; then
-			install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0500 bin/keysas-out /usr/bin/
+		if [ -f "../bin/keysas-out" ]; then
+			install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0500 ../bin/keysas-out /usr/bin/
 		else
-			echo "Binary ./bin/keysas-out cannot be found !"
+			echo "Binary ../bin/keysas-out cannot be found !"
 		fi
 	fi
 }
@@ -107,6 +107,9 @@ install_config() {
 		install -v -o $U_KEYSAS_IN -g $U_KEYSAS_IN -m 0600 debian/keysas-in.default /etc/keysas/keysas-in.conf
 		install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0600 debian/keysas-transit.default /etc/keysas/keysas-transit.conf
 		install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0600 debian/keysas-out.default /etc/keysas/keysas-out.conf
+	fi
+	if [ -d "/etc/sudoers.d "]; then
+		install -v -o root -g root -m 0644 debian/keysas-sudoconfig /etc/sudoers.d/010_keysas
 	fi
 }
 
@@ -170,6 +173,7 @@ enable_systemd() {
 	systemctl enable keysas-out.service
 	systemctl enable keysas-transit.service
 	systemctl enable keysas.service --now | true
+	systemctl restart clamav-daemon
 }
 
 main() {

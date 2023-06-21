@@ -10,6 +10,7 @@
 use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
+use http::header::HeaderValue;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -37,6 +38,13 @@ extern crate serde_derive;
 extern crate libc;
 extern crate regex;
 mod errors;
+
+const SAS_IN: &str = "/var/local/in";
+const SAS_OUT: &str = "/var/local/out";
+const LOCK_IN: &str = "/var/lock/keysas/keysas-in";
+const LOCK_TRANSIT: &str = "/var/lock/keysas/keysas-transit";
+const LOCK_OUT: &str = "/var/lock/keysas/keysas-out";
+const NEVER_SIGNED: &str = "/usr/share/keysas/neversigned";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GlobalStatus {
@@ -122,36 +130,27 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .output()
         .expect("failed to get status for keysas-in");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[0] = true;
-    } else {
-        state[0] = false;
-    }
+    let re = Regex::new(r"Active:")?;
+    state[0] = re.is_match(&status_in);
+
     let output = Command::new("systemctl")
         .arg("status")
         .arg("keysas-transit.service")
         .output()
         .expect("failed to get status for keysas-transit");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[1] = true;
-    } else {
-        state[1] = false;
-    }
+    let re = Regex::new(r"Active:")?;
+    state[1] = re.is_match(&status_in);
+
     let output = Command::new("systemctl")
         .arg("status")
         .arg("keysas-out.service")
         .output()
         .expect("failed to get status for keysas-out");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active: active")?;
-    if re.is_match(&status_in) {
-        state[2] = true;
-    } else {
-        state[2] = false;
-    }
+    let re = Regex::new(r"Active:")?;
+    state[2] = re.is_match(&status_in);
+
     Ok(state)
 }
 
@@ -161,17 +160,15 @@ fn parse_ip(s: &str) -> IResult<&str, &str> {
 
 fn get_ip() -> Result<Vec<String>> {
     let mut ips = Vec::new();
-    let addrs = nix::ifaddrs::getifaddrs().unwrap();
+    let addrs = nix::ifaddrs::getifaddrs()?;
     for ifaddr in addrs {
-        match ifaddr.address {
-            Some(address) => {
-                let addr = address.to_string();
-                let (_, ip) = parse_ip(&addr).unwrap();
-                if ifaddr.interface_name == "eth0" && ip.parse::<Ipv4Addr>().is_ok() {
-                    ips.push(ip.to_string());
-                }
+        if let Some(address) = ifaddr.address {
+            let addr = address.to_string();
+            let (_, ip) = parse_ip(&addr).unwrap();
+            let re = Regex::new(r"eth|enp")?;
+            if re.is_match(&ifaddr.interface_name) && ip.parse::<Ipv4Addr>().is_ok() {
+                ips.push(ip.to_string());
             }
-            None => {}
         }
     }
     Ok(ips)
@@ -181,52 +178,41 @@ fn main() -> Result<()> {
     landlock_sandbox()?;
     let server = TcpListener::bind("127.0.0.1:3012")?;
     for stream in server.incoming() {
+        println!("keysas-backend: Received a new websocket handshake.");
+        let stream = match stream {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Failed to accept client connection: {}", e);
+                continue;
+            }
+        };
         spawn(move || -> Result<()> {
             let callback = |_req: &Request, mut response: Response| {
-                println!("keysas-backend: Received a new websocket handshake.");
-                //println!("The request's path is: {}", req.uri().path());
-                //println!("The request's headers are:");
-                //for (ref header, _value) in req.headers() {
-                //    println!("* {}", header);
-                //}
-
-                // Let's add an additional header to our response to the client.
-                let headers = response.headers_mut();
-                headers.append("Keysas-backend", "true".parse().unwrap());
-
+                log::info!("keysas-backend: Received a new websocket handshake.");
+                //let headers = response.headers_mut();
+                //headers.append("KeysasBackend", "true".parse().unwrap());
+                response.headers_mut().append(
+                    "Sec-WebSocket-Protocol",
+                    HeaderValue::from_static("websocket"),
+                );
+                //println!("Response: {response:?}");
                 Ok(response)
             };
-            let mut websocket = accept_hdr(stream?, callback)?;
+            let mut websocket = accept_hdr(stream, callback)?;
 
             loop {
-                let files_in = list_files("/var/local/in");
-                let files_out = list_files("/var/local/out");
+                let files_in = list_files(SAS_IN);
+                let files_out = list_files(SAS_OUT);
 
-                let mut diode_in = PathBuf::new();
-                diode_in.push("/run/diode-in");
-                let mut diode_out = PathBuf::new();
-                diode_out.push("/run/diode-out/");
-                let is_empty_in = diode_in.read_dir()?.next().is_none();
                 let mut fs_in = PathBuf::new();
-                fs_in.push("/var/local/in");
+                fs_in.push(SAS_IN);
                 let is_empty_fs_in = fs_in.read_dir()?.next().is_none();
 
-                let is_empty_out = diode_out.read_dir()?.next().is_none();
-                let mut fs_transit = PathBuf::new();
-                fs_transit.push("/var/local/transit");
-                let is_empty_fs_transit = fs_transit.read_dir()?.next().is_none();
+                let working_in = Path::new(LOCK_IN).exists() || !is_empty_fs_in;
 
-                let working_in = !is_empty_in
-                    || Path::new("/var/lock/keysas/keysas-in").exists()
-                    || !is_empty_fs_in;
+                let working_out = Path::new(LOCK_OUT).exists();
 
-                let working_out = !is_empty_out
-                    || Path::new("/var/lock/keysas/keysas-out").exists()
-                    || !is_empty_fs_transit;
-
-                let working_transit = !(is_empty_out
-                    && is_empty_in
-                    && !Path::new("/var/lock/keysas/keysas-transit").exists());
+                let working_transit = Path::new(LOCK_TRANSIT).exists();
 
                 let health: Daemons = Daemons {
                     status_in: daemon_status()?[0],
@@ -245,15 +231,8 @@ fn main() -> Result<()> {
                 };
                 let mut has_signed = false;
 
-                if !Path::new("/usr/share/keysas/neversigned").exists() {
+                if !Path::new(NEVER_SIGNED).exists() {
                     has_signed = true;
-                }
-                let mut keypair_ok = false;
-
-                if Path::new("/etc/keysas/keysas.priv").exists()
-                    && Path::new("/etc/keysas/keysas.pub").exists()
-                {
-                    keypair_ok = true;
                 }
 
                 let orders = GlobalStatus {
@@ -262,13 +241,13 @@ fn main() -> Result<()> {
                     guichettransit: working_transit,
                     guichetout: guichet_state_out,
                     has_signed_once: has_signed,
-                    keypair_generated: keypair_ok,
+                    keypair_generated: true,
                     ip: get_ip()?,
                 };
 
                 let serialized = serde_json::to_string(&orders)?;
                 websocket.write_message(Message::Text(serialized))?;
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_millis(300));
             }
         });
     }
