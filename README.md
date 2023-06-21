@@ -49,8 +49,7 @@ apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-pro
 bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
 git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
-rustup toolchain install nightly-2023-05-20 --force
-rustup default nightly-2023-05-20
+rustup default nightly
 make help
 make build
 make install
