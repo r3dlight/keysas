@@ -108,7 +108,7 @@ install_config() {
 		install -v -o $U_KEYSAS_TRANSIT -g $U_KEYSAS_TRANSIT -m 0600 debian/keysas-transit.default /etc/keysas/keysas-transit.conf
 		install -v -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT -m 0600 debian/keysas-out.default /etc/keysas/keysas-out.conf
 	fi
-	if [ -d "/etc/sudoers.d "]; then
+	if [ -d "/etc/sudoers.d" ]; then
 		install -v -o root -g root -m 0644 debian/keysas-sudoconfig /etc/sudoers.d/010_keysas
 	fi
 }
