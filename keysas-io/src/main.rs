@@ -259,7 +259,11 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded)
         .context("Cannot parse classic signature from bytes")?;
     oqs::init();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5)?;
+    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        Ok(pq_s) => pq_s,
+        Err(e) => return Err(anyhow!("Cannot construct new Dilithium5 algorithm: {e}")),
+    };
+
     let sig_pq = match pq_scheme.signature_from_bytes(&s_pq_decoded) {
         Some(sig) => sig,
         None => return Err(anyhow!("Cannot parse PQ signature from bytes")),
