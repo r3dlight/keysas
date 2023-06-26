@@ -855,7 +855,7 @@ fn main() -> Result<()> {
                                     let serialized = serde_json::to_string(&keys)?;
                                     websocket
                                         .write_message(Message::Text(serialized))
-                                        .expect("bunbun");
+                                        .expect("Cannot write to websocket");
                                     move_device_out(Path::new(&device))?;
                                     info!("Signed USB device done.");
                                     ready_out()?;
