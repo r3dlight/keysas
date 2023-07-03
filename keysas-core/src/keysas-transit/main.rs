@@ -56,6 +56,7 @@ use std::str;
 use std::thread as main_thread;
 use std::time::Duration;
 use yara::*;
+mod sandbox;
 
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
 
@@ -513,8 +514,14 @@ fn main() -> Result<()> {
     init_logger();
 
     // landlock init
-    landlock_sandbox(&config.rule_path)?;
-
+    match landlock_sandbox(&config.rule_path) {
+        Ok(_) => log::info!("Landlock sandbox activated."),
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}")
+    }
+match sandbox::init() {
+    Ok(_) => log::info!("Seccomp sandbox activated."),
+    Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}")
+    }
     // Initilize clamd client
     // Test if ClamAV IP is valid
     match config.clamav_ip.parse::<IpAddr>() {
