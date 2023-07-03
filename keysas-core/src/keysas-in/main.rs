@@ -49,6 +49,7 @@ use std::thread as main_thread;
 use std::time::Duration;
 use time::OffsetDateTime;
 mod tests;
+mod sandbox;
 
 #[macro_use]
 extern crate serde_derive;
@@ -278,7 +279,14 @@ fn main() -> Result<()> {
     let mut config = Config::default();
     command_args(&mut config);
     init_logger();
-    landlock_sandbox(&config.sas_in)?;
+    match landlock_sandbox(&config.sas_in) {
+        Ok(_) => log::info!("Landlock sandbox activated."),
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}")
+    }
+    match sandbox::init() {
+        Ok(_) => log::info!("Seccomp sandbox activated."),
+        Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}")
+    }
 
     info!("Keysas-in started :)");
     info!("Running configuration is:");
