@@ -853,9 +853,10 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket
-                                        .write_message(Message::Text(serialized))
-                                        .expect("Cannot write to websocket");
+                                    match websocket.write_message(Message::Text(serialized)) {
+                                        Ok(_) => log::debug!("Data wrote into the websocket"),
+                                        Err(e) => log::error!("Cannot write data into the websocket: {e}"),
+                                    }
                                     move_device_out(Path::new(&device))?;
                                     info!("Signed USB device done.");
                                     ready_out()?;
