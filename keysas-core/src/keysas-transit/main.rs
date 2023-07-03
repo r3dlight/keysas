@@ -516,11 +516,11 @@ fn main() -> Result<()> {
     // landlock init
     match landlock_sandbox(&config.rule_path) {
         Ok(_) => log::info!("Landlock sandbox activated."),
-        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}")
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}"),
     }
-match sandbox::init() {
-    Ok(_) => log::info!("Seccomp sandbox activated."),
-    Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}")
+    match sandbox::init() {
+        Ok(_) => log::info!("Seccomp sandbox activated."),
+        Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}"),
     }
     // Initilize clamd client
     // Test if ClamAV IP is valid
