@@ -81,7 +81,7 @@ pub fn sha256_digest(input: &File) -> Result<String> {
     Ok(format!("{digest:x}"))
 }
 
-/// This function lists all files in a directory except hidden ones.
+/// This function lists all files in a directory except hidden ones or links.
 ///
 /// Example:
 /// ```
@@ -107,9 +107,12 @@ pub fn list_files(directory: &str) -> Result<Vec<String>> {
     let mut names = paths
         .filter_map(|entry| {
             entry.ok().and_then(|e| {
-                e.path()
-                    .file_name()
-                    .and_then(|n| n.to_str().map(String::from))
+                let path = e.path();
+                if path.is_file() {
+                    path.file_name().and_then(|n| n.to_str().map(String::from))
+                } else {
+                    None
+                }
             })
         })
         .collect::<Vec<String>>();
