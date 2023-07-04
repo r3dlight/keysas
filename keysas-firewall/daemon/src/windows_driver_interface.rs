@@ -29,8 +29,8 @@ use libc::c_void;
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::path::{Component, Path};
-use std::thread;
 use std::ffi::OsStr;
+use std::thread;
 use widestring::U16CString;
 use windows::core::{PCSTR, PCWSTR};
 use windows::s;
@@ -50,6 +50,8 @@ use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use keysas_lib::file_report::parse_report;
+
+use crate::tray_if;
 
 /// Operation code for the request to userland
 #[derive(Debug)]
@@ -123,7 +125,7 @@ impl WindowsDriverInterface {
     /// # Arguments
     ///
     /// * `cb` - Callback to handle the driver requests
-    pub fn start_driver_com(&self, _cb: fn() -> ()) -> Result<(), anyhow::Error> {
+    pub fn start_driver_com(&self) -> Result<(), anyhow::Error> {
         let handle = self.handle;
         thread::spawn(move || -> Result<(), anyhow::Error> {
             let request_size = u32::try_from(size_of::<DriverRequest>())?;
@@ -169,16 +171,23 @@ impl WindowsDriverInterface {
                 };
 
                 // Dispatch the request
-                let result = match request.operation {
+                let (result, should_notify) = match request.operation {
                     KeysasFilterOperation::ScanFile | KeysasFilterOperation::UserAllowFile => {
-                        matches!(authorize_file(request.operation, &content), Ok(true))
+                        // By default block the file and notify the user
+                        match authorize_file(request.operation, &content) {
+                            Ok(res) => res,
+                            Err(e) => {
+                                println!("Failed to validate the file: {e}");
+                                (false, true)
+                            }
+                        }
                     }
-                    KeysasFilterOperation::ScanUsb => true /*match authorize_usb(&content) {
+                    KeysasFilterOperation::ScanUsb => (true, false) /*match authorize_usb(&content) {
                         Ok(true) => true,
                         _ => false,
                     }*/,
-                    KeysasFilterOperation::UserAllowAllUsb => true,
-                    KeysasFilterOperation::UserAllowUsbWithWarning => true,
+                    KeysasFilterOperation::UserAllowAllUsb => (true, false),
+                    KeysasFilterOperation::UserAllowUsbWithWarning => (true, false),
                 };
 
                 // Prepare the response and send it
@@ -194,6 +203,13 @@ impl WindowsDriverInterface {
                     if FilterReplyMessage(handle, &reply.header, reply_size).is_err() {
                         println!("Failed to send response to driver");
                         continue;
+                    }
+                }
+
+                // Send the authorization result to the tray interface
+                if should_notify {
+                    if let Err(e) = tray_if::send_file_auth_status(&content.trim_matches(char::from(0)), result) {
+                        println!("Failed to send file status to tray app {e}");
                     }
                 }
             }
@@ -336,11 +352,15 @@ fn authorize_usb(content: &str) -> Result<bool, anyhow::Error> {
 /// 
 /// USB_op will be used to apply a device wide filter policy
 /// 
+/// Returns a tuple containing
+///     - if the file is authorized or not
+///     - if a notification must be sent to the user or not
+/// 
 /// # Arguments
 /// 
 /// * 'usb_op' - Device wide filtering policy
 /// * 'content' - Content of the driver request, it contains the path to the file
-fn authorize_file(_usb_op: KeysasFilterOperation, content: &str) -> Result<bool, anyhow::Error> {
+fn authorize_file(_usb_op: KeysasFilterOperation, content: &str) -> Result<(bool, bool), anyhow::Error> {
     let file_path = Path::new(content.trim_matches(char::from(0)));
 
     // Try to get the parent directory
@@ -356,18 +376,18 @@ fn authorize_file(_usb_op: KeysasFilterOperation, content: &str) -> Result<bool,
     }
 
     if components.next() == Some(Component::Normal(OsStr::new("System Volume Information"))) {
-        return Ok(true);
+        return Ok((true, false));
     }
 
     // Skip the directories
     if file_path.metadata()?.is_dir() {
-        return Ok(true);
+        return Ok((true, false));
     }
 
     // Try to validate the file from the station report
     match validate_file(file_path) {
         Ok(true) => {
-            return Ok(true);
+            return Ok((true, true));
         }
         _ => {
             println!("File not validated by station");
@@ -375,7 +395,7 @@ fn authorize_file(_usb_op: KeysasFilterOperation, content: &str) -> Result<bool,
     }
 
     // If the validation fails, ask the user authorization
-    user_authorize_file(file_path)
+    user_authorize_file(file_path).map(|r| (r, true))
 }
 
 /// Check a file

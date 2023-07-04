@@ -28,16 +28,12 @@ use crate::windows_driver_interface::WindowsDriverInterface;
 
 use anyhow::anyhow;
 
-fn request_callback() {
-    log::info!("Called!");
-}
-
 /// Initiliaze the driver interface depending on the OS
 pub fn init_driver_com() -> Result<WindowsDriverInterface, anyhow::Error> {
     if cfg!(windows) {
         let driver_interface = WindowsDriverInterface::open_driver_com()?;
 
-        driver_interface.start_driver_com(request_callback)?;
+        driver_interface.start_driver_com()?;
 
         Ok(driver_interface)
     } else {

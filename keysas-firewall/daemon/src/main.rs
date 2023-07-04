@@ -27,8 +27,10 @@
 #![feature(vec_into_raw_parts)]
 #![feature(str_split_remainder)]
 
+
 pub mod driver_interface;
 pub mod windows_driver_interface;
+pub mod tray_if;
 
 use crate::driver_interface::init_driver_com;
 
@@ -37,6 +39,11 @@ use anyhow::anyhow;
 fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger
     simple_logger::init()?;
+
+    if let Err(e) = tray_if::init() {
+        log::error!("Failed to start tray interface server: {e}");
+        return Err(anyhow!("Failed to start tray interface server"));
+    };
 
     // Initialize the connection with the driver
     if let Err(e) = init_driver_interface() {

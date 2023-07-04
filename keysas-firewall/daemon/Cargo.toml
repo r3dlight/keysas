@@ -19,6 +19,10 @@ wchar = "0.11"
 mbrman = "0.5"
 libc = "0.2"
 keysas_lib = { path = "../../keysas_lib" }
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+libmailslot = {path = "../libmailslot"}
 
 [dependencies.windows]
 version = "0.48.0"

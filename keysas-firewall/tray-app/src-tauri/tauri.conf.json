@@ -50,9 +50,7 @@
         "title": "Keysas USB Firewall",
         "url": "index.html",
         "visible": false,
-        "decorations": false,
-        "width": 600,
-        "height": 400
+        "decorations": false
       }
     ]
   }

@@ -1,0 +1,47 @@
+;
+; usbfilter.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class = USB
+ClassGuid = {36fc9e60-c465-11cf-8056-444553540000}
+Provider=%ManufacturerName%
+CatalogFile=usbfilter.cat
+DriverVer = 05/10/2023,16.21.56.700
+PnpLockdown=1
+
+[DefaultInstall.NTamd64]
+CopyFiles=@usbfilter.sys
+Addreg = usbfilter.AddReg
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[usbfilter.AddReg]
+HKLM, System\CurrentControlSet\Control\Class\{36fc9e60-c465-11cf-8056-444553540000}, UpperFilters, 0x00010008, usbfilter
+
+[DefaultInstall.NTamd64.Services]
+AddService = usbfilter, , usbfilter.Service.Install
+
+[usbfilter.Service.Install]
+DisplayName = "usbfilter"
+Description = "Keysas USB filter"
+ServiceBinary = %12%\usbfilter.sys
+ServiceType = 1
+StartType = 0
+ErrorControl = 1
+
+[SourceDisksFiles]
+usbfilter.sys=1
+
+[SourceDisksNames]
+1 = %DiskId1%
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="Keysas" ;TODO: Replace with your manufacturer name
+DiskName = "usbfilter Installation Disk"
+usbfilter.DeviceDesc = "usbfilter Device"
+usbfilter.SVCDESC = "usbfilter Service"
+DiskId1 = "USB upper filter driver"
