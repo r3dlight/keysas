@@ -28,6 +28,8 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::mprotect)?;
     ctx.allow_syscall(Syscall::munmap)?;
     ctx.allow_syscall(Syscall::statx)?;
+    #[cfg(target_arch = "x86_64")]
+    ctx.allow_syscall(Syscall::unlink)?;
     ctx.allow_syscall(Syscall::unlinkat)?;
     ctx.allow_syscall(Syscall::pread64)?;
     ctx.allow_syscall(Syscall::rt_sigaction)?;
@@ -58,7 +60,6 @@ pub fn init() -> Result<()> {
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::faccessat)?;
     ctx.allow_syscall(Syscall::execve)?;
-    ctx.allow_syscall(Syscall::unlink)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::sched_getaffinity)?;
     ctx.allow_syscall(Syscall::landlock_create_ruleset)?;
