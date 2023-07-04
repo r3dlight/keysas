@@ -41,14 +41,21 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::listen)?;
     ctx.allow_syscall(Syscall::mremap)?;
     ctx.allow_syscall(Syscall::brk)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::poll)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::ppoll)?;
     ctx.allow_syscall(Syscall::mprotect)?;
     ctx.allow_syscall(Syscall::ioctl)?;
     ctx.allow_syscall(Syscall::pread64)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::access)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::faccessat)?;
     ctx.allow_syscall(Syscall::execve)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::prctl)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::arch_prctl)?;
     ctx.allow_syscall(Syscall::futex)?;
     ctx.allow_syscall(Syscall::sched_getaffinity)?;
