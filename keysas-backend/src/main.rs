@@ -148,7 +148,7 @@ pub fn daemon_status() -> Result<[bool; 3]> {
         .output()
         .expect("failed to get status for keysas-out");
     let status_in = String::from_utf8_lossy(&output.stdout);
-    let re = Regex::new(r"Active:")?;
+    let re = Regex::new(r"Active: active")?;
     state[2] = re.is_match(&status_in);
 
     Ok(state)
