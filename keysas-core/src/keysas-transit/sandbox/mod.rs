@@ -7,6 +7,7 @@
  * This file contains various funtions
  * to sandbox this binary using seccomp.
  */
+pub use anyhow::Result;
 
 #[cfg(target_os = "linux")]
 use syscallz::{Context, Syscall};
