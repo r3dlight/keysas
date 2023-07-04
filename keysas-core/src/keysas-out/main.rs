@@ -88,6 +88,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str;
+mod sandbox;
 
 /// Structure representing a file and its metadata in the daemon
 #[derive(Debug)]
@@ -307,7 +308,14 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
-    landlock_sandbox(&config.sas_out)?;
+    match landlock_sandbox(&config.sas_out) {
+        Ok(_) => log::info!("Landlock sandbox activated."),
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}"),
+    }
+    match sandbox::init() {
+        Ok(_) => log::info!("Seccomp sandbox activated."),
+        Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}"),
+    }
 
     // Load station signing keys and certificate
     let sign_keys = match HybridKeyPair::load(
