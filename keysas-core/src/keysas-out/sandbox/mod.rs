@@ -37,17 +37,24 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::pread64)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::prlimit64)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::poll)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::ppoll)?;
     ctx.allow_syscall(Syscall::ioctl)?;
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
     ctx.allow_syscall(Syscall::prctl)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::arch_prctl)?;
     ctx.allow_syscall(Syscall::sched_getaffinity)?;
     ctx.allow_syscall(Syscall::set_tid_address)?;
     ctx.allow_syscall(Syscall::rseq)?;
     ctx.allow_syscall(Syscall::set_robust_list)?;
     ctx.allow_syscall(Syscall::socket)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::access)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::faccessat)?;
     ctx.allow_syscall(Syscall::connect)?;
     ctx.allow_syscall(Syscall::execve)?;
     ctx.load()?;

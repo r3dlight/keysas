@@ -32,12 +32,17 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::pread64)?;
     ctx.allow_syscall(Syscall::rt_sigaction)?;
     ctx.allow_syscall(Syscall::accept4)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::poll)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::ppoll)?;
     ctx.allow_syscall(Syscall::socket)?;
+    ctx.allow_syscall(Syscall::ppoll)?;
     ctx.allow_syscall(Syscall::sendmsg)?;
     ctx.allow_syscall(Syscall::prlimit64)?;
     ctx.allow_syscall(Syscall::rseq)?;
     ctx.allow_syscall(Syscall::landlock_add_rule)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::arch_prctl)?;
     ctx.allow_syscall(Syscall::set_robust_list)?;
     ctx.allow_syscall(Syscall::set_tid_address)?;
@@ -48,7 +53,10 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::prctl)?;
     ctx.allow_syscall(Syscall::getrandom)?;
     ctx.allow_syscall(Syscall::brk)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::access)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::faccessat)?;
     ctx.allow_syscall(Syscall::execve)?;
     ctx.allow_syscall(Syscall::unlink)?;
     ctx.allow_syscall(Syscall::sigaltstack)?;
