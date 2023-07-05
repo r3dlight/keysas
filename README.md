@@ -31,7 +31,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Daemons are running under unprivileged users
  - Daemons are sandboxed using systemd (Security drop-in)
  - Daemons are sandboxed using LandLock
- - Daemons are sandboxed using Seccomp (TODO)
+ - Daemons are sandboxed using Seccomp (x86_64 & aarch64)
 
 ## Other binaries or applications available
  - Keysas-io: Daemon watching udev events to verify the signature of any mass storage USB devices and mount it as a IN (no or invalid signature) or OUT device (valid signature). It also send json values to keysas-frontend for visualization
