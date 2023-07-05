@@ -73,6 +73,7 @@ impl ServiceIf {
                     return;
                 }
             };
+            println!("Start listening for daemon");
             loop {
                 while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
                     if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes()) {

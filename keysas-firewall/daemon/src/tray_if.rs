@@ -49,6 +49,7 @@ pub fn init() -> Result<(), anyhow::Error> {
 
         loop {
             while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
+                println!("Message received: {:?}", msg);
                 if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes()) {
                     println!("message from tray {:?}", update);
                 }
@@ -70,6 +71,8 @@ pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
     if let Err(e) = libmailslot::write_mailslot(SERVICE_PIPE, &msg_vec) {
         return Err(anyhow!("Failed to post message to the mailslot: {e}"));
     }
+
+    println!("Message sent");
 
     Ok(())
 }
