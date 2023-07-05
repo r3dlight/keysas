@@ -33,7 +33,10 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::sendmsg)?;
     ctx.allow_syscall(Syscall::statx)?;
     ctx.allow_syscall(Syscall::rt_sigprocmask)?;
+    #[cfg(target_arch = "x86_64")]
     ctx.allow_syscall(Syscall::dup2)?;
+    #[cfg(target_arch = "aarch64")]
+    ctx.allow_syscall(Syscall::dup3)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
     ctx.allow_syscall(Syscall::madvise)?;
     ctx.allow_syscall(Syscall::accept4)?;
