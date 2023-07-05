@@ -57,6 +57,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::faccessat)?;
     ctx.allow_syscall(Syscall::connect)?;
     ctx.allow_syscall(Syscall::execve)?;
+    ctx.allow_syscall(Syscall::copy_file_range)?;
     ctx.load()?;
     Ok(())
 }
