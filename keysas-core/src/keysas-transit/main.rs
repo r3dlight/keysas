@@ -24,7 +24,7 @@
 #![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#![allow(clippy::forget_ref)]
+#![allow(forgetting_references)]
 
 use anyhow::Result;
 use bincode::Options;
