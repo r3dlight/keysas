@@ -666,7 +666,7 @@ async fn sign_key(password: String) -> bool {
             return false;
         }
     };
-    let _result = match sign_usb(
+    match sign_usb(
         &device, &vendor, &model, &revision, &serial, "out", &password,
     ) {
         Ok(o) => o,
@@ -868,7 +868,7 @@ async fn revoke_usb() -> bool {
             return false;
         }
     };
-    let _result = match revoke_device(&device) {
+    match revoke_device(&device) {
         Ok(d) => d,
         Err(e) => {
             log::error!("Cannot revoke device: {e}.");

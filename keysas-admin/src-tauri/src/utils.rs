@@ -92,17 +92,14 @@ pub fn send_cert_to_station(
         return Err(anyhow!("Connection error"));
     }
 
-    let command = format!(
-        "{}",
-        "sudo /bin/chown keysas-out:keysas-out /etc/keysas/file-sign-cl.p8 /etc/keysas/file-sign-cl.pem /etc/keysas/file-sign-pq.p8 /etc/keysas/file-sign-pq.pem /etc/keysas/usb-ca-cl.pem /etc/keysas/usb-ca-pq.pem",
-    );
+    let command = "sudo /bin/chown keysas-out:keysas-out /etc/keysas/file-sign-cl.p8 /etc/keysas/file-sign-cl.pem /etc/keysas/file-sign-pq.p8 /etc/keysas/file-sign-pq.pem /etc/keysas/usb-ca-cl.pem /etc/keysas/usb-ca-pq.pem".to_string();
 
     if let Err(e) = session_exec(session, &command) {
         log::error!("Failed to chown files: {e}");
         return Err(anyhow!("Connection error"));
     }
 
-    let command = format!("{}", "sudo /bin/systemctl restart keysas",);
+    let command = "sudo /bin/systemctl restart keysas".to_string();
 
     if let Err(e) = session_exec(session, &command) {
         log::error!("Failed to restart Keysas: {e}");
