@@ -476,6 +476,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             f.md.av_pass,
             f.md.is_toobig
         );
+        #[allow(forgetting_references)]
         mem::forget(f);
     }
 }
