@@ -132,7 +132,7 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
     loop {
         let result = unsafe {
             ppoll(
-                (&mut fds[..]).as_mut_ptr(),
+                fds[..].as_mut_ptr(),
                 fds.len() as nfds_t,
                 ptr::null_mut(),
                 ptr::null(),
