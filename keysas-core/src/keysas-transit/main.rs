@@ -34,10 +34,6 @@ use clap::{crate_version, Arg, ArgAction, Command};
 use infer::get;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
-use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
-};
 use log::{error, info, warn};
 use nix::unistd;
 use std::fs::File;
@@ -107,33 +103,6 @@ struct Configuration {
     yara_timeout: i32,         // Timeout for yara
     yara_rules: Option<Rules>, // Yara rules
     type_off: bool,
-}
-
-fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
-    let abi = ABI::V2;
-    let status = Ruleset::new()
-        .handle_access(AccessFs::from_all(abi))?
-        .create()?
-        // Read-only access.
-        .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, rule_path],
-            AccessFs::from_read(abi),
-        ))?
-        .restrict_self()?;
-    match status.ruleset {
-        // The FullyEnforced case must be tested.
-        RulesetStatus::FullyEnforced => {
-            info!("Keysas-transit is now fully sandboxed using Landlock !")
-        }
-        RulesetStatus::PartiallyEnforced => {
-            warn!("Keysas-transit is only partially sandboxed using Landlock !")
-        }
-        // Users should be warned that they are not protected.
-        RulesetStatus::NotEnforced => {
-            warn!("Keysas-transit: Not sandboxed with Landlock ! Please update your kernel.")
-        }
-    }
-    Ok(())
 }
 
 /// This function parse the command arguments into a structure
@@ -506,19 +475,18 @@ fn send_files(files: &Vec<FileData>, stream: &UnixStream) {
 }
 
 fn main() -> Result<()> {
-    // TODO activate seccomp
-
     // Parse command arguments
     let mut config = parse_args();
 
     // Configure logger
     init_logger();
 
-    // landlock init
-    match landlock_sandbox(&config.rule_path) {
+    // Landlock initialization
+    match sandbox::landlock_sandbox(&config.rule_path) {
         Ok(_) => log::info!("Landlock sandbox activated."),
         Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}"),
     }
+    // Seccomp initialization
     match sandbox::init() {
         Ok(_) => log::info!("Seccomp sandbox activated."),
         Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}"),
