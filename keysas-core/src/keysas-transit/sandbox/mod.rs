@@ -7,7 +7,12 @@
  * This file contains various funtions
  * to sandbox this binary using seccomp.
  */
+use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
+use landlock::{
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
+    RulesetStatus, ABI,
+};
 
 #[cfg(target_os = "linux")]
 use syscallz::{Context, Syscall};
@@ -72,5 +77,32 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::landlock_add_rule)?;
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
     ctx.load()?;
+    Ok(())
+}
+
+pub fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
+    let abi = ABI::V2;
+    let status = Ruleset::new()
+        .handle_access(AccessFs::from_all(abi))?
+        .create()?
+        // Read-only access.
+        .add_rules(path_beneath_rules(
+            &[CONFIG_DIRECTORY, rule_path],
+            AccessFs::from_read(abi),
+        ))?
+        .restrict_self()?;
+    match status.ruleset {
+        // The FullyEnforced case must be tested.
+        RulesetStatus::FullyEnforced => {
+            log::info!("Keysas-transit is now fully sandboxed using Landlock !")
+        }
+        RulesetStatus::PartiallyEnforced => {
+            log::warn!("Keysas-transit is only partially sandboxed using Landlock !")
+        }
+        // Users should be warned that they are not protected.
+        RulesetStatus::NotEnforced => {
+            log::warn!("Keysas-transit: Not sandboxed with Landlock ! Please update your kernel.")
+        }
+    }
     Ok(())
 }
