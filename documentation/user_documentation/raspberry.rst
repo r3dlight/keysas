@@ -1,32 +1,32 @@
-***********************************
-Station blanche pour Raspberry Pi 4 
-***********************************
+***************************************
+Decontamination station for USB devices
+***************************************
 
 
-Ceci est une version 100% opensource de station blanche pour **Raspberry Pi v4**. 
+This is a 100% open-source decontamination station version for **Raspberry Pi v4**.
 
-L'image mise à disposition est basée sur le logiciel Keysas et propose une analyse antivirale ainsi qu'une analyse basée 
-sur environ +2000 règles Yara déjà pré-installées dans l'image. Vous pourrez bien entendu ajouter de nouvelles règles Yara à 
-votre convenance afin d'augmenter la probabilité de détection. Vous pourrez également filtrer les types et la taille maximale 
-des fichiers à transférer en sortie. Le code est intégralement écrit en Rust, sandboxé et repose sur le principe du moindre privilège.
+The provided image is based on the Keysas software and offers antivirus scanning as well as analysis based on +20000 pre-installed Yara rules. 
+You can add new Yara rules as desired to increase the detection probability. 
+You can also filter the types and maximum size of files to transfer as output. 
+The code is entirely written in Rust, sandboxed, and follows the principle of least privilege.
 
 .. note::
- Malgré tout le soin apporté à la solution, elle peut toutefois encore présenter certains bugs à l'utilisation. N'hésitez pas à nous contacter pour remonter ces bugs qui seront
- corrigés dans les prochaines versions.
+ Despite the care taken in the solution, there may still be some bugs during use. 
+ Please don't hesitate to contact us to report any bugs, which will be addressed in future versions.
 
-.. admonition:: Ce dont la station blanche ne vous protège pas
+.. admonition:: What the Keysas station doesn't protect you from
   :class: warning
 
-  De part la nature et le faible coût de la plateforme Raspberry Pi, la station blanche ne sera évidemment pas protégée contre USB-Killer. Des mécanismes de protection sont déployés contre les attaques de type BadUSB, la station y reste cependant potentiellement vulnérable, sous certaines conditions, pendant la phase de démarrage. Il est fortement conseillé dans ce cas de maitriser le parc des périphériques USB de sortie (comme nous le ferons plus tard dans cette documentation) mais aussi, dans une certaine mesure, celui des périphériques d’entrée.
+  Due to the nature and low cost of the Raspberry Pi platform, the Keysas station will obviously not be protected against USB-Killer. Protection mechanisms are deployed against BadUSB attacks, but the station may still be potentially vulnerable, under certain conditions, during the startup phase. It is strongly recommended in this case to control the output USB device inventory (as we will discuss later in this documentation) and, to some extent, the input device inventory as well.
 
-Téléchargement
-==============
+Download
+=========
 - `keysas-sd-v1.2 <https://keysas.fr/download/rasp/keysas-sd-v1.2.tar.gz>`_ (`sha256 <https://keysas.fr/download/rasp/keysas-sd-v1.2.tar.gz.sha256>`_)
 - `keysas-admin-v0.1.2 (GNU/Linux) <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_amd64.AppImage>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_amd64.AppImage.sha256>`_)
 - `keysas-admin-v0.1.2 (Windows) <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_x64_en-US.msi>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_x64_en-US.msi.sha256>`_)
 
-L'image que vous avez téléchargé se redimensionnera automatiquement en fonction de la taille de votre carte MicroSD. 
-Pour copier l'image de la station blanche sur votre carte SD:
+The downloaded image will automatically resize according to the size of your MicroSD card.
+To copy the white station image to your SD card:
 
 .. code-block:: shell-session
 
@@ -34,74 +34,66 @@ Pour copier l'image de la station blanche sur votre carte SD:
  sudo dd if=raspberry_keysas_system_image.img of=/dev/sdX bs=1M status=progress
 
 
-Il est cependant conseillé d'utiliser le logiciel bmaptool comme suit:
-
+However, it is recommended to use the bmaptool software as follows:
 
 .. code-block:: shell-session
 
  tar -xvzf keysas-sd-xxyy.tar.gz
  sudo bmaptool copy --bmap raspberry_keysas_system_image.img.bmap raspberry_keysas_system_image.img /dev/sdX 
   
-Où sdX sera le périphérique détecté par votre ordinateur pour la carte SD.
+Where sdX is the device detected by your computer for the SD card.
 
 .. note::
- Etant donné le nombre de lecture/écriture élevé sur la carte MicroSD, il est fortement conseillé d'utiliser des cartes haute performance.
+ Due to the high read/write activity on the MicroSD card, it is strongly recommended to use high-performance cards.
 
-Avant de commencer, il faut signer au moins un périphérique USB de sortie (qui receptionnera les fichiers considérés comme sains). 
-Tous les périphériques de stockage USB non signés seront considérés comme périphériques d'entrée par défaut (donc contenant des fichiers
-potentiellement malveillants).
+Before getting started, you need to sign at least one output USB device (which will receive files considered safe). All unsigned USB storage devices will be considered default input devices (potentially containing malicious files).
 
 .. danger::
- Les périphériques USB de sortie que vous allez devoir signer, seront complétement détruits (MBR/Partitions etc...) et reconstruits selon un modèle précis.
- Il n'y a pas de support des tables de partitions au format GPT pour le moment.
+ The output USB devices that you need to sign will be completely destroyed (MBR/Partitions, etc.) and rebuilt according to a specific model. There is no support for GPT partition tables at the moment.
 
 Keysas-admin (Client lourd pour postes d'administration)
 ========================================================
 
-L'administration des stations **Keysas**, la signature et la révocation de périphériques USB de sortie sont nettement facilitées par l'utilisation de l'application
-**keysas-admin**. Elle permet d'enregistrer vos stations blanches **Keysas**, de les administrer depuis un poste d'administration. 
+The administration of Keysas stations, the signing, and revocation of output USB devices are greatly facilitated by using the keysas-admin application. 
+It allows you to register your Keysas stations and manage them from an administration workstation.
 
-Pour le moment, seuls les postes d'administration **GNU/Linux** sont supportés ainsi que **Windows 10**. 
-Les téléchargements sont disponibles plus haut dans la section téléchargement.
+Currently, only GNU/Linux administration workstations are supported. The downloads are available in the download section above.
 
-Afin de vous faire profiter d'un maximum de sécurité, l'application **keysas-admin** est développée en utilisant le framework **Tauri-app** et utilise exclusivement
-Vue-JS 3 pour la partie Frontend et le language Rust pour la partie backend. Une fois installée, l'application vous notifira automatiquement en cas de mises à jour disponibles
-et vous proposera de les installer.
+To provide you with maximum security, the keysas-admin application is developed using the Tauri-app framework and exclusively uses Vue-JS 3 for the frontend and Rust language for the backend. 
+Once installed, the application will automatically notify you of available updates and offer to install them.
 
-L'administration des stations blanches Keysas fonctionne en utilisant le protocole SSHv2. Il conviendra donc de générer une paire de clés asymétriques ed25519 dédiée 
-à l'administration des stations **Keysas**. Pour ce faire, ouvrez un terminal et tapez la commande suivante:
+The administration of **Keysas** stations works using the SSHv2 protocol. 
+Therefore, you need to generate a dedicated pair of ed25519 asymmetric keys for Keysas station administration. 
+To do this, open a terminal and enter the following command:
 
 .. code-block:: shell-session
 
  ssh-keygen -m PEM -t ed25519 -f mykey
 
 .. warning:: 
- L'application ne supporte pas pour le moment la gestion des passphases ni du format PKCS#12. 
- Il vous faudra donc entrer une passphrase vide en appuyant sur entrée.
- De même, les fonctionnalités d'enrollement et de révocation des Yubikeys
- ne sont pas encore supportées par l'application.
+ The application currently does not support passphrase management or the PKCS#12 format. 
+ Therefore, you need to enter an empty passphrase by pressing Enter. 
+ Similarly, the enrollment and revocation features of Yubikeys are not yet supported by the application.
 
-Une fois la paire de clés générée, ouvrez l'application et allez dans l'onglet **SSH configuration**. 
-Renseignez le chemin vers votre clé publique et votre clé privée puis validez.
-Ajouter enfin votre nouvelle station **Keysas** dans le menu **Add a new Keysas** en récupérant l'adresse IP s'affichant sur votre **Keysas**.
-Cliquez enfin dans le menu sur **Manage your Keysas**. Votre nouvelle station doit maintenant y apparaitre.
-Commencez par exporter votre clé SSH publique en cliquant sur **Export SSH pubkey**.
+Once the key pair is generated, open the application and go to the **SSH configuration** tab. 
+Enter the path to your public key and private key, and then validate. 
+Finally, add your new Keysas white station in the **Add a new Keysas** menu by retrieving the IP address displayed on your Keysas white station. 
+Then click on Manage your Keysas in the menu. 
+Your new station should now appear there. 
+Start by exporting your SSH public key by clicking on **Export SSH pubkey**.
 
 .. warning:: 
- Vous devez impérativement exporter votre clé publique avant d'utiliser les autres fonctionnalitées disponibles.
- Sinon, elles ne fonctionneront pas.
+ You must export your public key before using other available features. Otherwise, they will not work.
 
-Une fois la clé SSH publique exportée, l'authentification SSH par mot de passe sera interdite. Il faudra alors
-s'authentifier grace à la bi-clé SSH précédemment crée.
+Once the SSH public key is exported, password-based SSH authentication will be disabled. You will need to authenticate using the SSH key pair previously created.
 
 .. code-block:: shell-session
 
- ssh -i myprivatekey keysas@192.168.XX.YY (IP obtenue via DHCP)
+ ssh -i myprivatekey keysas@192.168.XX.YY (IP obtained via DHCP)
 
 .. danger:: 
- Lors de la première connexion et donc avant l'export de la clé SSH publique, le mot de passe par defaut est **Changeme007**.
+ During the first connection, before exporting the SSH public key, the default password is **Changeme007**.
 
-Si vous ne souhaitez pas utilisez l'application **Keysas-admin**, vous pouvez toujours signer un périphérique USB de sortie manuellement.
 
 Signer un périphérique USB de sortie manuellement via SSH
 =========================================================
