@@ -27,8 +27,12 @@ To compile Keysas from sources, let's start by installing the required dependenc
   # Install rustup
   $ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-  # Install the LLVM toolchain (x86_64 only)
+  # Install the LLVM toolchain
   $ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
+  # Install the nightly rust toolchain
+  $ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+  $ rustup default nightly
 
 Getting **Keysas**
 -------------------
