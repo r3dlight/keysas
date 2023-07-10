@@ -31,6 +31,7 @@ User documentation
    :maxdepth: 3
    :caption: Contents:
 
+   installation
    networkgw
    raspberry
    keysas-admin

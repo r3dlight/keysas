@@ -30,8 +30,8 @@ To compile Keysas from sources, let's start by installing the required dependenc
   # Install the LLVM toolchain (x86_64 only)
   $ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 
-Getting **Keysas** (Network gateway)
-------------------------------------
+Getting **Keysas**
+-------------------
 
 A pre-compiled **Keysas** binary is at your
 disposal, you can choose and download a specific version of **Keysas**
@@ -133,7 +133,7 @@ You can now install **Keysas-core** on your system.
  $ sudo make install-core
  $ sudo make install-yararules
 
-To install the USB version of **Keysas** (decontamination station):
+To install the Full USB version of **Keysas** (decontamination station):
 
 .. code-block:: shell-session
 
