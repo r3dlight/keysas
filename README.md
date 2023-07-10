@@ -56,5 +56,5 @@ make install
 ```
 ## User documentation
 
-User documentation (outdated for now) can be found here : [https://keysas.fr](https://keysas.fr)
+User documentation can be found here : [https://keysas.fr](https://keysas.fr)
 
