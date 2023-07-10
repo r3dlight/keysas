@@ -6,7 +6,7 @@ Lastest release
 ==================
 
 Keysas v2.0 (x86_64 only)
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. admonition:: Files
  :class: tip
