@@ -3,7 +3,7 @@ Decontamination station for USB devices
 ***************************************
 
 
-This is a 100% open-source decontamination station version for **Raspberry Pi v4**.
+This is a 100% open-source decontamination station version for **Raspberry Pi v4** (read-to-go), but you can of course build **Keysas** on Debian 12 (Bookworm) for both architecture (x86_64 or aarch64).
 
 The provided image is based on the Keysas software and offers antivirus scanning as well as analysis based on +20000 pre-installed Yara rules. 
 You can add new Yara rules as desired to increase the detection probability. 
@@ -21,12 +21,11 @@ The code is entirely written in Rust, sandboxed, and follows the principle of le
 
 Download
 =========
-- `keysas-sd-v1.2 <https://keysas.fr/download/rasp/keysas-sd-v1.2.tar.gz>`_ (`sha256 <https://keysas.fr/download/rasp/keysas-sd-v1.2.tar.gz.sha256>`_)
-- `keysas-admin-v0.1.2 (GNU/Linux) <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_amd64.AppImage>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_amd64.AppImage.sha256>`_)
-- `keysas-admin-v0.1.2 (Windows) <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_x64_en-US.msi>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v0.1.2/keysas-admin_0.1.2_x64_en-US.msi.sha256>`_)
+- `keysas-sd-v2.0 <https://keysas.fr/download/rasp/keysas-sd-v2.0.tar.gz>`_ (`sha256 <https://keysas.fr/download/rasp/keysas-sd-v2.0.tar.gz.sha256>`_)
+- `keysas-admin-v2.0 (GNU/Linux) <https://keysas.fr/download/keysas-admin/v0.2.0/keysas-admin_2.0_amd64.AppImage>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v2.0/keysas-admin_2.0_amd64.AppImage.sha256>`_)
 
 The downloaded image will automatically resize according to the size of your MicroSD card.
-To copy the white station image to your SD card:
+To copy the **Keysas** station image to your SD card:
 
 .. code-block:: shell-session
 
@@ -77,7 +76,7 @@ To do this, open a terminal and enter the following command:
 
 Once the key pair is generated, open the application and go to the **SSH configuration** tab. 
 Enter the path to your public key and private key, and then validate. 
-Finally, add your new Keysas white station in the **Add a new Keysas** menu by retrieving the IP address displayed on your Keysas white station. 
+Finally, add your new Keysas station in the **Add a new Keysas** menu by retrieving the IP address displayed on your **Keysas** station. 
 Then click on Manage your Keysas in the menu. 
 Your new station should now appear there. 
 Start by exporting your SSH public key by clicking on **Export SSH pubkey**.
@@ -107,7 +106,7 @@ By default, the **Keysas** station accepts transfers from any input devices. How
 Enabling the Feature
 ---------------------
 
-To activate the authentication feature, you need to connect to the white station as a superadministrator. 
+To activate the authentication feature, you need to connect to the **Keysas** station as a superadministrator. 
 Please note that if you have exported your SSH public key using the "keysas-admin" application, password authentication is disabled. 
 Therefore, you should connect using your private key.
 
@@ -133,7 +132,7 @@ Reload the daemon configuration:
 
  sudo systemctl daemon-reload
 
-Finally, restart the white station to apply the configuration changes:
+Finally, restart the station to apply the configuration changes:
 
 .. code-block:: shell-session
 
@@ -155,7 +154,7 @@ Please note that slot 2 of the YubiKey will be modified.
 YubiKey Initialization
 -----------------------
 
-Connect a YubiKey 5 to the white station to configure it. Use the "keysas-sign" account to perform this step:
+Connect a YubiKey 5 to the **Keysas** station to configure it. Use the "keysas-sign" account to perform this step:
 
 .. code-block:: shell-session
 
@@ -167,7 +166,7 @@ Now, the FIDO2 key is ready for use.
 Revoking a YubiKey
 -------------------
 
-If you ever need to revoke a YubiKey, simply connect it to the white station and proceed as follows:
+If you ever need to revoke a YubiKey, simply connect it to the **Keysas** station and proceed as follows:
 
 .. code-block:: shell-session
 
@@ -180,7 +179,7 @@ Using the Keysas Station
 =========================
 
 
-- In the top-right menu, you can find the status of the white station as well as help ;
+- In the top-right menu, you can find the status of the **Keysas** station as well as help ;
 - If FIDO2 authentication is enabled, insert a registered YubiKey first ;
 - Connect an input device (Any unsigned USB device should be recognized as an input device) ;
 - If FIDO2 authentication is enabled, the YubiKey icon on the screen will turn green, and the button on the YubiKey should start blinking. Press the button to confirm the authentication ;

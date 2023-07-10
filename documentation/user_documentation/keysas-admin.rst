@@ -17,6 +17,11 @@ This keypair should only be dedicated to the administration of your Keysas stati
  
  ssh-keygen -m PEM -t ed25519 -f mykey
 
+.. warning:: 
+ The application currently does not support passphrase management or the PKCS#12 format. 
+ Therefore, you need to enter an empty passphrase by pressing Enter. 
+ Similarly, the enrollment and revocation features of Yubikeys are not yet supported by the application.
+
 Then, set the path of both keys in the **"Admin configuration->SSH configuration"** menu
 
 Generate a IKPQPKI
