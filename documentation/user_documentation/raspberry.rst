@@ -51,7 +51,7 @@ Before getting started, you need to sign at least one output USB device (which w
 .. danger::
  The output USB devices that you need to sign will be completely destroyed (MBR/Partitions, etc.) and rebuilt according to a specific model. There is no support for GPT partition tables at the moment.
 
-Keysas-admin (Client lourd pour postes d'administration)
+Keysas-admin (Desktop client)
 ========================================================
 
 The administration of Keysas stations, the signing, and revocation of output USB devices are greatly facilitated by using the keysas-admin application. 
@@ -95,217 +95,141 @@ Once the SSH public key is exported, password-based SSH authentication will be d
  During the first connection, before exporting the SSH public key, the default password is **Changeme007**.
 
 
-Signer un périphérique USB de sortie manuellement via SSH
-=========================================================
+Fido2 Authentication
+=====================
 
-Connexion à la station blanche
-------------------------------
-
-L'image fournie est basée sur une distribution GNU/Linux Debian 11 (Bullseye) toujours en cours de durcissement. Le DHCP est activé par défaut: Référez-vous à votre équipement réseau pour obtenir l'adresse IP obtenue par la station blanche après son démarrage.
-
-Afin de prémunir la station blanche d'attaques de type BadUSB, seuls les périphériques USB de type "stockage de masse" comme les clés ou disques durs USB sont reconnus par la station blanche.
-Pour signer un périphérique USB de sortie, il faut donc absolument se connecter via SSH sur la station blanche:
-
-.. code-block:: shell-session
-
- ssh keysas-sign@192.168.XX.YY (IP obtenue via DHCP)
-
-.. warning:: 
- Le mot de passe par defaut est **Changeme**. Il conviendra de modifier ce dernier dès la première utilisation en le remplacant par un mot de passe robuste avec la commande **passwd**.
- L'utilisateur **keysas-sign** est privilégié uniquement lorsque de l'utilisation des commandes **keysas-sign** et **keysas-manage-yubikey**.
-
-Génération des clés de signature
---------------------------------
-
-On va générer maintenant une paire de clés asymétriques qui servira à signer et vérifier les périphériques sortants:
-
-.. code-block:: shell-session
-
- sudo /usr/bin/keysas-sign --generate=true --password=Toto007
- sudo chmod 600 /etc/keysas/keysas.priv
- sudo chattr +i /etc/keysas/keysas.priv
-
-.. warning::
-
- Il est très important de remplacer le mot de passe dans la ligne de commande par le votre :)
-
-.. danger::
- Cette bi-clé ne doit être générée qu'une seule fois à l'initialisation de la station blanche. Le remplacement de cette bi-clé
- entrainera l'échec de la vérification de la signature de toutes les périphériques USB déjà signés. Par défaut, les clés privées
- et publiques sont enregistrées dans /etc/keysas/. Il est important de sauvegarder ces clés dans un endroit sécurisé.
-
-Signature d'un périphérique USB
--------------------------------
-
-Une fois la paire de clés correctement générée, éxecutez la commande suivante:
-
-.. code-block:: shell-session
-
- sudo /usr/bin/keysas-sign --watch=true
-
-Brancher maintenant le périphérique usb de sortie à signer sur la station blanche. Ce périphérique devra être vide de tout fichier afin d'éviter des transferts non désirés.
-
-Pressez Ctrl+C et copier/coller la ligne qui apparait dans le terminal en la modifiant avec le mot de passe que 
-vous avez choisi pour générer la paire de clés précédemment. Par exemple:
-
-.. code-block:: shell-session
-
- sudo /usr/bin/keysas-sign -device=/dev/sda --sign=true --password=Toto007 --vendorid=0951 --modelid=160b --revision=1.00 --serial=Kingston_DataTraveler_2.0_0019E000B4625C8B0A070016-0:0
-
-Le nouveau périphérique USB devrait être maintenant correctement signé et formaté en fat32. Vous pouvez bien entendu reformater le périphérique avec tout autre système de fichier supporté par la station blanche (ext2, ext3, ext4, fat32, exfat, ntfs)
+By default, the **Keysas** station accepts transfers from any input devices. However, it is now possible for the administrator to configure the station to enforce user authentication using FIDO2.
 
 .. note::
- Répetez cette procédure avec l'ensemble des périphériques USB que vous souhaitez utiliser en tant que périphériques de sortie.
-
-
-Une fois l'opération terminée, débranchez le(s) périphérique's) et rebranchez-le(s) afin de s'assurer qu'il(s) est(sont) bien reconnu(s) comme périphérique(s) de sortie.
-
-
-Authentification avec fido2
-===========================
-
-Par défaut, la station blanche **Keysas** accepte les analyses à partir de n'importe quels périphériques d'entrée. 
-Il est désormais possible pour l'administrateur de configurer la station blanche pour forcer une authentification des utilisateurs via Fido2.
-
-.. note::
- Pour l'heure seules les clés **Yubikey 5 et 5c** sont prises en charge. D'autres types de clés compatibles **Fido2** seront bientôt supportées.
+ Currently, only YubiKey 5 and 5c are supported for FIDO2 authentication. Support for other FIDO2-compatible keys will be added soon.
 
  
-Activation de la fonctionnalité
--------------------------------
+Enabling the Feature
+---------------------
 
-Pour activer la fonctionnalité d'authentification, il faut se connecter à la station blanche en tant que superadministrateur. Prenez note que si vous avez exporter votre clé SSH publique depuis l'application **keysas-admin**, l'authentification par mot de passe est désactivée. Il faudra donc se connecter en utilisant votre clé privée.
-
-.. code-block:: shell-session
-
- ssh keysas@192.168.XX.YY (IP obtenue via DHCP)
-
-.. danger:: 
- Le mot de passe par defaut est **Changeme007**. Il conviendra de modifier ce dernier dès la première utilisation en le remplacant par un mot de passe robuste avec la commande **passwd**.
- L'utilisateur **keysas** est totalement privilégié, l'utilisation de ce compte "superadmin" est donc critique et ne doit être employé que pour
- des tâches importantes d'administration ou pour modifier la configuration de la station blanche. 
-
-Modifier ensuite la configuration du démon système **keysas-udev**:
+To activate the authentication feature, you need to connect to the white station as a superadministrator. 
+Please note that if you have exported your SSH public key using the "keysas-admin" application, password authentication is disabled. 
+Therefore, you should connect using your private key.
 
 .. code-block:: shell-session
 
- sudo vim /etc/systemd/system/keysas-udev.service
+ ssh -i mykey keysas@192.168.XX.YY (IP obtenue via DHCP)
 
-Puis ajouter l'option -y true après ExecStart=/usr/bin/keysas-udev, comme suit:
+Next, modify the configuration of the **keysas-io** system daemon:
 
 .. code-block:: shell-session
 
- ExecStart=/usr/bin/keysas-udev -y
+ sudo vim /etc/systemd/system/keysas-io.service
 
-Recharger la configuration du démon:
+Add the option -y true après ExecStart=/usr/bin/keysas-udev, as follows:
+
+.. code-block:: shell-session
+
+ ExecStart=/usr/bin/keysas-io -y
+
+Reload the daemon configuration:
 
 .. code-block:: shell-session
 
  sudo systemctl daemon-reload
 
-Enfin, il ne vous reste plus qu'à redémarrer la station blanche pour activer la configuration:
+Finally, restart the white station to apply the configuration changes:
 
 .. code-block:: shell-session
 
  sudo shutdown -r now
 
-La station blanche **Keysas** n'accepte désormais plus que les transferts d'utilisateurs authentifiés.
+The **Keysas** station will now only accept transfers from authenticated users.
 
 Initialisation de la Yubikey
 ----------------------------
 
-Brancher une Yubikey 5 sur la station blanche pour la configurer et en vous connectant avec le compte **keysas-sign**:
+Connect a YubiKey 5 to the station to configure it. Use the "keysas" account to perform this step:
 
 .. code-block:: shell-session
 
  sudo /usr/bin/keysas-manage-yubikey -i
 
-Pour information, le slot 2 de la Yubikey sera modifié.
+Please note that slot 2 of the YubiKey will be modified.
 
-Enregistrement de la Yubikey
-----------------------------
+YubiKey Initialization
+-----------------------
 
-Enregistrons maintenant la nouvelle Yubikey pour l'authentification d'un utilisateur de confiance:
+Connect a YubiKey 5 to the white station to configure it. Use the "keysas-sign" account to perform this step:
 
 .. code-block:: shell-session
 
  sudo /usr/bin/keysas-manage-yubikey -e -n Jean
 
-**Jean** correspond au nom de l'utilisateur de la clé **Fido2**. Il conviendra donc de la modifier en fonction de votre besoin.
-C'est terminé, la clé **Fido2** est maintenant opérationnelle. 
+Replace "John" with the name of the FIDO2 user. Modify it according to your needs.
+Now, the FIDO2 key is ready for use.
 
-Révoquation d'une Yubikey
--------------------------
+Revoking a YubiKey
+-------------------
 
-Si un jour cette clé doit être révoquée, il suffit de la brancher sur la station blanche et de procéder ainsi:
+If you ever need to revoke a YubiKey, simply connect it to the white station and proceed as follows:
 
 .. code-block:: shell-session
 
  sudo /usr/bin/keysas-manage-yubikey -r true
 
 
-La Yubikey se met à clignoter, appuyer alors sur le bouton pour valider la révocation.
+The YubiKey will start flashing. Press the button to confirm the revocation.
 
-Utilisation de la station blanche
-=================================
-
-
-- Dans le menu en haut à droite, vous trouverez l'état de la station blanche ainsi que l'aide;
-- Si l'authentification fido2 est activée: branchez d'abord une **Yubikey** enregistrée;
-- Brancher un périphérique d'entrée (Tout périphérique USB non signé devrait être reconnue comme périphérique d'entrée) ;
-- Si l'authentification fido2 est activée: L'icône de la Yubikey passe en vert sur l'écran et le bouton sur la **Yubikey** doit clignoter, appuyer dessus pour valider l'authentification;
-- En suivant les instructions à l'écran et une fois les fichiers commençant à apparaitrent dans le sas de sortie, débrancher le périphérique d'entrée ;
-- Brancher le périphérique de sortie signé une fois le périphérique d'entrée debranché ;
-
-Si besoin, plusieurs périphériques d'entrée peuvent être utilisés à la suite avant de brancher le périphérique de sortie.
-
-Tous les fichiers de configuration se situent dans /etc/keysas/keysas-\*.conf. Il est notamment possible de contrôler une liste blanche de types de fichers (magic numbers) ainsi que la taille maximale des fichiers à transférer. Veuillez-vous référer à la documentation officielle de Keysas pour plus d'information sur les différentes options (https://keysas.fr/administration.html#keysas-transit).
+Using the Keysas Station
+=========================
 
 
-Durcissement de la station blanche
-==================================
+- In the top-right menu, you can find the status of the white station as well as help ;
+- If FIDO2 authentication is enabled, insert a registered YubiKey first ;
+- Connect an input device (Any unsigned USB device should be recognized as an input device) ;
+- If FIDO2 authentication is enabled, the YubiKey icon on the screen will turn green, and the button on the YubiKey should start blinking. Press the button to confirm the authentication ;
+- Follow the on-screen instructions. Once the files start appearing in the output SAS, disconnect the input device ;
+- Connect the signed output device after disconnecting the input device. ;
 
-L'image système prête à l'emploi pour Raspberry Pi 4 dispose des fonctionnalités de durcissement suivantes:
 
-- Des protections contre BadUSB (l'écran marche uniquement avec le bus MIPI/DSI); 
-- Un noyau linux-hardened avec la configuration de ClipOS v5;
-- Un firewall NFTables (seul le port SSH est exposé) ;
-- Une protection contre le bruteforce SSH ;
-- Une protection anti-rebond SSH (pivot SSH) ;
-- Un paramètrage spécifique du noyau Linux ;
-- Montage des périphériques non signés en RO, NODEV, NOSUID, NOEXEC, NODEV ;
-- Kiosk utilisateur sandboxé via Firejail;
-- Démons "keysas" sandoxés plusieurs fois (Seccomp, Landlock, Namespaces, Apparmor).
+All configuration files are located in /etc/keysas/keysas-*.conf. 
+It is possible to control a whitelist of file types (magic numbers) and set the maximum file size for transfer. Please refer to the official Keysas documentation for more information on the available options (https://keysas.fr/administration.html#keysas-transit).
 
-Tous les fichiers transférés dans la station blanche sont automatiquement renommé avec un horodatage. 
-Pour chaque fichier transféré, vous pourrez éventuellement trouver, en fonction des résultats des différents scans, les extensions suivantes:
+Hardening of the station
+=========================
 
-- .sha256: Contient le sha256 digest du fichier transféré;
-- .antivirus: le fichier a été détecté par l'antivirus comme malveillant. Le fichier original n'est donc plus disponible;
-- .forbidden: l'extension et le magic number ne correspondent pas ou est interdit par l'administrateur;
-- .yara: Le moteur Yara a détecté un fichier potentiellement malveillant. Le fichier peut être transféré ou non suivant la configuration de l'administrateur. Par défaut, le fichier est supprimé;
-- .tooBig: La taille du fichier est supérieure à celle fixée par l'administrateur. Le fichier n'est pas transféré;
-- .failed: Un fichier n'a pas été tranféré complétement (erreur d'entrée/sortie lors de l'arrachage prématuré d'une clé par exemple).
+The pre-built system image for Raspberry Pi 4 includes the following hardening features:
+
+- Protections against BadUSB (the screen only works with the MIPI/DSI bus).
+- Linux-hardened kernel with ClipOS v5 configuration.
+- NFTables firewall (only the SSH port is exposed).
+- Protection against SSH brute force attacks.
+- Anti-bounce protection for SSH (SSH pivot).
+- Specific configuration of the Linux kernel.
+- Unsigned devices mounted as read-only (RO), NODEV, NOSUID, NOEXEC, NODEV.
+- User sandboxing using Firejail.
+- **Keysas** daemons sandboxed using Seccomp, Landlock, Namespaces, AppArmor.
+
+For each transferred file, depending on the results of various scans, you may find the following extensions:
+
+- .krp: Keysas report, contains various information about the scan
+- .ioerror: the file has been corrupted (incomplete copy or disc full);
 
 
 
-Mises à jour
-============
 
-La station blanche installe automatique les dernières signatures antivirales et les mises à jour de sécurité du système lorque celle-ci peut accéder à internet.
-Si la station blanche ne peut accéder à internet, il est tout à fait possible d'effectuer les mises à jours via un dépôt local au système d'information.
-Les démons "Keysas" ne sont, quant à eux, pas automatiquement mis à jour et nécessitent pour le moment l'installation des nouvelles images qui seront misent à disposition.
-Il conviendra donc de faire une sauvegarde des configurations et des clés générées.
+Updates
+========
 
-Matériel nécessaire
-===================
+The **Keysas** station automatically installs the latest antivirus signatures and security updates when it has internet access. 
+If the station cannot access the internet, updates can be performed using a local repository in the information system. 
+However, for now the "Keysas" daemons are not automatically updated and require the installation of new images that will be provided. 
+It is important to backup configurations and generated keys.
 
-`L'écran officiel. <https://www.raspberrypi.com/products/raspberry-pi-touch-display/>`_
+Required Hardware
+=================
 
-`Le Raspberry Pi 4 8Go de RAM / modèle B. <https://www.raspberrypi.com/products/raspberry-pi-4-model-b/?variant=raspberry-pi-4-model-b-8gb>`_
+`Official screen. <https://www.raspberrypi.com/products/raspberry-pi-touch-display/>`_
 
-`L'alimentation. <https://www.raspberrypi.com/products/type-c-power-supply/>`_
+`Raspberry Pi 4 8Go RAM / model B. <https://www.raspberrypi.com/products/raspberry-pi-4-model-b/?variant=raspberry-pi-4-model-b-8gb>`_
+
+`Power supply. <https://www.raspberrypi.com/products/type-c-power-supply/>`_
 
 .. note:: 
-  Aucune donnée n'est et ne sera jamais collectée lors de votre utilisation de la station blanche.
-
+  No data is or will be collected during your use of the white station.
