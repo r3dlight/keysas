@@ -219,6 +219,7 @@ Updates
 
 The **Keysas** station automatically installs the latest antivirus signatures and security updates when it has internet access. 
 If the station cannot access the internet, updates can be performed using a local repository in the information system. 
+Check the **FreshClam** documentation.
 However, for now the "Keysas" daemons are not automatically updated and require the installation of new images that will be provided. 
 It is important to backup configurations and generated keys.
 
@@ -232,4 +233,4 @@ Required Hardware
 `Power supply. <https://www.raspberrypi.com/products/type-c-power-supply/>`_
 
 .. note:: 
-  No data is or will be collected during your use of the white station.
+  No data is or will be collected during your use of the **Keysas** station.

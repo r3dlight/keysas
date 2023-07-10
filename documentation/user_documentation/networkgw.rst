@@ -10,8 +10,7 @@ Network gateway (keysas-core)
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
-   installation
+   
    administration
    usage
    download
