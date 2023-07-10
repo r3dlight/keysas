@@ -398,7 +398,7 @@ Then, verify that the profile is still in **enforce mode**:
    ...
 
 Libyara analysis
----------------
+-----------------
 
 **keysas-transit** daemon is able to perform a *Yara* scan on transfered files according to the rules defined in path:
 
