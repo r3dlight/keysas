@@ -23,7 +23,7 @@ Each test and verification is added to metadata and sent to **Keysas-out**.
 **Keysas-out** receives the raw file descriptors and metadata through a dedicated abstract socket.
 It immediately verifies the sha256 digest. If a file is considered unhealthy (reading metadata), the file descriptor is definitly closed. 
 If not the file descriptor is copied into the outgoing SAS with a report containing the metadata associated.
-If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Dilithium5 on each file and linked metadata.
+If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Dilithium5 on each file and linked report containing the file metadata and the station analysis.
 
 System configuration
 ====================
@@ -35,7 +35,7 @@ Here are some recommendations and best practices to use **Keysas** in good condi
 
 .. admonition:: System hardening recommendations.
 
- To be safe enough, the GNU/Linux system used should be hardened according to the best practices such as *ANSSI*, *CIS*, *STIG* etc.
+ The GNU/Linux system used should be hardened according to the best practices such as *ANSSI*, *CIS*, *STIG* etc.
 
  You can take a look at the following: https://www.ssi.gouv.fr/en/guide/configuration-recommendations-of-a-gnulinux-system/ 
 
@@ -48,8 +48,6 @@ Here are some recommendations and best practices to use **Keysas** in good condi
   * One dedicated card and IP address for the administration tasks;
   * One dedicated card and IP address for Syslog.
 
-It is also highly recommended to preserve an SSH access using a dedicated daemon and a dedicated network.
-
 .. admonition:: OpenSSH configuration (Only for network gateway)
  :class: tip
 
@@ -61,6 +59,8 @@ It is also highly recommended to preserve an SSH access using a dedicated daemon
  Alternatively, you can choose to set up only two separate OpenSSH daemons:
   * One for the *administration* network;
   * One for the *untrusted* network and the *trusted* network.
+  
+A third solution would be to reserve an SSH access using a dedicated daemon and a dedicated network.
 
  **In any cases, you should configure allowed users and networks in your sshd configuration:**
 
@@ -220,14 +220,14 @@ You might want to ajust **MAX_SIZE**, **YARA_MAXFILESIZE**, **YARA_TIMEOUT**, **
 YARA_MAXFILESIZE
 ~~~~~~~~~~~~~~~~
 
-This parameter sets the maximum file size (in bytes) to be scanned. The bigger it is, the longer it takes to scan a file !
+This parameter sets the maximum file size (in bytes) to be scanned. The bigger it is, the longer it can take to scan a file !
 You should set this option to the same value as MAX_SIZE to be consistant.
 If a file is bigger than YARA_MAXFILESIZE, it is deleted.
 
 YARA_TIMEOUT
 ~~~~~~~~~~~~
 
-This parameter sets a timeout (in seconds) to scan a file. 
+This parameter sets a timeout (in seconds) to scan a file.
 If a file scan takes too long because of a big file, you can adjust the timeout here.
 
 YARA_CLEAN

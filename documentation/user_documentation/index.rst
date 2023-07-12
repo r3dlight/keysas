@@ -10,7 +10,7 @@ Keysas
 **Keysas** is a modern decontamination station prototype, fast, which aims to be secure.
 
 It provides an easy solution to verify your documents.
-It can be used as a simple “decontamination station” or act as a gateway to transfert untrusted files to higher security level networks. 
+It can be used as a standalone “decontamination station” or act as a gateway to transfert untrusted files to higher security level networks. 
 Untrusted files are scanned by an antivirus and you can manage and create your own Yara rules and add them easily to Keysas in order to inspect your files with more efficiency.
 You can also create a whitelist of file types you want to transfert based on their **magic number** to filter more accurately. 
 

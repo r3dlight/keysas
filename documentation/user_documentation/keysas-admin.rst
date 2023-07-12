@@ -6,7 +6,7 @@ Keysas-admin application
 .. note:: 
 
  **Keysas-admin** is a desktop application that allows you to manage your **Keysas** stations.
- You can manager your Public Key Infrastucture, register new stations, update them, sign USB devices and muche more.
+ You can manage your Public Key Infrastucture, register new stations, update them, sign USB devices and much more.
 
 .. warning:: 
 
@@ -42,7 +42,7 @@ Enroll you Keysas stations
 You can now start adding new **Keysas** stations in the **"Add a new Keysas"** menu providing a name and an IP address
 When done, export the **public SSH** key by clicking the **"Export SSH pubkey"** button for each station added.
 
-In the menu, go to **"Manage your registred stations"**, click on more, provide your **IKPQPKI** **password** then click on **"Enroll"**
+In the menu, go to **"Manage your registered stations"**, click on more, provide your **IKPQPKI** **password** then click on **"Enroll"**
 Be patient, this may take some time !
 
 Sign your outgoing USB keys
