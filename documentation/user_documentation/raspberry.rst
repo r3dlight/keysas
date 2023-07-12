@@ -3,7 +3,7 @@ Decontamination station for USB devices
 ***************************************
 
 
-This is a 100% open-source decontamination station version for **Raspberry Pi v4** (read-to-go), but you can of course build **Keysas** on Debian 12 (Bookworm) for both architecture (x86_64 or aarch64).
+This is a 100% open-source decontamination station version for **Raspberry Pi v4** (ready-to-go), but you can of course build **Keysas** on Debian 12 (Bookworm) for both architecture (x86_64 or aarch64).
 
 The provided image is based on the Keysas software and offers antivirus scanning as well as analysis based on +20000 pre-installed Yara rules. 
 You can add new Yara rules as desired to increase the detection probability. 
