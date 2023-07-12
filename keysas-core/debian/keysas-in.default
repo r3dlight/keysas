@@ -11,6 +11,3 @@ SOCKET_IN=socket_in
 # Pay attention to add a slash at the end.
 SAS_IN=/var/local/in/
 
-# Maximum file size to transfert
-# Default is 500Mo
-MAXFILESIZE=500000000

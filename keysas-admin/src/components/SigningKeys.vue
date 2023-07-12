@@ -27,7 +27,7 @@
     </div>
   <!--</div>-->
   <div v-if="showLoadPKIForm">
-    <form class="add-form" @submit.prevent="onSubmit">
+    <!--<form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
@@ -44,7 +44,11 @@
         <br><br>
         <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
       </div>
-    </form>
+    </form>-->
+    <div>
+      <br>
+       Not implemented yet !
+   </div>
   </div>
   <div v-if="showRootKeyForm">
     <form class="add-form" @submit.prevent="onSubmit">

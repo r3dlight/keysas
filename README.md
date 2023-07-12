@@ -13,8 +13,8 @@
 - Signatures (Files and USB keys)
     - Trusted (Outgoing) USB device must be signed with Keysas-admin app
     - Each verified file signature is stored in the corresponding file report  
-    - Signatures are post-quantum proof (hybrid ed25519/Diltithium5 scheme)
-    - Private keys are stored using PKCS#8 format (PKCS#11 will also be implemented)
+    - Signatures are post-quantum proof (hybrid Ed25519/Diltithium5 scheme)
+    - Private keys are stored using PKCS#8 format
     - x509 certificates are signed by the internal PKI (using Keysas-admin)
 - Authentication
     - Users can be authenticated using personal Yubikeys 5
@@ -31,15 +31,15 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Daemons are running under unprivileged users
  - Daemons are sandboxed using systemd (Security drop-in)
  - Daemons are sandboxed using LandLock
- - Daemons are sandboxed using Seccomp (TODO)
+ - Daemons are sandboxed using Seccomp (x86_64 & aarch64)
 
 ## Other binaries or applications available
- - Keysas-io: Daemon watching udev events to verify the signature of any mass storage USB devices and mount it as a IN (no or invalid signature) or OUT device (valid signature). It also send json values to keysas-frontend for visualization
- - Keysas-sign: Command line utility to sign or verify the signature of a USB device
- - Keysas-fido: Manage Yubikeys 5 enrollment
+ - Keysas-io: Daemon watching udev events to verify the signature of any mass storage USB devices and mount it as a IN (no or invalid signature) or OUT device (valid signature).
+ - Keysas-sign: Command line utility to import PEM certificate via Keysas-admin
+ - Keysas-fido: Command line utility to manage Yubikeys 5 enrollment
  - Keysas-backend: Create a websocket server to send different json values to the keysas-frontend
- - Keysas-frontend: Readonly VueJS3 Frontend for the final user
- - Keysas-admin: Desktop application for managing several Keysas stations (Tauri + VueJS). It also provides an hybrid post-quantum PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
+ - Keysas-frontend: Readonly Vue.js Frontend for the final user
+ - Keysas-admin: Desktop application for managing several Keysas stations (Tauri application). It also provides an hybrid post-quantum PKI to sign USB outgoing devices, sign certificat signing reqests (csr) from Keysas stations.
 
 ## Installation
 
@@ -56,5 +56,5 @@ make install
 ```
 ## User documentation
 
-User documentation (outdated for now) can be found here : [https://keysas.fr](https://keysas.fr)
+User documentation can be found here : [https://keysas.fr](https://keysas.fr)
 

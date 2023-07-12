@@ -214,15 +214,11 @@ pub fn bind_and_sign(
 
     let mut signature = Vec::new();
 
-    match sign_keys {
-        Some(keys) => {
-            // Sign with ED25519
-            signature.append(&mut keys.classic.message_sign(concat.as_bytes())?);
-
-            // Sign with Dilithium5
-            signature.append(&mut keys.pq.message_sign(concat.as_bytes())?);
-        }
-        None => (),
+    if let Some(keys) = sign_keys {
+        // Sign with ED25519
+        signature.append(&mut keys.classic.message_sign(concat.as_bytes())?);
+        // Sign with Dilithium5
+        signature.append(&mut keys.pq.message_sign(concat.as_bytes())?);
     }
 
     // Generate the final report
@@ -265,7 +261,7 @@ pub fn parse_report(
     let report: Report = serde_json::from_str(report_content.as_str())?;
 
     // If the report is linked to a file, test that there is a path to it supplied
-    if report.metadata.name.ne("") && file_path == None {
+    if report.metadata.name.ne("") && file_path.is_none() {
         return Err(anyhow!("No file supplied with the report"));
     }
 

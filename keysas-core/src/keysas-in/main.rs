@@ -26,14 +26,9 @@
 #![warn(deprecated)]
 
 use anyhow::{Context, Result};
-//use bincode::serialize;
 use clap::{crate_version, Arg, ArgAction, Command};
 use itertools::MultiUnzip;
 use keysas_lib::append_ext;
-use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
-};
 use log::{debug, error, info, warn};
 use nix::unistd::unlinkat;
 use nix::unistd::UnlinkatFlags;
@@ -48,6 +43,7 @@ use std::process;
 use std::thread as main_thread;
 use std::time::Duration;
 use time::OffsetDateTime;
+mod sandbox;
 mod tests;
 
 #[macro_use]
@@ -76,32 +72,6 @@ impl Default for Config {
             socket_in: "socket_in".to_string(),
         }
     }
-}
-fn landlock_sandbox(sas_in: &String) -> Result<(), RulesetError> {
-    let abi = ABI::V2;
-    let status = Ruleset::new()
-        .handle_access(AccessFs::from_all(abi))?
-        .create()?
-        // Read-only access.
-        .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY],
-            AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(&[sas_in], AccessFs::from_all(abi)))?
-        .restrict_self()?;
-    match status.ruleset {
-        // The FullyEnforced case must be tested.
-        RulesetStatus::FullyEnforced => info!("Keysas-in is now fully sandboxed using Landlock !"),
-        RulesetStatus::PartiallyEnforced => {
-            warn!("Keysas-in is only partially sandboxed using Landlock !")
-        }
-        // Users should be warned that they are not protected.
-        RulesetStatus::NotEnforced => {
-            warn!("Keysas-in: Not sandboxed with Landlock ! Please update your kernel.")
-        }
-    }
-    Ok(())
 }
 
 fn command_args(config: &mut Config) {
@@ -271,14 +241,18 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
 }
 
 fn main() -> Result<()> {
-    // TODO:
-    // - Add seccomp whitelist
-    // - Check that fd is not dir
-
     let mut config = Config::default();
     command_args(&mut config);
     init_logger();
-    landlock_sandbox(&config.sas_in)?;
+
+    match sandbox::landlock_sandbox(&config.sas_in) {
+        Ok(_) => log::info!("Landlock sandbox activated."),
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}"),
+    }
+    match sandbox::init() {
+        Ok(_) => log::info!("Seccomp sandbox activated."),
+        Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}"),
+    }
 
     info!("Keysas-in started :)");
     info!("Running configuration is:");

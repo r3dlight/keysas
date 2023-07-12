@@ -1,6 +1,7 @@
 bin/
 fuzz/
 target/
+documentation/user_documentation/_build
 Cargo.lock
 keysas-core/documentation/user_documentation/_build/
 keysas-core/bin/

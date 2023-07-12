@@ -70,10 +70,6 @@ use keysas_lib::file_report::FileMetadata;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::sha256_digest;
-use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
-};
 use log::{error, info, warn};
 use nix::unistd;
 use pkcs8::der::EncodePem;
@@ -88,6 +84,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str;
+mod sandbox;
 
 /// Structure representing a file and its metadata in the daemon
 #[derive(Debug)]
@@ -113,36 +110,6 @@ struct Configuration {
     sas_out: String,
     /// True if the file are allowed to pass even if yara failed
     yara_clean: bool,
-}
-
-/// Setup the landlock sandboxing
-fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
-    let abi = ABI::V2;
-    let status = Ruleset::new()
-        .handle_access(AccessFs::from_all(abi))?
-        .create()?
-        // Read-only access.
-        .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY],
-            AccessFs::from_read(abi),
-        ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(&[sas_out], AccessFs::from_all(abi)))?
-        .restrict_self()?;
-    match status.ruleset {
-        // The FullyEnforced case must be tested.
-        RulesetStatus::FullyEnforced => {
-            info!("Keysas-out is now fully sandboxed using Landlock !")
-        }
-        RulesetStatus::PartiallyEnforced => {
-            warn!("Keysas-out is only partially sandboxed using Landlock !")
-        }
-        // Users should be warned that they are not protected.
-        RulesetStatus::NotEnforced => {
-            warn!("Keysas-out: Not sandboxed with Landlock ! Please update your kernel.")
-        }
-    }
-    Ok(())
 }
 
 /// This function parse the command arguments into a structure
@@ -307,7 +274,15 @@ fn main() -> Result<()> {
     init_logger();
 
     //Init Landlock
-    landlock_sandbox(&config.sas_out)?;
+    match sandbox::landlock_sandbox(&config.sas_out) {
+        Ok(_) => log::info!("Landlock sandbox activated."),
+        Err(e) => log::warn!("Landlock sandbox cannot be activated: {e}"),
+    }
+    // Init Seccomp filters
+    match sandbox::init() {
+        Ok(_) => log::info!("Seccomp sandbox activated."),
+        Err(e) => log::warn!("Seccomp sandbox cannot be activated: {e}"),
+    }
 
     // Load station signing keys and certificate
     let sign_keys = match HybridKeyPair::load(
