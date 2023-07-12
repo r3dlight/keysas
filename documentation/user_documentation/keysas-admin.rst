@@ -8,6 +8,10 @@ Keysas-admin application
  **Keysas-admin** is a desktop application that allows you to manage your **Keysas** stations.
  You can manager your Public Key Infrastucture, register new stations, update them, sign USB devices and muche more.
 
+.. warning:: 
+
+ **Keysas-admin** only work on GNU/Linux based systems for now !
+
 SSH configuration
 =================
 First, start by creating a **Ed25519** private key and the associated public key on your computer

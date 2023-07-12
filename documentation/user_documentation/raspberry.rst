@@ -72,7 +72,7 @@ To do this, open a terminal and enter the following command:
 .. warning:: 
  The application currently does not support passphrase management or the PKCS#12 format. 
  Therefore, you need to enter an empty passphrase by pressing Enter. 
- Similarly, the enrollment and revocation features of Yubikeys are not yet supported by the application.
+ Similarly, the enrollment and revocation features of Yubikeys are not supported by the application yet.
 
 Once the key pair is generated, open the application and go to the **SSH configuration** tab. 
 Enter the path to your public key and private key, and then validate. 
