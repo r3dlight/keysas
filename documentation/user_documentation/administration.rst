@@ -39,7 +39,7 @@ Here are some recommendations and best practices to use **Keysas** in good condi
 
  You can take a look at the following: https://www.ssi.gouv.fr/en/guide/configuration-recommendations-of-a-gnulinux-system/ 
 
-.. admonition:: Network Cards
+.. admonition:: Network Cards (Only for network gateway)
  :class: tip
 
  We recommend to set up at least four network cards:
@@ -50,7 +50,7 @@ Here are some recommendations and best practices to use **Keysas** in good condi
 
 It is also highly recommended to preserve an SSH access using a dedicated daemon and a dedicated network.
 
-.. admonition:: OpenSSH configuration
+.. admonition:: OpenSSH configuration (Only for network gateway)
  :class: tip
 
  You can set up three separate OpenSSH daemons:
@@ -150,7 +150,7 @@ The corresponding logs:
 
 .. code-block:: shell-session
 
-  journaclt -fu keysas-transit.service
+  journactl -fu keysas-transit.service
 
 Let's now take a look at the configuration of the second daemon called *keysas-transit*:
 
@@ -215,13 +215,13 @@ It should look like this:
 .. warning::
  Do not modify **SOCKET_IN**, **SOCKET_OUT** parameters unless you really know what to do.
 
-You might want to ajust **YARA_MAXFILESIZE**, **YARA_TIMEOUT**, **YARA_CLEAN** and **ALLOWED_TYPES** according to your needs.
+You might want to ajust **MAX_SIZE**, **YARA_MAXFILESIZE**, **YARA_TIMEOUT**, **YARA_CLEAN** and **ALLOWED_TYPES** according to your needs.
 
 YARA_MAXFILESIZE
 ~~~~~~~~~~~~~~~~
 
 This parameter sets the maximum file size (in bytes) to be scanned. The bigger it is, the longer it takes to scan a file !
-You should set this option to the same value as MAXFILESIZE (keysas-in) to be consistant.
+You should set this option to the same value as MAX_SIZE to be consistant.
 If a file is bigger than YARA_MAXFILESIZE, it is deleted.
 
 YARA_TIMEOUT

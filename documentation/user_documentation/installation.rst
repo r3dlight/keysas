@@ -172,3 +172,38 @@ If you want to check the full installation (USB mode):
 .. code-block:: shell-session
 
  $ systemctl status keysas keysas-in keysas-transit keysas-out keysas-io keysas-backend
+
+Building **Keysas-frontend**
+-----------------------------
+
+**Keysas-frontend** is a read-only Vue-JS application to help visualizing transfers for the end-user.
+
+Go to the **keysas-frontend** directory and install the dependencies using npm:
+
+.. code-block:: shell-session
+
+ $ npm i
+
+One done, you can build the application:
+
+.. code-block:: shell-session
+
+ $ npm run build
+
+The application is now built into the dist directory. Copy the content of this directory at the root of a local webserver (like nginx for exemple).
+Open now a web browser like firefox and visit the http://127.0.0.1
+
+
+Building **Keysas-admin**
+--------------------------
+
+**Keysas-admin** needs to be signed by our personal private key.
+Nevertheless, if you want to build it yourself for testing purposes:
+
+.. code-block:: shell-session
+
+ $ cd keysas-admin && npm i vite@latest && cargo install cargo-cli && cargo tauri build
+
+.. warning:: 
+
+ **Keysas-admin** only work on GNU/Linux based systems for now !
