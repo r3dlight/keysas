@@ -28,7 +28,6 @@ MemoryDenyWriteExecute=yes
 TemporaryFileSystem=/etc
 BindReadOnlyPaths=/etc/keysas
 TemporaryFileSystem=/var
-BindPaths=/var/local/transit
 IPAddressDeny=any
 RestrictAddressFamilies=AF_INET AF_UNIX
 IPAddressAllow=127.0.0.1/8
