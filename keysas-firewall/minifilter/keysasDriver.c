@@ -29,6 +29,7 @@ Environment:
 #include <suppress.h>
 #include <ntstrsafe.h>
 #include <ntdef.h>
+#include <wdm.h>
 
 #include "keysasDriver.h"
 #include "keysasUtils.h"
@@ -161,12 +162,54 @@ Return Value:
 --*/
 {
 	NTSTATUS status = STATUS_SUCCESS;
+	DWORD cbData = 0;
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas: DriverEntry\n"));
 
 	ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
+
+	// Initialize global data structure
+	RtlZeroMemory(&KeysasData, sizeof(KeysasData));
+	InitializeListHead(&KeysasData.FileCtxListHead);
+	KeInitializeSpinLock(&KeysasData.FileCtxListLock);
+
+	if (!NT_SUCCESS(status = BCryptOpenAlgorithmProvider(
+		&KeysasData.HashProvider,
+		BCRYPT_SHA256_ALGORITHM,
+		NULL,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas: Failed to get hash provider\n"));
+		return status;
+	}
+
+	// Get the internal hash object size
+	if (!NT_SUCCESS(status = BCryptGetProperty(
+		KeysasData.HashProvider,
+		BCRYPT_OBJECT_LENGTH,
+		(PUCHAR) &KeysasData.HashObjectSize,
+		sizeof(DWORD),
+		&cbData,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas: Failed to get hash object size\n"));
+		return status;
+	}
+
+	// Get the hash size
+	if (!NT_SUCCESS(status = BCryptGetProperty(
+		KeysasData.HashProvider,
+		BCRYPT_HASH_LENGTH,
+		(PUCHAR)&KeysasData.HashLength,
+		sizeof(DWORD),
+		&cbData,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas: Failed to get hash length\n"));
+		return status;
+	}
 
 	// Register the filter's callbacks
 	status = FltRegisterFilter(DriverObject,
@@ -228,6 +271,8 @@ Return Value:
 	FltCloseCommunicationPort(KeysasData.ServerPort);
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfUnload: Closed server port\n"));
+
+	// TODO - Release all context in the list
 
 	FltUnregisterFilter(KeysasData.Filter);
 	KeysasData.Filter = NULL;

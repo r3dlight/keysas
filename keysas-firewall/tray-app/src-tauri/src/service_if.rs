@@ -28,14 +28,15 @@ use serde::{Serialize, Deserialize};
 use std::sync::{Arc, RwLock};
 use libmailslot;
 
-use crate::app_controler::AppControler;
+use crate::app_controller::AppController;
 
 /// Message for a file status notification
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileUpdateMessage {
     pub device: String,
+    pub id: [u16; 16],
     pub path: String,
-    pub authorization: bool,
+    pub authorization: bool
 }
 
 /// Handle to the service interface client and server
@@ -61,7 +62,7 @@ impl ServiceIf {
     }
 
     /// Start the server thread to listen for the Keysas service
-    pub fn start_server(&self, ctrl: &Arc<AppControler>) -> Result<(), anyhow::Error> {    
+    pub fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error> {    
         // Start listening on the server side
         let ctrl_hdl = ctrl.clone();
         let server = self.server.clone();

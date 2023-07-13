@@ -144,6 +144,7 @@ Return Value:
 		// Initialize the context
 		// Set all the fields to 0 => Authorization = UNKNOWN
 		RtlZeroMemory(fileContext, KEYSAS_FILE_CTX_SIZE);
+		// Initialize the lock
 		fileContext->Resource = ExAllocatePoolZero(
 			NonPagedPool,
 			sizeof(ERESOURCE),
@@ -156,6 +157,13 @@ Return Value:
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 		ExInitializeResourceLite(fileContext->Resource);
+		fileContext->FileID = NULL;
+
+		// Initialize and place the context in the list
+		ExInterlockedInsertHeadList(
+			&KeysasData.FileCtxListHead,
+			&fileContext->FileCtxList,
+			&KeysasData.FileCtxListLock);
 
 		// Attach the context to the file
 		status = FltSetFileContext(
@@ -404,7 +412,17 @@ Return Value:
 		}
 		// Test the authorization again as it can have been preempted
 		if (AUTH_UNKNOWN == fileContext->Authorization) {
+			// Resume file context initialization
 			fileContext->Authorization = AUTH_PENDING;
+
+			IoQueryFileDosDeviceName(FltObjects->FileObject, &msFileName);
+
+			// Compute hash of file name to store it in the file context
+			if (STATUS_SUCCESS != KeysasGetFileNameHash(&msFileName->Name, &(fileContext->FileID))) {
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to compute file name hash\n"));
+				status = FLT_POSTOP_FINISHED_PROCESSING;
+				goto cleanup;
+			}
 
 			// Try to acquire the instance context as the file authorization will depend on the instance status
 			status = FindInstanceContext(
@@ -416,6 +434,7 @@ Return Value:
 				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: FindInstanceContext failed with status: %0x8x\n",
 					status));
 				status = FLT_POSTOP_FINISHED_PROCESSING;
+				ReleaseResource(fileContext->Resource);
 				goto cleanup;
 			}
 
@@ -441,9 +460,9 @@ Return Value:
 				ReleaseResource(instanceContext->Resource);
 				// Send the file to further analysis in user space
 				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Send request to userspace\n"));
-				IoQueryFileDosDeviceName(FltObjects->FileObject, &msFileName);
 				(VOID)KeysasScanFileInUserMode(
 					&msFileName->Name,
+					fileContext->FileID,
 					operation,
 					&safeToOpen
 				);
@@ -510,12 +529,119 @@ cleanup:
 		FltReleaseContext(instanceContext);
 	}
 
+	if (NULL != msFileName) {
+		ExFreePool(msFileName);
+	}
+
+	return status;
+}
+
+NTSTATUS
+KeysasGetFileNameHash(
+	_In_ PUNICODE_STRING FileName,
+	_Out_ PUCHAR *Hash
+)
+/***
+Routine Description:
+	This routine compute the hash of a file name and stores it in a buffer.
+	This routine uses the crypto provider initialize in the global KeysasData.
+Arguments:
+	FileName - Name of the file
+	Hash - Pointer to the buffer. The buffer is allocated by the routine. It must be NULL.
+Return Value:
+	Returns STATUS_SUCCESS if no error occured.
+--*/
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	//PUCHAR hashObject = NULL;
+	BCRYPT_HASH_HANDLE hashHandle = NULL;
+
+	// Test provided hash pointer and allocate it
+	if (NULL == Hash || NULL != *Hash) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Non null hash buffer\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+	if (NULL == (*Hash = ExAllocatePoolZero(
+		NonPagedPool,
+		KeysasData.HashLength,
+		KEYSAS_MEMORY_TAG
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to allocate output hash\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+	// Allocate internal hash object
+	/*
+	if (NULL == (hashObject = ExAllocatePoolZero(
+		NonPagedPool,
+		KeysasData.HashObjectSize,
+		KEYSAS_MEMORY_TAG
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to allocate internal object\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+	*/
+
+	// Create the hash
+	if (!NT_SUCCESS(status = BCryptCreateHash(
+		KeysasData.HashProvider,
+		&hashHandle,
+		NULL,
+		0,
+		NULL,
+		0,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to create hash\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+	// Feed the hash with FileName
+	if (!NT_SUCCESS(status = BCryptHashData(
+		hashHandle,
+		(PUCHAR) FileName->Buffer,
+		FileName->Length,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to run hash\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+	// Finalize the hash in the output buffer
+	if (!NT_SUCCESS(status = BCryptFinishHash(
+		hashHandle,
+		*Hash,
+		KeysasData.HashLength,
+		0
+	))) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to finalize hash\n"));
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+cleanup:
+	if (hashHandle) {
+		BCryptDestroyHash(hashHandle);
+	}
+	/*
+	if (NULL != hashObject) {
+		ExFreePoolWithTag(hashObject, KEYSAS_MEMORY_TAG);
+	}
+	*/
+
 	return status;
 }
 
 NTSTATUS
 KeysasScanFileInUserMode(
 	_In_ PUNICODE_STRING FileName,
+	_In_ PUCHAR FileID,
 	_In_ KEYSAS_FILTER_OPERATION Operation,
 	_Out_ PBOOLEAN SafeToOpen
 )
@@ -554,7 +680,7 @@ Return Value:
 		return status;
 	}
 
-	if (FileName->Length > (KEYSAS_REQUEST_BUFFER_SIZE - 1)) {
+	if (FileName->Length > (KEYSAS_REQUEST_BUFFER_SIZE - KeysasData.HashLength - 1)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: File name too long\n"));
 	}
 
@@ -570,8 +696,14 @@ Return Value:
 		goto end;
 	}
 
+	// Copy the File ID at the start of the request
+	memcpy(request->Content, FileID, KeysasData.HashLength);
+
 	// Copy the name of the file in the request
-	status = RtlStringCbCopyUnicodeString(request->Content, KEYSAS_REQUEST_BUFFER_SIZE * sizeof(WCHAR), FileName);
+	status = RtlStringCbCopyUnicodeString(
+		request->Content + KeysasData.HashLength/2,
+		KEYSAS_REQUEST_BUFFER_SIZE * sizeof(WCHAR) - KeysasData.HashLength,
+		FileName);
 	if (STATUS_SUCCESS != status) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Failed to convert UNICODE_STRING\n"));
 		goto end;
@@ -585,7 +717,7 @@ Return Value:
 		KeysasData.Filter,
 		&KeysasData.ClientPort,
 		request,
-		FileName->Length+sizeof(KEYSAS_FILTER_OPERATION),
+		FileName->Length+sizeof(KEYSAS_FILTER_OPERATION) + KeysasData.HashLength,
 		request,
 		&replyLength,
 		NULL

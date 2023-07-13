@@ -25,11 +25,14 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use libmailslot;
+use std::sync::Arc;
+use crate::controller::ServiceController;
 
 /// Message for a file status notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct FileUpdateMessage {
+pub struct FileUpdateMessage {
     device: String,
+    id: [u16; 16],
     path: String,
     authorization: bool
 }
@@ -39,9 +42,10 @@ const SERVICE_PIPE: &str = r"\\.\mailslot\keysas\service-to-app";
 const TRAY_PIPE: &str = r"\\.\mailslot\keysas\app-to-service";
 
 /// Initialize the server behind the interface
-pub fn init() -> Result<(), anyhow::Error> {
+pub fn init(ctrl: &Arc<ServiceController>) -> Result<(), anyhow::Error> {
+    let ctrl_hdl = ctrl.clone();
     // Initialize the server in a separate thread
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
         let server = match libmailslot::create_mailslot(TRAY_PIPE) {
             Ok(s) => s,
             Err(_) => return (),
@@ -49,9 +53,11 @@ pub fn init() -> Result<(), anyhow::Error> {
 
         loop {
             while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
-                println!("Message received: {:?}", msg);
                 if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes()) {
                     println!("message from tray {:?}", update);
+                    if let Err(e) = ctrl_hdl.handle_tray_request(&update) {
+                        println!("Failed to handle tray request: {e}");
+                    }
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
@@ -77,10 +83,23 @@ pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn send_file_auth_status(path: &str, authorized: bool) -> Result<(), anyhow::Error> {
+pub fn send_file_auth_status(file_data: &[u16], authorized: bool) -> Result<(), anyhow::Error> {
+    let file_path = match String::from_utf16(&file_data[17..]) {
+        Ok(path) => path,
+        Err(_) => {
+            println!("Failed to convert request to string");
+            return Err(anyhow!("Failed to convert request to string"));
+        }
+    };
+    let file_path = file_path.trim_matches(char::from(0));
+
+    let mut id: [u16; 16] = Default::default();
+    id.copy_from_slice(&file_data[1..17]);
+
     let msg = FileUpdateMessage {
         device: String::from("D:"),
-        path: String::from(path),
+        id,
+        path: String::from(file_path),
         authorization: authorized
     };
 

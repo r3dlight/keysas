@@ -26,7 +26,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod service_if;
-mod app_controler;
+mod app_controller;
 mod filter_store;
 
 use tauri::{
@@ -36,7 +36,7 @@ use tauri::{
 use std::sync::Arc;
 use anyhow::anyhow;
 
-use crate::app_controler::AppControler;
+use crate::app_controller::AppController;
 
 /// Payload for the init event sent to the usb_details window
 #[derive(Clone, serde::Serialize)]
@@ -59,7 +59,7 @@ fn main() -> Result<(), anyhow::Error> {
 fn init_tauri() -> Result<(), anyhow::Error> {
     let app = tauri::Builder::default()
         .setup(|app| {
-            app.manage(AppControler::init(app.handle())?);
+            app.manage(AppController::init(app.handle())?);
             Ok(())
         })
         .system_tray(SystemTray::new())
@@ -174,7 +174,7 @@ fn open_usb_view(app: &AppHandle, click: &PhysicalPosition<f64>)
 /// * 'device_path' - Name of the path of the volume, e.g 'D:'
 /// * 'app_ctrl' - Handle to the application controler, it is supplied by tauri
 #[tauri::command]
-async fn get_file_list(device_path: String, app_ctrl: State<'_, Arc<AppControler>>) -> Result<String, String> {
+async fn get_file_list(device_path: String, app_ctrl: State<'_, Arc<AppController>>) -> Result<String, String> {
     match app_ctrl.get_file_list(&device_path) {
         Ok(files) => {
             match serde_json::to_string(&files) {
@@ -202,9 +202,9 @@ async fn get_file_list(device_path: String, app_ctrl: State<'_, Arc<AppControler
 /// * 'path' - Full path to the file on the device
 /// * 'current_auth' - Current authorization status for the file
 #[tauri::command]
-async fn toggle_file_auth(device: String, path: String, current_auth: bool,
-                            app_ctrl: State<'_, Arc<AppControler>>) -> Result<(), String> {
-    if let Err(e) = app_ctrl.request_file_auth_toggle(&device, &path, current_auth) {
+async fn toggle_file_auth(device: String, id: [u16; 16], path: String, current_auth: bool,
+                            app_ctrl: State<'_, Arc<AppController>>) -> Result<(), String> {
+    if let Err(e) = app_ctrl.request_file_auth_toggle(&device, &id, &path, current_auth) {
         log::error!("File toggle failed: {e}");
         return Err(e.to_string());
     }

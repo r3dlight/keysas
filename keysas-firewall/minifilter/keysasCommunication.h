@@ -69,4 +69,14 @@ KeysasPortDisconnect(
 	_In_opt_ PVOID ConnectionCookie
 );
 
+NTSTATUS
+KeysasPortNotify (
+	_In_ PVOID ConnectionCookie,
+	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+	_In_ ULONG InputBufferSize,
+	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
+	_In_ ULONG OutputBufferSize,
+	_Out_ PULONG ReturnOutputBufferLength
+);
+
 #endif // _H_KEYSAS_COMMUNICATION

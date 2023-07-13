@@ -5,7 +5,7 @@
  *
  */
 
-//! Controler for the application
+//! Controller for the application
 
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -30,22 +30,22 @@ use anyhow::anyhow;
 use std::sync::{Arc, RwLock};
 use tauri::{AppHandle, Manager};
 
-/// Application controler object, it contains handle to the application main services
-pub struct AppControler {
+/// Application controller object, it contains handle to the application main services
+pub struct AppController {
     pub store: RwLock<FilterStore>,
     view: AppHandle,
     comm: ServiceIf
 }
 
-impl AppControler {
-    /// Initialize the application controler
+impl AppController {
+    /// Initialize the application controller
     /// It initialize
     ///     - the application data store
     ///     - the communication interface to the Keysas service
     ///     - store an handle to the view
-    pub fn init(app_handle: AppHandle) -> Result<Arc<AppControler>, anyhow::Error> {
-        // Create the application controler
-        let ctrl = Arc::new(AppControler {
+    pub fn init(app_handle: AppHandle) -> Result<Arc<AppController>, anyhow::Error> {
+        // Create the application controller
+        let ctrl = Arc::new(AppController {
             store: RwLock::new(FilterStore::init_store()),
             view: app_handle,
             comm: ServiceIf::init_service_if()?
@@ -75,9 +75,12 @@ impl AppControler {
     /// Called when a file notification has been received from the driver
     /// It adds the new file to the data store and notifies the view to update itself
     pub fn notify_file_change(&self, update: &FileUpdateMessage) {
+        let mut id: [u16; 16] = Default::default();
+        id.copy_from_slice(&update.id);
         // Store the new file
         let file = FileAuth {
             device: String::from(&update.device),
+            id,
             path: String::from(&update.path),
             authorization: update.authorization,
         };
@@ -111,10 +114,13 @@ impl AppControler {
 
     /// Request a change of file authorization in the driver
     /// If it is successful it then change it in the datastore and updates the view
-    pub fn request_file_auth_toggle(&self, device: &str, file: &str, curr_auth: bool) -> Result<(), anyhow::Error> {
+    pub fn request_file_auth_toggle(&self, device: &str, id: &[u16], path: &str, curr_auth: bool) -> Result<(), anyhow::Error> {
+        let mut file_id: [u16; 16] = Default::default();
+        file_id.copy_from_slice(&id);
         if let Err(e) = self.comm.send_msg(&FileUpdateMessage{
             device: device.to_string(),
-            path: file.to_string(),
+            id: file_id,
+            path: path.to_string(),
             authorization: curr_auth}) {
             return Err(anyhow!("Failed to send request to Keysas daemon: {e}"));
         }

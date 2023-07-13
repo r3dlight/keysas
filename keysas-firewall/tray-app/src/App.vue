@@ -66,6 +66,7 @@ declare interface UsbDevice {
 
 declare interface File {
   device: string,
+  id: number[],
   path: string,
   authorization: boolean
 }
@@ -121,7 +122,7 @@ export default {
       this.showUsbDetails = true;
     },
     async toggleFileAuth(file: File) {
-      invoke('toggle_file_auth', {device: file.device, path: file.path, currentAuth: file.authorization})
+      invoke('toggle_file_auth', {device: file.device, id: file.id, path: file.path, currentAuth: file.authorization})
         .then((result) => {
           file.authorization = !file.authorization;
         })

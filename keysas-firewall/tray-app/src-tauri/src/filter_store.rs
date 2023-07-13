@@ -36,6 +36,7 @@ pub enum KeysasAuthorization {
 #[derive(Debug, Clone, Serialize)]
 pub struct FileAuth {
     pub device: String,
+    pub id: [u16; 16],
     pub path: String,
     pub authorization: bool,
 }
