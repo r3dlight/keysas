@@ -30,13 +30,30 @@ use libmailslot;
 
 use crate::app_controller::AppController;
 
+/// Authorization states for files and USB devices
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum KeysasAuthorization {
+    /// Default value
+    AuthUnknown = 0,
+    /// Authorization request pending
+    AuthPending,
+    /// Access is blocked
+    AuthBlock,
+    /// Access is allowed in read mode only
+    AuthAllowRead,
+    /// Access is allowed with a warning to the user
+    AuthAllowWarning,
+    /// Access is allowed for all operations
+    AuthAllowAll
+}
+
 /// Message for a file status notification
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileUpdateMessage {
     pub device: String,
     pub id: [u16; 16],
     pub path: String,
-    pub authorization: bool
+    pub authorization: KeysasAuthorization
 }
 
 /// Handle to the service interface client and server
@@ -68,7 +85,7 @@ impl ServiceIf {
         let server = self.server.clone();
         std::thread::spawn(move || {
             // Get a mutable lock on the server
-            let mut server = match server.write() {
+            let server = match server.write() {
                 Ok(s) => s,
                 Err(_) => {
                     return;

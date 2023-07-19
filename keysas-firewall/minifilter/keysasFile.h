@@ -53,7 +53,7 @@ KeysasScanFileInUserMode(
 	_In_ PUNICODE_STRING FileName,
 	_In_ PUCHAR FileID,
 	_In_ KEYSAS_FILTER_OPERATION Operation,
-	_Out_ PBOOLEAN SafeToOpen
+	_Out_ KEYSAS_AUTHORIZATION* Authorization
 );
 
 FLT_PREOP_CALLBACK_STATUS

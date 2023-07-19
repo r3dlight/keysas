@@ -23,8 +23,8 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use crate::filter_store::{FileAuth, FilterStore, KeysasAuthorization, USBDevice};
-use crate::service_if::{ServiceIf, FileUpdateMessage};
+use crate::filter_store::{FileAuth, FilterStore, USBDevice};
+use crate::service_if::{ServiceIf, FileUpdateMessage, KeysasAuthorization};
 
 use anyhow::anyhow;
 use std::sync::{Arc, RwLock};
@@ -61,7 +61,7 @@ impl AppController {
         let usb = USBDevice {
             name: String::from("Kingston USB"),
             path: String::from("D:"),
-            authorization: KeysasAuthorization::AllowedRead,
+            authorization: KeysasAuthorization::AuthAllowRead,
         };
 
         match ctrl.store.write() {
@@ -77,12 +77,19 @@ impl AppController {
     pub fn notify_file_change(&self, update: &FileUpdateMessage) {
         let mut id: [u16; 16] = Default::default();
         id.copy_from_slice(&update.id);
+
+        // TODO - For now, convert the authorization to a bool, nuances will have to be handled
+        let auth = match update.authorization {
+            KeysasAuthorization::AuthAllowRead | KeysasAuthorization::AuthAllowAll => true,
+            _ => false
+        };
+
         // Store the new file
         let file = FileAuth {
             device: String::from(&update.device),
             id,
             path: String::from(&update.path),
-            authorization: update.authorization,
+            authorization: auth,
         };
 
         match self.store.write() {
@@ -117,11 +124,18 @@ impl AppController {
     pub fn request_file_auth_toggle(&self, device: &str, id: &[u16], path: &str, curr_auth: bool) -> Result<(), anyhow::Error> {
         let mut file_id: [u16; 16] = Default::default();
         file_id.copy_from_slice(&id);
+
+        // Convert the current authorization to the new authorization
+        let authorization = match curr_auth {
+            true => KeysasAuthorization::AuthBlock,
+            false => KeysasAuthorization::AuthAllowAll
+        };
+
         if let Err(e) = self.comm.send_msg(&FileUpdateMessage{
             device: device.to_string(),
             id: file_id,
             path: path.to_string(),
-            authorization: curr_auth}) {
+            authorization}) {
             return Err(anyhow!("Failed to send request to Keysas daemon: {e}"));
         }
 

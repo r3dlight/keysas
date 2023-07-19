@@ -185,19 +185,26 @@ Return value
 	UNREFERENCED_PARAMETER(ConnectionCookie);
 	UNREFERENCED_PARAMETER(OutputBuffer);
 	UNREFERENCED_PARAMETER(OutputBufferSize);
-	UNREFERENCED_PARAMETER(InputBufferSize);
 
 	PLIST_ENTRY scan, next;
 	PKEYSAS_FILE_CTX fileCtx = NULL;
 	KIRQL kIrql;
+	PUCHAR inputBuffer = (PUCHAR)InputBuffer;
 
 	ReturnOutputBufferLength = 0;
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Entered\n"));
 
+	// Test that the input buffer contains at least 33 bytes
+	if (33 > InputBufferSize || NULL == InputBuffer) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Not enough input data\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
+
 	// Test if the file context list is empty
 	if (TRUE == IsListEmpty(&KeysasData.FileCtxListHead)) {
 		// TODO - Send response to userspace
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: File context list is empty\n"));
 		return STATUS_SUCCESS;
 	}
 
@@ -206,26 +213,15 @@ Return value
 	// Get lock on the list
 	KeAcquireSpinLock(&KeysasData.FileCtxListLock, &kIrql);
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: received %s\n", (PWCHAR) InputBuffer));
-
 	// Go through the list to find the context
 	for (scan = (KeysasData.FileCtxListHead).Flink, next = scan->Flink; scan != &(KeysasData.FileCtxListHead); scan = next, next = scan->Flink) {
 		fileCtx = CONTAINING_RECORD(scan, KEYSAS_FILE_CTX, FileCtxList);
-		//KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: file context name %wZ\n", fileCtx->FileName));
 
-		// TODO - Improve the comparaison
-		/*
-		if (TRUE == wcscmp(&fileCtx->FileName, &InputBuffer)) {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Found file\n"));
-			if (AUTH_BLOCK == fileCtx->Authorization) {
-				fileCtx->Authorization = AUTH_ALLOW_READ;
-			}
-			else {
-				fileCtx->Authorization = AUTH_BLOCK;
-			}
+		if (32 == RtlCompareMemory(fileCtx->FileID, inputBuffer, 32)) {
+			// Changed the authorization status to the one provided by the service
+			fileCtx->Authorization = inputBuffer[32];
 			break;
 		}
-		*/
 	}
 
 	KeReleaseSpinLock(&KeysasData.FileCtxListLock, kIrql);

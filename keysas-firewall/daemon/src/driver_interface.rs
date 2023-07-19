@@ -29,10 +29,11 @@ use std::mem::size_of;
 use std::thread;
 use libc::c_void;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use widestring::U16CString;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{
-    CloseHandle, BOOLEAN, HANDLE, STATUS_SUCCESS, GetLastError
+    CloseHandle, HANDLE, STATUS_SUCCESS, GetLastError
 };
 use windows::Win32::Storage::InstallableFileSystems::{
     FilterConnectCommunicationPort, FilterGetMessage, FilterReplyMessage, FilterSendMessage,
@@ -41,19 +42,44 @@ use windows::Win32::Storage::InstallableFileSystems::{
 
 use crate::controller::ServiceController;
 
-/// Operation code for the request to userland
-#[derive(Debug)]
+/// Operation code for the request from a driver to userland
+#[derive(Debug, Clone, Copy)]
 pub enum KeysasFilterOperation {
     /// Validate the signature of the file and the report
     ScanFile = 0,
-    /// Ask user to allow the file
-    UserAllowFile,
     /// Ask to validate the USB drive signature
-    ScanUsb,
-    /// Ask user to allow complete access the USB drive
-    UserAllowAllUsb,
-    /// Ask user to allow access to USB drive with warning on file opening
-    UserAllowUsbWithWarning,
+    ScanUsb
+}
+
+/// Authorization states for files and USB devices
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[repr(u8)]
+pub enum KeysasAuthorization {
+    /// Default value
+    AuthUnknown,
+    /// Authorization request pending
+    AuthPending,
+    /// Access is blocked
+    AuthBlock,
+    /// Access is allowed in read mode only
+    AuthAllowRead,
+    /// Access is allowed with a warning to the user
+    AuthAllowWarning,
+    /// Access is allowed for all operations
+    AuthAllowAll
+}
+
+impl KeysasAuthorization {
+    pub fn as_u8(&self) -> u8 {
+        match self {
+            Self::AuthUnknown => 0,
+            Self::AuthPending => 1,
+            Self::AuthBlock => 2,
+            Self::AuthAllowRead => 3,
+            Self::AuthAllowWarning => 4,
+            Self::AuthAllowAll => 5
+        }
+    }
 }
 
 /// Format of a request from the driver to the service scanner
@@ -74,8 +100,8 @@ struct DriverRequest {
 struct UserReply {
     /// Header of the message, managed by Windows
     header: FILTER_REPLY_HEADER,
-    /// Result of the request
-    result: BOOLEAN,
+    /// Result of the request => the authorization state to apply to the file or USB device
+    result: KeysasAuthorization,
 }
 
 /// Handle to the driver interface
@@ -117,15 +143,16 @@ impl WindowsDriverInterface {
         let handle = self.handle;
         let ctrl_hdl = ctrl.clone();
         thread::spawn(move || -> Result<(), anyhow::Error> {
+            // Pre compute the request and response size
             let request_size = u32::try_from(size_of::<DriverRequest>())?;
             let reply_size = u32::try_from(size_of::<FILTER_REPLY_HEADER>())?
-                + u32::try_from(size_of::<BOOLEAN>())?;
+                + u32::try_from(size_of::<KeysasAuthorization>())?;
 
             loop {
                 // Wait for a request from the driver
                 let mut request = DriverRequest {
                     header: FILTER_MESSAGE_HEADER::default(),
-                    operation: KeysasFilterOperation::ScanFile,
+                    operation: KeysasFilterOperation::ScanUsb,
                     content: [0; 1024],
                 };
 
@@ -137,14 +164,18 @@ impl WindowsDriverInterface {
                     }
                 }
 
+                println!("Received: {:?}", request);
+
                 // Dispatch the request
                 let result = match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
                     Ok(r) => r,
                     Err(e) => {
                         println!("Failed to handle driver request: {e}");
-                        false
+                        KeysasAuthorization::AuthBlock
                     }
                 };
+
+                println!("Sending authorization: {:?}", result);
 
                 // Prepare the response and send it
                 let reply = UserReply {
@@ -152,7 +183,7 @@ impl WindowsDriverInterface {
                         MessageId: request.header.MessageId,
                         Status: STATUS_SUCCESS,
                     },
-                    result: BOOLEAN::from(result),
+                    result,
                 };
 
                 unsafe {
@@ -166,12 +197,12 @@ impl WindowsDriverInterface {
         Ok(())
     }
 
-    pub fn send_msg(&self, msg: &str) -> Result<(), anyhow::Error> {
+    pub fn send_msg(&self, msg: &[u8]) -> Result<(), anyhow::Error> {
         let mut nb_bytes_ret: u32 = 0;
         unsafe {
             if let Err(_) = FilterSendMessage(
                 self.handle,
-                msg.as_bytes() as *const _ as *const c_void,
+                msg as *const _ as *const c_void,
                 msg.len().try_into()?,
                 None,
                 0,

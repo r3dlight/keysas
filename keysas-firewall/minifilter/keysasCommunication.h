@@ -26,6 +26,8 @@ Environment:
 #include <suppress.h>
 #include <ntdef.h>
 
+#include "keysasDriver.h"
+
 #define KEYSAS_REQUEST_BUFFER_SIZE 1024
 
 // Operation code for the request to userland
@@ -48,8 +50,8 @@ typedef struct _KEYSAS_DRIVER_REQUEST {
 // Structure of a reply from user space
 typedef struct _KEYSAS_REPLY {
 	// Result of the operation
-	// allow or not usb or file
-	BOOLEAN Result;
+	// Authorization status granted to usb or file
+	KEYSAS_AUTHORIZATION Result;
 } KEYSAS_REPLY, * PKEYSAS_REPLY;
 
 NTSTATUS

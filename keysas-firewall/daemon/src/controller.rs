@@ -41,11 +41,11 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::anyhow;
 
 use keysas_lib::file_report::parse_report;
-use crate::driver_interface::{WindowsDriverInterface, KeysasFilterOperation};
+use crate::driver_interface::{WindowsDriverInterface, KeysasFilterOperation, KeysasAuthorization};
 use crate::tray_interface;
 
 /// Service controller object, it contains handles to the service communication interfaces and data
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ServiceController {
     driver_if: WindowsDriverInterface
 }
@@ -89,10 +89,10 @@ impl ServiceController {
     /// * 'operation' - Operation code
     /// * 'content' - Content of the request
     pub fn handle_driver_request(&self, operation: KeysasFilterOperation,
-        content: &[u16]) -> Result<bool, anyhow::Error> {
+        content: &[u16]) -> Result<KeysasAuthorization, anyhow::Error> {
         // Dispatch the request
         let result = match operation {
-            KeysasFilterOperation::ScanFile | KeysasFilterOperation::UserAllowFile => {
+            KeysasFilterOperation::ScanFile => {
                 match self.authorize_file(operation, &content) {
                     Ok((result, true)) => {
                         // Send the authorization result to the tray interface
@@ -105,13 +105,11 @@ impl ServiceController {
                     Ok((result, false)) => result,
                     Err(e) => {
                         println!("Failed to validate the file: {e}");
-                        false
+                        KeysasAuthorization::AuthBlock
                     }
                 }
             }
-            KeysasFilterOperation::ScanUsb => false,
-            KeysasFilterOperation::UserAllowAllUsb => false,
-            KeysasFilterOperation::UserAllowUsbWithWarning => false,
+            KeysasFilterOperation::ScanUsb => KeysasAuthorization::AuthAllowAll, // For now, allow all
         };
 
         Ok(result)
@@ -122,13 +120,23 @@ impl ServiceController {
         -> Result<(), anyhow::Error> {
         // TODO - Check that the request is conforme to the security policy
 
-        // Send the request to the driver
-        let msg = match serde_json::to_string(req) {
-            Ok(m) => m,
-            Err(e) => return Err(anyhow!("Failed to serialize request: {e}"))
-        };
+        // Create the request for the driver
+        // The format is :
+        //   - FileID: 32 bytes
+        //   - New authorization: 1 byte
+        let mut request: [u8; 33] = [0; 33];
+        let mut index = 0;
 
-        if let Err(e) = self.driver_if.send_msg(&msg) {
+        for db in req.id {
+            let bytes = db.to_ne_bytes();
+            request[index] = bytes[0];
+            request[index+1] = bytes[1];
+            index += 2;
+        }
+        request[32] = req.authorization.as_u8();
+
+        // Send the request to the driver
+        if let Err(e) = self.driver_if.send_msg(&request) {
             println!("Failed to pass tray request to driver {e}");
             return Err(anyhow!("Failed to pass tray request to driver {e}"));
         }
@@ -272,7 +280,7 @@ impl ServiceController {
     /// * 'usb_op' - Device wide filtering policy
     /// * 'content' - Content of the driver request, it contains the path to the file
     fn authorize_file(&self, _usb_op: KeysasFilterOperation, content: &[u16]) 
-        -> Result<(bool, bool), anyhow::Error> {
+        -> Result<(KeysasAuthorization, bool), anyhow::Error> {
         // Extract content of the request
         // The first 32 bytes are the File ID
         let file_id = &content[1..16];
@@ -281,7 +289,7 @@ impl ServiceController {
             Ok(name) => name,
             Err(_) => {
                 println!("Failed to convert request to string");
-                return Ok((false, false));
+                return Ok((KeysasAuthorization::AuthBlock, false));
             }
         };
 
@@ -302,18 +310,18 @@ impl ServiceController {
         }
 
         if components.next() == Some(Component::Normal(OsStr::new("System Volume Information"))) {
-            return Ok((true, false));
+            return Ok((KeysasAuthorization::AuthAllowAll, false));
         }
 
         // Skip the directories
         if file_path.metadata()?.is_dir() {
-            return Ok((true, false));
+            return Ok((KeysasAuthorization::AuthAllowAll, false));
         }
 
         // Try to validate the file from the station report
         match self.validate_file(file_path) {
             Ok(true) => {
-                return Ok((true, true));
+                return Ok((KeysasAuthorization::AuthAllowAll, true));
             }
             _ => {
                 println!("File not validated by station");
@@ -406,7 +414,7 @@ impl ServiceController {
     /// # Arguments
     /// 
     /// * 'path' - Path to the file
-    fn user_authorize_file(&self, path: &Path) -> Result<bool, anyhow::Error> {
+    fn user_authorize_file(&self, path: &Path) -> Result<KeysasAuthorization, anyhow::Error> {
         // Find authorization status for the file
         let auth_request = format!("Allow file: {:?}", path.as_os_str());
         let (auth_request_ptr, _, _) = auth_request.into_raw_parts();
@@ -422,10 +430,10 @@ impl ServiceController {
 
         match authorization_status {
             IDYES => {
-                Ok(true)
+                Ok(KeysasAuthorization::AuthAllowAll)
             }
             IDNO => {
-                Ok(false)
+                Ok(KeysasAuthorization::AuthBlock)
             }
             _ => {
                 Err(anyhow!(format!(

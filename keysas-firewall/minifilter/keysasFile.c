@@ -60,7 +60,10 @@ Return Value:
 	switch (ContextType) {
 	case FLT_FILE_CONTEXT:
 		fileContext = (PKEYSAS_FILE_CTX)Context;
-		if (fileContext->Resource != NULL) {
+		if (NULL != fileContext->FileID) {
+			ExFreePoolWithTag(fileContext->FileID, KEYSAS_MEMORY_TAG);
+		}
+		if (NULL != fileContext->Resource) {
 			ExDeleteResourceLite(fileContext->Resource);
 			ExFreePoolWithTag(fileContext->Resource, KEYSAS_MEMORY_TAG);
 		}
@@ -277,29 +280,34 @@ Return Value:
 	// Get a read lock on the instance context
 	if (!AcquireResourceRead(instanceContext->Resource)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Failed to acquire ressource in read mode\n"));
+		FltReleaseContext(instanceContext);
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
+	// Apply authorization state to the call
 	switch (instanceContext->Authorization)
 	{
 	case AUTH_BLOCK:
 		// Block all calls
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 		Data->IoStatus.Information = 0;
-		ReleaseResource(instanceContext->Resource);
-		return FLT_PREOP_COMPLETE;
+		FltSetCallbackDataDirty(Data);
+		result = FLT_PREOP_COMPLETE;
 		break;
 	case AUTH_ALLOW_ALL:
 		// Allow all call without verification
-		ReleaseResource(instanceContext->Resource);
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+		result = FLT_PREOP_SUCCESS_NO_CALLBACK;
 		break;
 	case AUTH_UNKNOWN:
 	case AUTH_PENDING:
 		// These two states should not happen
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreCreateHandler: Invalid instance authorization state\n"));
 	default:
+		result = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 		break;
 	}
+
+	// Release resources
 	ReleaseResource(instanceContext->Resource);
 	FltReleaseContext(instanceContext);
 
@@ -344,7 +352,6 @@ Return Value:
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
-	BOOLEAN safeToOpen = TRUE;
 	PKEYSAS_FILE_CTX fileContext = NULL;
 	BOOLEAN contextCreated = FALSE;
 	KEYSAS_FILTER_OPERATION operation = SCAN_FILE;
@@ -464,18 +471,10 @@ Return Value:
 					&msFileName->Name,
 					fileContext->FileID,
 					operation,
-					&safeToOpen
+					&fileContext->Authorization
 				);
-				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Received authorization from userspace\n"));
-				// Allow or block the file depending on the userspace result
-				if (TRUE == safeToOpen) {
-					fileContext->Authorization = AUTH_ALLOW_READ;
-					KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization ALLOW\n"));
-				}
-				else {
-					fileContext->Authorization = AUTH_BLOCK;
-					KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File authorization BLOCK\n"));
-				}
+				KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: Received authorization status from userspace: %0x\n",
+					fileContext->Authorization));
 				break;
 			case AUTH_ALLOW_ALL:
 				// Set the file to allow mode
@@ -497,6 +496,7 @@ Return Value:
 		// Block the transaction
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 		Data->IoStatus.Information = 0;
+		FltSetCallbackDataDirty(Data);
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPostCreateHandler: File blocked\n"));
 		break;
 	case AUTH_PENDING:
@@ -553,7 +553,6 @@ Return Value:
 --*/
 {
 	NTSTATUS status = STATUS_SUCCESS;
-	//PUCHAR hashObject = NULL;
 	BCRYPT_HASH_HANDLE hashHandle = NULL;
 
 	// Test provided hash pointer and allocate it
@@ -572,19 +571,6 @@ Return Value:
 		status = STATUS_UNSUCCESSFUL;
 		goto cleanup;
 	}
-
-	// Allocate internal hash object
-	/*
-	if (NULL == (hashObject = ExAllocatePoolZero(
-		NonPagedPool,
-		KeysasData.HashObjectSize,
-		KEYSAS_MEMORY_TAG
-	))) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasGetFileNameHash: Failed to allocate internal object\n"));
-		status = STATUS_UNSUCCESSFUL;
-		goto cleanup;
-	}
-	*/
 
 	// Create the hash
 	if (!NT_SUCCESS(status = BCryptCreateHash(
@@ -643,7 +629,7 @@ KeysasScanFileInUserMode(
 	_In_ PUNICODE_STRING FileName,
 	_In_ PUCHAR FileID,
 	_In_ KEYSAS_FILTER_OPERATION Operation,
-	_Out_ PBOOLEAN SafeToOpen
+	_Out_ KEYSAS_AUTHORIZATION *Authorization
 )
 /*++
 Routine Description:
@@ -657,7 +643,7 @@ Routine Description:
 Arguments:
 	FileName - Name of the file. It should be NORMALIZED thus the complete path is given
 	Operation - Operation code for the user app
-	SafeToOpen - Set to TRUE if the file is valid
+	Authorization - Authorization status granted by the service
 Return Value:
 	The status of the operation, hopefully STATUS_SUCCESS.  The common failure
 	status will probably be STATUS_INSUFFICIENT_RESOURCES.
@@ -670,8 +656,8 @@ Return Value:
 
 	PAGED_CODE();
 
-	// Set default authorization to true
-	*SafeToOpen = TRUE;
+	// Set default authorization to pending
+	*Authorization = AUTH_PENDING;
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Entered\n"));
 
@@ -709,6 +695,7 @@ Return Value:
 		goto end;
 	}
 	request->Operation = Operation;
+	request->Operation = SCAN_FILE;
 
 	replyLength = sizeof(*request);
 
@@ -724,7 +711,7 @@ Return Value:
 	);
 
 	if (STATUS_SUCCESS == status) {
-		*SafeToOpen = ((PKEYSAS_REPLY)request)->Result;
+		*Authorization = ((PKEYSAS_REPLY)request)->Result;
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanFileInUserMode: Received result\n"));
 	}
 	else {

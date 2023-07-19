@@ -272,6 +272,9 @@ Return Value:
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfUnload: Closed server port\n"));
 
+	// Release crypto provider
+	BCryptCloseAlgorithmProvider(KeysasData.HashProvider, 0);
+
 	// TODO - Release all context in the list
 
 	FltUnregisterFilter(KeysasData.Filter);

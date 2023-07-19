@@ -27,14 +27,15 @@ use serde::{Deserialize, Serialize};
 use libmailslot;
 use std::sync::Arc;
 use crate::controller::ServiceController;
+use crate::driver_interface::KeysasAuthorization;
 
 /// Message for a file status notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FileUpdateMessage {
     device: String,
-    id: [u16; 16],
+    pub id: [u16; 16],
     path: String,
-    authorization: bool
+    pub authorization: KeysasAuthorization
 }
 
 /// Name of the communication pipe
@@ -83,7 +84,7 @@ pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn send_file_auth_status(file_data: &[u16], authorized: bool) -> Result<(), anyhow::Error> {
+pub fn send_file_auth_status(file_data: &[u16], authorization: KeysasAuthorization) -> Result<(), anyhow::Error> {
     let file_path = match String::from_utf16(&file_data[17..]) {
         Ok(path) => path,
         Err(_) => {
@@ -100,7 +101,7 @@ pub fn send_file_auth_status(file_data: &[u16], authorized: bool) -> Result<(), 
         device: String::from("D:"),
         id,
         path: String::from(file_path),
-        authorization: authorized
+        authorization
     };
 
     send(&msg)

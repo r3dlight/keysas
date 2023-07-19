@@ -24,14 +24,7 @@
 #![warn(unused_imports)]
 
 use serde::Serialize;
-
-#[derive(Debug, Clone)]
-pub enum KeysasAuthorization {
-    Blocked,
-    AllowedRead,
-    AllowedRwWarning,
-    AllowedAll,
-}
+use crate::service_if::KeysasAuthorization;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileAuth {
