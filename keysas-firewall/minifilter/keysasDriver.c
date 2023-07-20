@@ -77,6 +77,11 @@ KfUnload(
 //  operation registration
 //
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
+	// IRP_MJ_WRITE
+	{IRP_MJ_WRITE,
+	  0,
+	  KfPreWriteHandler,
+	  NULL},
 
 	{ IRP_MJ_CREATE,
 	  0,

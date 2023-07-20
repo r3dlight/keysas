@@ -52,7 +52,7 @@ pub enum KeysasFilterOperation {
 }
 
 /// Authorization states for files and USB devices
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum KeysasAuthorization {
     /// Default value
@@ -163,8 +163,6 @@ impl WindowsDriverInterface {
                         continue;
                     }
                 }
-
-                println!("Received: {:?}", request);
 
                 // Dispatch the request
                 let result = match ctrl_hdl.handle_driver_request(request.operation, &request.content) {

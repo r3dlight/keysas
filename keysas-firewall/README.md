@@ -18,7 +18,10 @@ The firewall is composed of four elements:
   - Minifilter
     - [X] System call interception and filtering
     - [X] Track per file context
-    - [ ] Allow authorization changes
+    - [X] Allow authorization changes
+    - [X] Filter file open and create operations
+    - [ ] Filter write operation
+    - [ ] Clean code: check IRQL, check paging, check fastIO, check sparse file API, check all flags in the pre-op filters...
   - Daemon
     - [X] Check report and files
     - [ ] Use CA certificate to check report certificate
@@ -26,6 +29,14 @@ The firewall is composed of four elements:
     - [ ] Check USB devices
   - Tray app
     - [X] Display files
-    - [X] Display USB devices
-    - [ ] Allow authorization changes
+    - [~] Display USB devices
+    - [X] Allow authorization changes
+    - [ ] Add drop down menu for authorization selection
     
+System security policy is configured from a TOML file at the base of the Daemon directory.
+The policy is configured with:
+ - 'disable_unsigned_usb': if set to 'true' unsigned usb devices are allowed. No checks are performed on files on these devices.
+ - 'allow_user_usb_authorization': if set to 'true' grant the user the ability to manualy allow unsigned USB devices. No checks are performed on files on these devices.
+ - 'allow_user_file_read': if set to 'true' grant the user the ability to manualy allow read access to an unsigned file.
+ - 'allow_user_file_write': if set to 'true' grant the user the ability to manualy allow write access to file on a USB device. 'allow_user_file_read' must also be set to true.
+If parameters are missing from the configuration file they are considered to be set to 'false'.

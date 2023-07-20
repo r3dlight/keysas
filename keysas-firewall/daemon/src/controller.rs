@@ -28,6 +28,7 @@ use std::path::PathBuf;
 use std::path::{Component, Path};
 use std::ffi::OsStr;
 use std::sync::Arc;
+use std::fs;
 use windows::core::PCSTR;
 use windows::s;
 use windows::Win32::Foundation::GetLastError;
@@ -39,38 +40,76 @@ use windows::Win32::System::Ioctl::VOLUME_DISK_EXTENTS;
 use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::anyhow;
+use serde::Deserialize;
 
 use keysas_lib::file_report::parse_report;
 use crate::driver_interface::{WindowsDriverInterface, KeysasFilterOperation, KeysasAuthorization};
 use crate::tray_interface;
+use crate::Config;
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+struct SecurityPolicy {
+    disable_unsigned_usb: bool,
+    allow_user_usb_authorization: bool,
+    allow_user_file_read: bool,
+    allow_user_file_write: bool,
+}
+
+impl Default for SecurityPolicy {
+    fn default() -> Self {
+        Self {
+            disable_unsigned_usb: false,
+            allow_user_usb_authorization: false,
+            allow_user_file_read: false,
+            allow_user_file_write: false,
+        }
+    }
+}
 
 /// Service controller object, it contains handles to the service communication interfaces and data
 #[derive(Debug, Clone, Copy)]
 pub struct ServiceController {
-    driver_if: WindowsDriverInterface
+    driver_if: WindowsDriverInterface,
+    policy: SecurityPolicy
 }
 
 impl ServiceController {
     /// Initialize the service controller
-    pub fn init() -> Result<Arc<ServiceController>, anyhow::Error> {
+    pub fn init(config: &Config) -> Result<Arc<ServiceController>, anyhow::Error> {
         if !cfg!(windows) {
             log::error!("OS not supported");
             return Err(anyhow!("Failed to open driver interface: OS not supported"));
         }
 
-        // TODO: load administration security policy
+        // Load administration security policy
+        let config_toml = match fs::read_to_string(&config.config) {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("Failed to read configuration file {e}");
+                return Err(anyhow!("Failed to open driver interface: Failed to read configuration file {e}"));
+            }
+        };
+
+        let policy: SecurityPolicy = match toml::from_str(&config_toml) {
+            Ok(p) => p,
+            Err(e) =>  {
+                log::error!("Failed to parse configuration file {e}");
+                return Err(anyhow!("Failed to open driver interface: Failed to parse configuration file {e}"));
+            }
+        };
 
         // TODO: load local certificate store
 
         // Start the interface with the kernel driver
-        let driver_interface = WindowsDriverInterface::open_driver_com()?;
+        let driver_if = WindowsDriverInterface::open_driver_com()?;
     
         // Initialize the controller
         let ctrl = Arc::new(ServiceController {
-            driver_if: driver_interface
+            driver_if,
+            policy
         });
 
-        driver_interface.start_driver_com(&ctrl)?;
+        driver_if.start_driver_com(&ctrl)?;
 
         // Start the interface with the HMI
         if let Err(e) = tray_interface::init(&ctrl) {
@@ -82,7 +121,7 @@ impl ServiceController {
     }
 
     /// Handle requests coming from the driver
-    /// Return the status of the operation or an error
+    /// Return the authorization state for the USB device or the file, or an error
     /// 
     /// # Arguments
     /// 
@@ -118,7 +157,19 @@ impl ServiceController {
     /// Handle a request coming from the HMI
     pub fn handle_tray_request(&self, req: &tray_interface::FileUpdateMessage) 
         -> Result<(), anyhow::Error> {
-        // TODO - Check that the request is conforme to the security policy
+        // Check that the request is conforme to the security policy
+        if (KeysasAuthorization::AuthAllowRead == req.authorization) 
+            && !self.policy.allow_user_file_read {
+            println!("Authorization change not allowed");
+            return Err(anyhow!("Authorization change not allowed"));
+        }
+
+        if (KeysasAuthorization::AuthAllowAll == req.authorization) 
+            && (!self.policy.allow_user_file_read
+                || !self.policy.allow_user_file_write) {
+            println!("Authorization change not allowed");
+            return Err(anyhow!("Authorization change not allowed"));
+        }
 
         // Create the request for the driver
         // The format is :
@@ -321,7 +372,7 @@ impl ServiceController {
         // Try to validate the file from the station report
         match self.validate_file(file_path) {
             Ok(true) => {
-                return Ok((KeysasAuthorization::AuthAllowAll, true));
+                return Ok((KeysasAuthorization::AuthAllowRead, true));
             }
             _ => {
                 println!("File not validated by station");
@@ -430,7 +481,7 @@ impl ServiceController {
 
         match authorization_status {
             IDYES => {
-                Ok(KeysasAuthorization::AuthAllowAll)
+                Ok(KeysasAuthorization::AuthAllowRead)
             }
             IDNO => {
                 Ok(KeysasAuthorization::AuthBlock)

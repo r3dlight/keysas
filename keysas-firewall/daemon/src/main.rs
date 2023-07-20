@@ -33,14 +33,56 @@ pub mod controller;
 
 use crate::controller::ServiceController;
 
+use clap::{crate_version, Arg, ArgAction, Command};
 use anyhow::anyhow;
+
+/// Configuration parameters for the service
+#[derive(Debug)]
+pub struct Config {
+    /// Path to the security policy configuration file
+    config: String
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            config: "./keysas-firewall-conf.toml".to_string(),
+        }
+    }
+}
+
+fn command_args(config: &mut Config) {
+    let matches = Command::new("keysas-usbfilter-daemon.exe")
+        .version(crate_version!())
+        .author("Luc B.")
+        .about("Keysas firewall Windows service")
+        .arg(
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("Path to security policy configuration")
+                .default_value("./keysas-firewall-conf.toml")
+                .action(ArgAction::Set)
+                .help("Path to security policy configuration"),
+        )
+        .get_matches();
+
+    //Won't panic according to clap authors
+    if let Some(p) = matches.get_one::<String>("config") {
+        config.config = p.to_string();
+    }
+}
 
 fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger
     simple_logger::init()?;
 
+    // Get command arguments
+    let mut config = Config::default();
+    command_args(&mut config);
+
     // Initialize and start the service
-    if let Err(e) = ServiceController::init() {
+    if let Err(e) = ServiceController::init(&config) {
         log::error!("Failed to start the service: {e}");
         return Err(anyhow!("Failed to start the service: {e}"));
     }

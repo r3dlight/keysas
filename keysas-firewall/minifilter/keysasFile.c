@@ -32,7 +32,7 @@ Environment:
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, KfFileContextCleanup)
-#pragma alloc_text(PAGE, FindFileContext)
+//#pragma alloc_text(PAGE, FindFileContext)
 #pragma alloc_text(PAGE, KfPostCreateHandler)
 #pragma alloc_text(PAGE, KfPreCreateHandler)
 #pragma alloc_text(PAGE, KeysasScanFileInUserMode)
@@ -106,7 +106,7 @@ Return Value:
 	PKEYSAS_FILE_CTX fileContext = NULL;
 	PKEYSAS_FILE_CTX oldFileContext = NULL;
 
-	PAGED_CODE();
+	//PAGED_CODE();
 
 	// Initialize output paramters
 	*FileContext = NULL;
@@ -250,8 +250,7 @@ Return Value:
 	// Don't filter call to directories or volumes
 	status = FltIsDirectory(Data->Iopb->TargetFileObject, FltObjects->Instance, &isDirectory);
 
-	if (((Data->Iopb->TargetFileObject->Flags & FO_VOLUME_OPEN) == TRUE) ||
-		((Data->Iopb->TargetFileObject->FileName.Length == 0) && (Data->Iopb->TargetFileObject->RelatedFileObject == NULL)) ||
+	if (((Data->Iopb->TargetFileObject->FileName.Length == 0) && (Data->Iopb->TargetFileObject->RelatedFileObject == NULL)) ||
 		isDirectory)
 	{
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -261,6 +260,12 @@ Return Value:
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY)) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if (FlagOn(FltObjects->FileObject->Flags, FO_VOLUME_OPEN)) {
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
@@ -534,6 +539,155 @@ cleanup:
 	}
 
 	return status;
+}
+
+FLT_PREOP_CALLBACK_STATUS
+KfPreWriteHandler(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+/***
+Routine Description:
+	This routine is a registered callback called before any operation that can modify a file.
+	It retrieves the file context and check that it is authorize in "Write" mode, else it blocks the operation.
+	This is non-pageable because it could be called on the paging path.
+Arguments:
+	Data - Pointer to the filter callback data
+	FltObjects - Pointer to the structure containing handles to the filter, instance, associated volume and file.
+	CompletionContext - Optional context that can be passed to the post callback. NULL in this case.
+--*/
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PKEYSAS_FILE_CTX fileContext = NULL;
+	PKEYSAS_INSTANCE_CTX instanceContext = NULL;
+	BOOLEAN contextCreated = FALSE;
+	BOOLEAN isDirectory = FALSE;
+	PFLT_FILE_NAME_INFORMATION nameInfo = NULL;
+	FLT_PREOP_CALLBACK_STATUS result = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: Entered\n"));
+	status = FltGetFileNameInformation(
+		Data,
+		FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT,
+		&nameInfo
+	);
+	if (!NT_SUCCESS(status)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: FltGetFileNameInformation failed with status: %0x8x\n",
+			status));
+		status = FLT_POSTOP_FINISHED_PROCESSING;
+		goto cleanup;
+	}
+
+	FltParseFileNameInformation(nameInfo);
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: File Name:%wZ, Extension: %wZ, Volume: %wZ\n",
+		nameInfo->Name,
+		nameInfo->Extension,
+		nameInfo->Volume));
+
+	// Filter call
+	// Allow call from our userspace application
+	if (IoThreadToProcess(Data->Thread) == KeysasData.UserProcess) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: User process call exit\n"));
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	// Don't filter call to directories or volumes
+	status = FltIsDirectory(Data->Iopb->TargetFileObject, FltObjects->Instance, &isDirectory);
+
+	if (((Data->Iopb->TargetFileObject->Flags & FO_VOLUME_OPEN) == TRUE) ||
+		((Data->Iopb->TargetFileObject->FileName.Length == 0) && (Data->Iopb->TargetFileObject->RelatedFileObject == NULL)) ||
+		isDirectory)
+	{
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: directory 1 exit\n"));
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DIRECTORY_FILE)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: directory 2 exit\n"));
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: directory 3 exit\n"));
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	// Check that the instance is allowed
+	// Get the instance context
+	status = FltGetInstanceContext(
+		Data->Iopb->TargetInstance,
+		&instanceContext
+	);
+	if (!NT_SUCCESS(status)) {
+		// There should always be a context for an instance to which the filter is attached
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: FltGetInstanceContext failed with status: %0x8x\n",
+			status));
+		goto cleanup;
+	}
+
+	// Get a read lock on the instance context
+	if (!AcquireResourceRead(instanceContext->Resource)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: Failed to acquire instance ressource in read mode\n"));
+		FltReleaseContext(instanceContext);
+		goto cleanup;
+	}
+
+	// Apply authorization state to the call
+	if (AUTH_ALLOW_ALL != instanceContext->Authorization) {
+		// The instance is blocked, reject the operation
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+		FltSetCallbackDataDirty(Data);
+		result = FLT_PREOP_COMPLETE;
+		ReleaseResource(instanceContext->Resource);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: Instance blocked, operation rejected\n"));
+		goto cleanup;
+	}
+	ReleaseResource(instanceContext->Resource);
+
+	// Get the file context
+	status = FindFileContext(Data, &fileContext, &contextCreated);
+	if (!NT_SUCCESS(status)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: FindFileContext failed with status: %0x8x\n",
+			status));
+		goto cleanup;
+	}
+
+	// Get a read lock on the file context
+	if (!AcquireResourceRead(fileContext->Resource)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: Failed to acquire file ressource in read mode\n"));
+		FltReleaseContext(fileContext);
+		goto cleanup;
+	}
+
+	// Apply authorization state to the call
+	if (AUTH_ALLOW_ALL != fileContext->Authorization) {
+		// The file is blocked, reject the operation
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+		FltSetCallbackDataDirty(Data);
+		result = FLT_PREOP_COMPLETE;
+		ReleaseResource(fileContext->Resource);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: File blocked, operation rejected\n"));
+		goto cleanup;
+	}
+	ReleaseResource(fileContext->Resource);
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfPreWriteHandler: Operation allowed\n"));
+	result = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+cleanup:
+	if (NULL != instanceContext) {
+		FltReleaseContext(instanceContext);
+	}
+	if (NULL != fileContext) {
+		FltReleaseContext(fileContext);
+	}
+
+	return result;
 }
 
 NTSTATUS
