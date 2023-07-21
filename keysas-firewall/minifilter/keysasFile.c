@@ -636,7 +636,8 @@ Arguments:
 	}
 
 	// Apply authorization state to the call
-	if (AUTH_ALLOW_ALL != instanceContext->Authorization) {
+	if ((AUTH_ALLOW_ALL != instanceContext->Authorization)
+			&& (AUTH_ALLOW_WARNING != instanceContext->Authorization)) {
 		// The instance is blocked, reject the operation
 		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 		Data->IoStatus.Information = 0;

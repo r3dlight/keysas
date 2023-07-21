@@ -41,6 +41,8 @@ use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::anyhow;
 use serde::Deserialize;
+use x509_cert::Certificate;
+use x509_cert::der::DecodePem;
 
 use keysas_lib::file_report::parse_report;
 use crate::driver_interface::{WindowsDriverInterface, KeysasFilterOperation, KeysasAuthorization};
@@ -67,10 +69,12 @@ impl Default for SecurityPolicy {
 }
 
 /// Service controller object, it contains handles to the service communication interfaces and data
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ServiceController {
     driver_if: WindowsDriverInterface,
-    policy: SecurityPolicy
+    policy: SecurityPolicy,
+    ca_cert_cl: Certificate,
+    ca_cert_pq: Certificate
 }
 
 impl ServiceController {
@@ -98,7 +102,13 @@ impl ServiceController {
             }
         };
 
-        // TODO: load local certificate store
+        // Load local certificates for the CA
+        let cl_cert_pem = fs::read_to_string(&config.ca_cert_cl)?;
+        let ca_cert_cl = Certificate::from_pem(cl_cert_pem)?;
+
+        let pq_cert_pem = fs::read_to_string(&config.ca_cert_pq)?;
+        let ca_cert_pq = Certificate::from_pem(pq_cert_pem)?;
+
 
         // Start the interface with the kernel driver
         let driver_if = WindowsDriverInterface::open_driver_com()?;
@@ -106,7 +116,9 @@ impl ServiceController {
         // Initialize the controller
         let ctrl = Arc::new(ServiceController {
             driver_if,
-            policy
+            policy,
+            ca_cert_cl,
+            ca_cert_pq
         });
 
         driver_if.start_driver_com(&ctrl)?;
@@ -408,7 +420,9 @@ impl ServiceController {
             match file_path.is_file() {
                 true => {
                     // If it exists, validate both
-                    match parse_report(Path::new(path), Some(&file_path), None, None) {
+                    match parse_report(Path::new(path), Some(&file_path), 
+                                        Some(&self.ca_cert_cl),
+                                        Some(&self.ca_cert_pq)) {
                         Ok(_) => return Ok(true),
                         Err(e) => {
                             println!("Failed to parse report: {e}");
@@ -418,7 +432,9 @@ impl ServiceController {
                 },
                 false => {
                     // If no corresponding file validate it alone
-                    match parse_report(Path::new(path), None, None, None) {
+                    match parse_report(Path::new(path), None,
+                                        Some(&self.ca_cert_cl),
+                                        Some(&self.ca_cert_pq)) {
                         Ok(_) => return Ok(true),
                         Err(e) => {
                             println!("Failed to parse report: {e}");
@@ -445,7 +461,9 @@ impl ServiceController {
         match path_report.is_file() {
             true => {
                 // If a corresponding report is found then validate both the file and the report
-                if let Err(e) = parse_report(path_report.as_path(), Some(path), None, None) {
+                if let Err(e) = parse_report(path_report.as_path(), Some(path),
+                                                Some(&self.ca_cert_cl),
+                                                Some(&self.ca_cert_pq)) {
                     println!("Failed to parse file and report: {e}");
                     return Ok(false);
                 }

@@ -25,6 +25,7 @@ serde_derive = "1.0"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 toml = "0.7"
 libmailslot = {path = "../libmailslot"}
+x509-cert = "0.2"
 
 [dependencies.windows]
 version = "0.48.0"

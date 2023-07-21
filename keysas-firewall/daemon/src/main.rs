@@ -40,13 +40,20 @@ use anyhow::anyhow;
 #[derive(Debug)]
 pub struct Config {
     /// Path to the security policy configuration file
-    config: String
+    config: String,
+    /// Path to the CA ED25519 certificate
+    ca_cert_cl: String,
+    /// Path to the CA Dilithium 5 certificate
+    ca_cert_pq: String,
+    // TODO - Add revocation mecanism configuration (OCSP IP or CRL IP)
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             config: "./keysas-firewall-conf.toml".to_string(),
+            ca_cert_cl: "./st-ca-cl.pem".to_string(),
+            ca_cert_pq: "./st-ca-pq.pem".to_string()
         }
     }
 }
@@ -65,11 +72,35 @@ fn command_args(config: &mut Config) {
                 .action(ArgAction::Set)
                 .help("Path to security policy configuration"),
         )
+        .arg(
+            Arg::new("ca_cl")
+                .short('l')
+                .long("ca_cl")
+                .value_name("Path to CA ED25519 certificate")
+                .default_value("./st-ca-cl.pem")
+                .action(ArgAction::Set)
+                .help("Path to CA ED25519 certificate"),
+        )
+        .arg(
+            Arg::new("ca_pq")
+                .short('q')
+                .long("ca_pq")
+                .value_name("Path to CA Dilithium 5 certificate")
+                .default_value("./st-ca-pq.pem")
+                .action(ArgAction::Set)
+                .help("Path to CA Dilithium 5 certificate"),
+        )
         .get_matches();
 
-    //Won't panic according to clap authors
+    //Won't panic according to clap authors because there are default values
     if let Some(p) = matches.get_one::<String>("config") {
         config.config = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("ca_cl") {
+        config.ca_cert_cl = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("ca_pq") {
+        config.ca_cert_pq = p.to_string();
     }
 }
 

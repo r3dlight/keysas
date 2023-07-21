@@ -24,14 +24,14 @@ The firewall is composed of four elements:
     - [ ] Clean code: check IRQL, check paging, check fastIO, check sparse file API, check all flags in the pre-op filters...
   - Daemon
     - [X] Check report and files
-    - [ ] Use CA certificate to check report certificate
+    - [X] Use CA certificate to check report certificate
     - [X] Enforce system security policy
     - [ ] Check USB devices
   - Tray app
     - [X] Display files
     - [~] Display USB devices
     - [X] Allow authorization changes
-    - [ ] Add drop down menu for authorization selection
+    - [X] Add drop down menu for authorization selection
     
 System security policy is configured from a TOML file at the base of the Daemon directory.
 The policy is configured with:
