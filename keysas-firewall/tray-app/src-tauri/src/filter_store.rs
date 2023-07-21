@@ -31,7 +31,7 @@ pub struct FileAuth {
     pub device: String,
     pub id: [u16; 16],
     pub path: String,
-    pub authorization: bool,
+    pub authorization: u8,
 }
 
 #[derive(Debug, Clone)]

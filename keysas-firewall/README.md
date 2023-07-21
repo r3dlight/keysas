@@ -20,12 +20,12 @@ The firewall is composed of four elements:
     - [X] Track per file context
     - [X] Allow authorization changes
     - [X] Filter file open and create operations
-    - [ ] Filter write operation
+    - [X] Filter write operation
     - [ ] Clean code: check IRQL, check paging, check fastIO, check sparse file API, check all flags in the pre-op filters...
   - Daemon
     - [X] Check report and files
     - [ ] Use CA certificate to check report certificate
-    - [ ] Enforce system security policy
+    - [X] Enforce system security policy
     - [ ] Check USB devices
   - Tray app
     - [X] Display files

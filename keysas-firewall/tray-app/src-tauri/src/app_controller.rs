@@ -78,18 +78,12 @@ impl AppController {
         let mut id: [u16; 16] = Default::default();
         id.copy_from_slice(&update.id);
 
-        // TODO - For now, convert the authorization to a bool, nuances will have to be handled
-        let auth = match update.authorization {
-            KeysasAuthorization::AuthAllowRead | KeysasAuthorization::AuthAllowAll => true,
-            _ => false
-        };
-
         // Store the new file
         let file = FileAuth {
             device: String::from(&update.device),
             id,
             path: String::from(&update.path),
-            authorization: auth,
+            authorization: update.authorization.to_u8_file(),
         };
 
         match self.store.write() {
@@ -121,21 +115,18 @@ impl AppController {
 
     /// Request a change of file authorization in the driver
     /// If it is successful it then change it in the datastore and updates the view
-    pub fn request_file_auth_toggle(&self, device: &str, id: &[u16], path: &str, curr_auth: bool) -> Result<(), anyhow::Error> {
+    pub fn request_file_auth_toggle(&self, device: &str, id: &[u16], path: &str, 
+        new_auth: KeysasAuthorization) -> Result<(), anyhow::Error> {
+        
         let mut file_id: [u16; 16] = Default::default();
         file_id.copy_from_slice(&id);
-
-        // Convert the current authorization to the new authorization
-        let authorization = match curr_auth {
-            true => KeysasAuthorization::AuthBlock,
-            false => KeysasAuthorization::AuthAllowAll
-        };
 
         if let Err(e) = self.comm.send_msg(&FileUpdateMessage{
             device: device.to_string(),
             id: file_id,
             path: path.to_string(),
-            authorization}) {
+            authorization: new_auth}) {
+            println!("request_file_auth_toggle: File toggle failed: {e}");
             return Err(anyhow!("Failed to send request to Keysas daemon: {e}"));
         }
 

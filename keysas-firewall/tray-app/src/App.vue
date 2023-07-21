@@ -41,8 +41,9 @@ import {listen} from '@tauri-apps/api/event'
       <tbody>
         <tr v-for="file in file_list">
           <td>{{ file.path }}</td>
-          <td v-if="file.authorization"><button class="bi-folder-check" @click="toggleFileAuth(file)"></button></td>
-          <td v-if="!file.authorization"><button class="bi-folder-x" @click="toggleFileAuth(file)"></button></td>
+          <td v-if="file.authorization == AuthorizationMode.Allowed_Read"><button class="bi-file-earmark-check" @click="toggleFileAuth(file, AuthorizationMode.Allowed_RW)"></button></td>
+          <td v-if="file.authorization == AuthorizationMode.Allowed_RW"><button class="bi-file-earmark-plus" @click="toggleFileAuth(file, AuthorizationMode.Blocked)"></button></td>
+          <td v-if="file.authorization == AuthorizationMode.Blocked"><button class="bi-file-earmark-x" @click="toggleFileAuth(file, AuthorizationMode.Allowed_Read)"></button></td>
         </tr>
       </tbody>
     </table>
@@ -53,7 +54,7 @@ import {listen} from '@tauri-apps/api/event'
 import {invoke} from "@tauri-apps/api"
 
 enum AuthorizationMode {
-  Blocked = 1,
+  Blocked = 0,
   Allowed_Read,
   Allowed_RW
 }
@@ -68,7 +69,7 @@ declare interface File {
   device: string,
   id: number[],
   path: string,
-  authorization: boolean
+  authorization: AuthorizationMode
 }
 
 export default {
@@ -121,10 +122,18 @@ export default {
       this.showUsbList = false;
       this.showUsbDetails = true;
     },
-    async toggleFileAuth(file: File) {
-      invoke('toggle_file_auth', {device: file.device, id: file.id, path: file.path, currentAuth: file.authorization})
+    async toggleFileAuth(file: File, new_mode: AuthorizationMode) {
+      let auth = 0; // Blocked
+      if (new_mode == AuthorizationMode.Allowed_Read) {
+        auth = 1;
+      } else if (new_mode == AuthorizationMode.Allowed_RW) {
+        auth = 2;
+      }
+      console.log("New authorization");
+      invoke('toggle_file_auth', {device: file.device, id: file.id, path: file.path, newAuth: auth})
         .then((result) => {
-          file.authorization = !file.authorization;
+          console.log("New authorization result OK");
+          file.authorization = new_mode;
         })
         .catch((error) => alert("Toggle file authorization failed"));
     },

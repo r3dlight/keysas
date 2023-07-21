@@ -47,6 +47,26 @@ pub enum KeysasAuthorization {
     AuthAllowAll
 }
 
+impl KeysasAuthorization {
+    /// Convert the authorization enum to an unsigned char so that it can be send to javascript
+    pub fn to_u8_file(&self) -> u8 {
+        match self {
+            Self::AuthAllowRead => 1,
+            Self::AuthAllowAll => 2,
+            _ => 0
+        }
+    }
+
+    /// Convert an unsigned char to the authorization enum for a file
+    pub fn from_u8_file(auth: u8) -> KeysasAuthorization {
+        match auth {
+            1 => Self::AuthAllowRead,
+            2 => Self::AuthAllowAll,
+            _ => Self::AuthBlock
+        }
+    }
+}
+
 /// Message for a file status notification
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileUpdateMessage {
