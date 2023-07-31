@@ -9,7 +9,7 @@ ClassGuid = {36fc9e60-c465-11cf-8056-444553540000}
 Provider=%ManufacturerName%
 CatalogFile=usbfilter.cat
 DriverVer = 05/10/2023,16.21.56.700
-PnpLockdown=1
+PnpLockdown=0
 
 [DefaultInstall.NTamd64]
 CopyFiles=@usbfilter.sys
@@ -39,8 +39,8 @@ usbfilter.sys=1
 1 = %DiskId1%
 
 [Strings]
-SPSVCINST_ASSOCSERVICE= 0x00000002
-ManufacturerName="Keysas" ;TODO: Replace with your manufacturer name
+; SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="Keysas"
 DiskName = "usbfilter Installation Disk"
 usbfilter.DeviceDesc = "usbfilter Device"
 usbfilter.SVCDESC = "usbfilter Service"

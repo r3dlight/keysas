@@ -11,6 +11,8 @@
     <DeployFiles />
     <ScriptName>Microsoft.DriverKit.DefaultDriverPackageInstallationClass.PerformDefaultDriverPackageInstallation</ScriptName>
     <ScriptDeviceQuery />
+    <FrameWorkInteraction>FvOn</FrameWorkInteraction>
+    <EnableIrqlChecks>true</EnableIrqlChecks>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <RemoveDriver>True</RemoveDriver>
@@ -23,5 +25,7 @@
     <DeployFiles />
     <ScriptName>Microsoft.DriverKit.DefaultDriverPackageInstallationClass.PerformDefaultDriverPackageInstallation</ScriptName>
     <ScriptDeviceQuery />
+    <FrameWorkInteraction>FvOn</FrameWorkInteraction>
+    <EnableIrqlChecks>true</EnableIrqlChecks>
   </PropertyGroup>
 </Project>
