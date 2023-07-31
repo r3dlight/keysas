@@ -11,7 +11,7 @@ members = [
 ]
 
 exclude = [
-    "keysas-usbfilter"
+    "keysas-firewall"
 ]
 
 [patch.crates-io.loopdev]

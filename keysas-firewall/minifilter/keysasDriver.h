@@ -25,6 +25,7 @@ Environment:
 #include <fltKernel.h>
 #include <dontuse.h>
 #include <suppress.h>
+#include <bcrypt.h>
 
 // Memory Pool Tag
 #define KEYSAS_MEMORY_TAG	'eKlF'
@@ -45,6 +46,22 @@ typedef struct _KEYSAS_DATA {
 
 	// Connection port to user-mode
 	PFLT_PORT ClientPort;
+
+	// List head of the file context tracked by the driver
+	LIST_ENTRY FileCtxListHead;
+
+	// Lock to synchronize accesses to the file context list
+	KSPIN_LOCK FileCtxListLock;
+
+	// Handle to the crypto provider
+	BCRYPT_ALG_HANDLE HashProvider;
+
+	// Hash parameters
+	// Hash internal object size
+	unsigned long HashObjectSize;
+
+	// Length of the hash
+	unsigned long HashLength;
 } KEYSAS_DATA, * PKEYSAS_DATA;
 
 extern KEYSAS_DATA KeysasData;

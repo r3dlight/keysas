@@ -5,11 +5,12 @@
 # USB virus cleaning station
 
 # Main features
+
 - Retrieve untrusted files from USB (via keysas-io) or over the network
 - Perform multiple checks
-    - Run anti-virus check (ClamAV)
-    - Run Yara parsing
-    - Run extensions and size checks
+  - Run anti-virus check (ClamAV)
+  - Run Yara parsing
+  - Run extensions and size checks
 - Signatures (Files and USB keys)
     - Trusted (Outgoing) USB device must be signed with Keysas-admin app
     - Each verified file signature is stored in the corresponding file report  
@@ -17,9 +18,10 @@
     - Private keys are stored using PKCS#8 format
     - x509 certificates are signed by the internal PKI (using Keysas-admin)
 - Authentication
-    - Users can be authenticated using personal Yubikeys 5
+  - Users can be authenticated using personal Yubikeys 5
 
 # Keysas-core
+
 ## Architecture
 
 <div align="center">
@@ -34,6 +36,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Daemons are sandboxed using Seccomp (x86_64 & aarch64)
 
 ## Other binaries or applications available
+
  - Keysas-io: Daemon watching udev events to verify the signature of any mass storage USB devices and mount it as a IN (no or invalid signature) or OUT device (valid signature).
  - Keysas-sign: Command line utility to import PEM certificate via Keysas-admin
  - Keysas-fido: Command line utility to manage Yubikeys 5 enrollment
@@ -43,8 +46,9 @@ Files are passed between daemons as raw file descriptors and using abstract sock
 
 ## Installation
 
-On Debian stable (Bookwoom):
-```
+On Debian stable (Bookwoom only):
+
+```bash
 apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
@@ -54,7 +58,7 @@ make help
 make build
 make install
 ```
+
 ## User documentation
 
 User documentation can be found here : [https://keysas.fr](https://keysas.fr)
-

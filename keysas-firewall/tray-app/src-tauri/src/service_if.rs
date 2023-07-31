@@ -23,48 +23,118 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use std::time::Duration;
-use std::io;
-use std::thread;
-use tokio::net::windows::named_pipe::ClientOptions;
-use tokio::time;
-use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 use anyhow::anyhow;
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, RwLock};
+use libmailslot;
 
-use crate::filter_store::FilterStore;
+use crate::app_controller::AppController;
 
-const SERVICE_PIPE: &str = r"\\.\pipe\keysas-service";
+/// Authorization states for files and USB devices
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum KeysasAuthorization {
+    /// Default value
+    AuthUnknown = 0,
+    /// Authorization request pending
+    AuthPending,
+    /// Access is blocked
+    AuthBlock,
+    /// Access is allowed in read mode only
+    AuthAllowRead,
+    /// Access is allowed with a warning to the user
+    AuthAllowWarning,
+    /// Access is allowed for all operations
+    AuthAllowAll
+}
 
-/// Initialize the pipe with Keysas Service and start a thread to monitor it
-pub fn init_service_if(store: &FilterStore) -> Result<(), anyhow::Error> {
-    // Initialize the client socket
-    let client = loop {
-        match ClientOptions::new().open(SERVICE_PIPE) {
-            Ok(client) => break client,
-            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
-            Err(e) => return Err(anyhow!("Failed to open client socket")),
+impl KeysasAuthorization {
+    /// Convert the authorization enum to an unsigned char so that it can be send to javascript
+    pub fn to_u8_file(&self) -> u8 {
+        match self {
+            Self::AuthAllowRead => 1,
+            Self::AuthAllowAll => 2,
+            _ => 0
         }
-        time::sleep(Duration::from_millis(50));
-    };
+    }
 
-    // Start the listening thread
-    tokio::task::spawn(async {
-        let mut msg = vec![0;1024];
+    /// Convert an unsigned char to the authorization enum for a file
+    pub fn from_u8_file(auth: u8) -> KeysasAuthorization {
+        match auth {
+            1 => Self::AuthAllowRead,
+            2 => Self::AuthAllowAll,
+            _ => Self::AuthBlock
+        }
+    }
+}
 
-        loop {
-            client.readable().await;
+/// Message for a file status notification
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileUpdateMessage {
+    pub device: String,
+    pub id: [u16; 16],
+    pub path: String,
+    pub authorization: KeysasAuthorization
+}
 
-            match client.try_read(&mut msg) {
-                Ok(n) => {
-                    msg.truncate(n);
-                    println!("Message: {:?}", msg);
-                    break;
+/// Handle to the service interface client and server
+pub struct ServiceIf {
+    server: Arc<RwLock<libmailslot::MailSlot>>
+}
+
+/// Name of the communication pipe
+const SERVICE_PIPE: &str = r"\\.\mailslot\keysas\service-to-app";
+const TRAY_PIPE: &str = r"\\.\mailslot\keysas\app-to-service";
+
+
+impl ServiceIf {
+    /// Initialize the pipe with Keysas Service
+    pub fn init_service_if() -> Result<ServiceIf, anyhow::Error> {
+        // Initialize the mailslot handles
+        let server = match libmailslot::create_mailslot(SERVICE_PIPE) {
+            Ok(s) => s,
+            Err(e) => return Err(anyhow!("Failed to create server: {e}")),
+        };
+    
+        Ok(ServiceIf{server: RwLock::new(server).into()})
+    }
+
+    /// Start the server thread to listen for the Keysas service
+    pub fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error> {    
+        // Start listening on the server side
+        let ctrl_hdl = ctrl.clone();
+        let server = self.server.clone();
+        std::thread::spawn(move || {
+            // Get a mutable lock on the server
+            let server = match server.write() {
+                Ok(s) => s,
+                Err(_) => {
+                    return;
                 }
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {continue;}
-                Err(e) => {return;}
+            };
+            println!("Start listening for daemon");
+            loop {
+                while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
+                    if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes()) {
+                        ctrl_hdl.notify_file_change(&update);
+                        println!("message from service {:?}", update);
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
             }
-        }
-    });
+        });
+        Ok(())
+    }
 
-    Ok(())
+    pub fn send_msg(&self, msg: &impl Serialize) -> Result<(), anyhow::Error> {
+        let msg_vec = match serde_json::to_string(msg) {
+            Ok(m) => m,
+            Err(e) => return Err(anyhow!("Failed to serialize message: {e}"))
+        };
+
+        if let Err(e) = libmailslot::write_mailslot(TRAY_PIPE, &msg_vec) {
+            return Err(anyhow!("Failed to post message to the mailslot: {e}"));
+        }
+
+        Ok(())
+    }
 }
