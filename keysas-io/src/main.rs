@@ -222,7 +222,7 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     f.read_exact(&mut buf)?;
     let signature_size = u32::from_be_bytes(buf);
     // Size must not be > 7684 bytes LBA-MBR (8196-512)
-    if signature_size > 7684 as u32 {
+    if signature_size > 7684_u32 {
         return Err(anyhow!("Invalid length for signature"));
     }
     // Now read the signature size only
@@ -318,11 +318,11 @@ fn is_signed(
     match KeysasHybridPubKeys::verify_key_signatures(data.as_bytes(), signatures, pubkeys) {
         Ok(_) => {
             info!("USB device is signed");
-            return Ok(true);
+            Ok(true)
         }
         Err(e) => {
             info!("Signatures are not matching on USB device: {e}");
-            return Ok(false);
+            Ok(false)
         }
     }
 }
@@ -853,9 +853,12 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket
-                                        .write_message(Message::Text(serialized))
-                                        .expect("Cannot write to websocket");
+                                    match websocket.write_message(Message::Text(serialized)) {
+                                        Ok(_) => log::debug!("Data wrote into the websocket"),
+                                        Err(e) => {
+                                            log::error!("Cannot write data into the websocket: {e}")
+                                        }
+                                    }
                                     move_device_out(Path::new(&device))?;
                                     info!("Signed USB device done.");
                                     ready_out()?;
