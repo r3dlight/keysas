@@ -46,7 +46,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
 
 ## Installation
 
-On Debian stable (Bookwoom):
+On Debian stable (Bookwoom only):
 
 ```bash
 apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
