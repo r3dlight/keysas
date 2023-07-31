@@ -120,7 +120,7 @@ Return Value:
 		}
 		ExInitializeResourceLite(instanceContext->Resource);
 
-		// Attach the context to the file
+		// Attach the context to the instance
 		status = FltSetInstanceContext(
 			Instance,
 			FLT_SET_CONTEXT_KEEP_IF_EXISTS,
@@ -143,7 +143,7 @@ Return Value:
 			status = STATUS_SUCCESS;
 		}
 		else {
-			// Successful creation of a new file context
+			// Successful creation of a new instance context
 			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!FindInstanceContext: Created a new instance context\n"));
 			*ContextCreated = TRUE;
 		}
@@ -157,8 +157,7 @@ Return Value:
 NTSTATUS
 KeysasScanInstanceInUserMode(
 	_In_ PUNICODE_STRING InstanceName,
-	_In_ KEYSAS_FILTER_OPERATION Operation,
-	_Out_ PBOOLEAN SafeToOpen
+	_Out_ KEYSAS_AUTHORIZATION* Authorization
 )
 /*++
 Routine Description:
@@ -166,8 +165,7 @@ Routine Description:
 	instance and tell our caller whether it's safe to open it.
 Arguments:
 	FileName - Name of the file. It should be NORMALIZED thus the complete path is given
-	Operation - Operation code for the user app
-	SafeToOpen - Set to TRUE if the instance is valid
+	Authorization - Authorization status granted by the service
 Return Value:
 	The status of the operation, hopefully STATUS_SUCCESS.  The common failure
 	status will probably be STATUS_INSUFFICIENT_RESOURCES.
@@ -181,7 +179,7 @@ Return Value:
 	PAGED_CODE();
 
 	// Set default authorization to true
-	*SafeToOpen = TRUE;
+	*Authorization = AUTH_ALLOW_ALL;
 
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Entered\n"));
 
@@ -212,7 +210,7 @@ Return Value:
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Failed to convert UNICODE_STRING\n"));
 		goto end;
 	}
-	request->Operation = Operation;
+	request->Operation = SCAN_USB;
 
 	replyLength = sizeof(*request);
 
@@ -228,8 +226,10 @@ Return Value:
 	);
 
 	if (STATUS_SUCCESS == status) {
-		*SafeToOpen = ((PKEYSAS_REPLY)request)->Result;
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Received result\n"));
+		*Authorization = ((PKEYSAS_REPLY)request)->Result;
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Received result %x\n",
+			*Authorization));
+		*Authorization = AUTH_ALLOW_WARNING;
 	}
 	else {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasScanInstanceInUserMode: Failed to send request to userspace\n"));
@@ -295,7 +295,6 @@ Return Value:
 	BOOLEAN						instanceCreated = FALSE;
 	wchar_t						nameBuffer[512] = { 0 };
 	UNICODE_STRING				volumeName = { 0, sizeof(nameBuffer)-sizeof(wchar_t), nameBuffer};
-	BOOLEAN						instanceValid = TRUE;
 
 	// Print debug info on the call context
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Entered\n"));
@@ -395,7 +394,6 @@ Return Value:
 			goto end;
 		}
 
-		// TODO: default set instance to ALLOW
 		AcquireResourceWrite(instanceContext->Resource);
 
 		status = FltGetVolumeName(FltObjects->Volume, &volumeName, NULL);
@@ -410,8 +408,7 @@ Return Value:
 
 		status = KeysasScanInstanceInUserMode(
 			&volumeName,
-			SCAN_USB,
-			&instanceValid
+			&instanceContext->Authorization
 		);
 
 		if (!NT_SUCCESS(status)) {
@@ -420,9 +417,9 @@ Return Value:
 			goto end;
 		}
 
-		instanceContext->Authorization = AUTH_ALLOW_WARNING;
 		ReleaseResource(instanceContext->Resource);
 
+		status = STATUS_SUCCESS;
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KfInstanceSetup: Instance context attached\n"));
 	}
 	else {

@@ -24,8 +24,10 @@ Environment:
 #include <suppress.h>
 #include <ntstrsafe.h>
 #include <ntdef.h>
+#include <wdm.h>
 
 #include "keysasDriver.h"
+#include "keysasFile.h"
 
 // Name of the port used to communicate with user space
 const PWSTR KeysasPortName = L"\\KeysasPort";
@@ -33,6 +35,7 @@ const PWSTR KeysasPortName = L"\\KeysasPort";
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, KeysasPortConnect)
 #pragma alloc_text(PAGE, KeysasPortDisconnect)
+#pragma alloc_text(PAGE, KeysasPortNotify)
 #endif
 
 NTSTATUS
@@ -72,7 +75,7 @@ Return Value
 			NULL,
 			KeysasPortConnect,
 			KeysasPortDisconnect,
-			NULL,
+			KeysasPortNotify,
 			1
 		);
 
@@ -154,4 +157,78 @@ Return value
 	FltCloseClientPort(KeysasData.Filter, &KeysasData.ClientPort);
 
 	KeysasData.UserProcess = NULL;
+}
+
+NTSTATUS
+KeysasPortNotify (
+	_In_ PVOID ConnectionCookie,
+	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+	_In_ ULONG InputBufferSize,
+	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
+	_In_ ULONG OutputBufferSize,
+	_Out_ PULONG ReturnOutputBufferLength
+)
+/*++
+Routine Description
+	This is called when a request is received from userspace
+Arguments
+	PortCookie - Cookie that identifies the user, not use as there is only one connection from the service
+	InputBuffer - Buffer containing the request, it is allocated by the userspace
+	InputBufferLength - Length of the input buffer
+	OutputBuffer - Buffer for the response, it is allocated by the userspace
+	OutputBufferLength - Length of the output buffer
+	ReturnOutputBufferlength - Length of the response
+Return value
+	None
+--*/
+{
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+	UNREFERENCED_PARAMETER(OutputBuffer);
+	UNREFERENCED_PARAMETER(OutputBufferSize);
+
+	PLIST_ENTRY scan, next;
+	PKEYSAS_FILE_CTX fileCtx = NULL;
+	KIRQL kIrql;
+	PUCHAR inputBuffer = (PUCHAR)InputBuffer;
+
+	ReturnOutputBufferLength = 0;
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Entered\n"));
+
+	// Test that the input buffer contains at least 33 bytes
+	if (33 > InputBufferSize || NULL == InputBuffer) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Not enough input data\n"));
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	// Test if the file context list is empty
+	if (TRUE == IsListEmpty(&KeysasData.FileCtxListHead)) {
+		// TODO - Send response to userspace
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: File context list is empty\n"));
+		return STATUS_SUCCESS;
+	}
+
+	kIrql = KeGetCurrentIrql();
+
+	// Get lock on the list
+	KeAcquireSpinLock(&KeysasData.FileCtxListLock, &kIrql);
+
+	// Go through the list to find the context
+	for (scan = (KeysasData.FileCtxListHead).Flink, next = scan->Flink; scan != &(KeysasData.FileCtxListHead); scan = next, next = scan->Flink) {
+		fileCtx = CONTAINING_RECORD(scan, KEYSAS_FILE_CTX, FileCtxList);
+
+		if (32 == RtlCompareMemory(fileCtx->FileID, inputBuffer, 32)) {
+			// Changed the authorization status to the one provided by the service
+			fileCtx->Authorization = inputBuffer[32];
+			break;
+		}
+	}
+
+	KeReleaseSpinLock(&KeysasData.FileCtxListLock, kIrql);
+
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas!KeysasPortNotify: Done\n"));
+
+	// If the context is found apply the request
+	
+	return STATUS_SUCCESS;
 }

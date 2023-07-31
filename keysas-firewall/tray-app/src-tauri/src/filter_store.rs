@@ -23,20 +23,15 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::anyhow;
+use serde::Serialize;
+use crate::service_if::KeysasAuthorization;
 
-#[derive(Debug, Clone)]
-pub enum KeysasAuthorization {
-    Blocked,
-    AllowedRead,
-    AllowedRwWarning,
-    AllowedAll,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileAuth {
+    pub device: String,
+    pub id: [u16; 16],
     pub path: String,
-    pub authorization: KeysasAuthorization,
+    pub authorization: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -44,18 +39,19 @@ pub struct USBDevice {
     pub name: String,
     pub path: String,
     pub authorization: KeysasAuthorization,
-    pub files: Vec<FileAuth>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FilterStore {
     pub devices: Vec<USBDevice>,
+    pub files: Vec<FileAuth>,
 }
 
 impl FilterStore {
     pub fn init_store() -> FilterStore {
         FilterStore {
             devices: Vec::new(),
+            files: Vec::new(),
         }
     }
 
@@ -63,40 +59,61 @@ impl FilterStore {
         self.devices.push(device.clone());
     }
 
-    pub fn remove_device(&mut self, device_name: &str) -> Result<(), anyhow::Error> {
-        Ok(())
+    pub fn remove_device(&mut self, _device_name: &str) -> Result<(), anyhow::Error> {
+        todo!()
     }
 
     pub fn get_devices(&self) -> &[USBDevice] {
         &self.devices
     }
 
+    pub fn get_device(&self, device_path: &str) -> Option<&USBDevice> {
+        self.devices.iter().find(|&d| d.path.eq(device_path))
+    }
+
+    pub fn get_device_mut(&mut self, device_path: &str) -> Option<&mut USBDevice> {
+        self.devices.iter_mut().find(|d| d.path.eq(device_path))
+    }
+
     pub fn set_device_auth(
         &mut self,
-        device_name: &str,
-        auth: KeysasAuthorization,
+        _device_name: &str,
+        _auth: KeysasAuthorization,
     ) -> Result<(), anyhow::Error> {
+        todo!()
+    }
+
+    pub fn add_file(&mut self, file: &FileAuth) -> Result<(), anyhow::Error> {
+        self.files.push(file.clone());
         Ok(())
     }
 
-    pub fn add_file(&mut self, device_name: &str, file: &FileAuth) -> Result<(), anyhow::Error> {
-        Ok(())
+    pub fn remove_file(
+        &mut self,
+        _device_name: &str,
+        _file_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        todo!()
     }
 
-    pub fn remove_file(&mut self, device_name: &str, file_name: &str) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
-
-    pub fn get_files(&self, device_name: &str) -> Result<&[FileAuth], anyhow::Error> {
-        Err(anyhow!("Not implemented"))
+    pub fn get_files(&self, device_path: &str) -> Result<Vec<FileAuth>, anyhow::Error> {
+        let files: Vec<FileAuth> = self
+            .files
+            .iter()
+            .filter_map(|f| match f.device.eq(device_path) {
+                true => Some(f.clone()),
+                false => None,
+            })
+            .collect();
+        Ok(files)
     }
 
     pub fn set_file_auth(
         &mut self,
-        device_name: &str,
-        file_name: &str,
-        auth: KeysasAuthorization,
+        _device_name: &str,
+        _file_name: &str,
+        _auth: KeysasAuthorization,
     ) -> Result<(), anyhow::Error> {
-        Ok(())
+        todo!()
     }
 }

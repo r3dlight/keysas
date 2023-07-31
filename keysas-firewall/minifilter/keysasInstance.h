@@ -76,9 +76,8 @@ FindInstanceContext(
 
 NTSTATUS
 KeysasScanInstanceInUserMode(
-	_In_ PUNICODE_STRING FileName,
-	_In_ KEYSAS_FILTER_OPERATION Operation,
-	_Out_ PBOOLEAN SafeToOpen
+	_In_ PUNICODE_STRING InstanceName,
+	_Out_ KEYSAS_AUTHORIZATION* Authorization
 );
 
 #endif _H_KEYSAS_INSTANCE_

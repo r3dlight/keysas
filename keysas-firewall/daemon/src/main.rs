@@ -28,31 +28,99 @@
 #![feature(str_split_remainder)]
 
 pub mod driver_interface;
-pub mod windows_driver_interface;
+pub mod tray_interface;
+pub mod controller;
 
-use crate::driver_interface::init_driver_com;
+use crate::controller::ServiceController;
 
+use clap::{crate_version, Arg, ArgAction, Command};
 use anyhow::anyhow;
+
+/// Configuration parameters for the service
+#[derive(Debug)]
+pub struct Config {
+    /// Path to the security policy configuration file
+    config: String,
+    /// Path to the CA ED25519 certificate
+    ca_cert_cl: String,
+    /// Path to the CA Dilithium 5 certificate
+    ca_cert_pq: String,
+    // TODO - Add revocation mecanism configuration (OCSP IP or CRL IP)
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            config: "./keysas-firewall-conf.toml".to_string(),
+            ca_cert_cl: "./st-ca-cl.pem".to_string(),
+            ca_cert_pq: "./st-ca-pq.pem".to_string()
+        }
+    }
+}
+
+fn command_args(config: &mut Config) {
+    let matches = Command::new("keysas-usbfilter-daemon.exe")
+        .version(crate_version!())
+        .author("Luc B.")
+        .about("Keysas firewall Windows service")
+        .arg(
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("Path to security policy configuration")
+                .default_value("./keysas-firewall-conf.toml")
+                .action(ArgAction::Set)
+                .help("Path to security policy configuration"),
+        )
+        .arg(
+            Arg::new("ca_cl")
+                .short('l')
+                .long("ca_cl")
+                .value_name("Path to CA ED25519 certificate")
+                .default_value("./st-ca-cl.pem")
+                .action(ArgAction::Set)
+                .help("Path to CA ED25519 certificate"),
+        )
+        .arg(
+            Arg::new("ca_pq")
+                .short('q')
+                .long("ca_pq")
+                .value_name("Path to CA Dilithium 5 certificate")
+                .default_value("./st-ca-pq.pem")
+                .action(ArgAction::Set)
+                .help("Path to CA Dilithium 5 certificate"),
+        )
+        .get_matches();
+
+    //Won't panic according to clap authors because there are default values
+    if let Some(p) = matches.get_one::<String>("config") {
+        config.config = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("ca_cl") {
+        config.ca_cert_cl = p.to_string();
+    }
+    if let Some(p) = matches.get_one::<String>("ca_pq") {
+        config.ca_cert_pq = p.to_string();
+    }
+}
 
 fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger
     simple_logger::init()?;
 
-    // Initialize the connection with the driver
-    if let Err(e) = init_driver_interface() {
-        log::error!("Failed to initialize communications with driver: {e}");
-        return Err(anyhow!("Error: Driver interface initialization failed"));
+    // Get command arguments
+    let mut config = Config::default();
+    command_args(&mut config);
+
+    // Initialize and start the service
+    if let Err(e) = ServiceController::init(&config) {
+        log::error!("Failed to start the service: {e}");
+        return Err(anyhow!("Failed to start the service: {e}"));
     }
 
-    log::info!("Driver interface OK");
+    // Put the service in sleep until it receives request from the driver or the HMI
 
     loop {
         std::thread::sleep(std::time::Duration::from_secs(10));
     }
-}
-
-// Initialize the driver interface and register the callbacks
-fn init_driver_interface() -> Result<(), anyhow::Error> {
-    init_driver_com()?;
-    Ok(())
 }
