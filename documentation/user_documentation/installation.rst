@@ -38,8 +38,9 @@ Getting **Keysas**
 -------------------
 
 A pre-compiled **Keysas** binary is at your
-disposal. We recommend to use the latest version here:
+disposal. We recommend using the latest version here:
 https://github.com/r3dlight/keysas/tags
+
 
 Download the following files of lastest stable version.
  * keysas-vx.y.z.zip
