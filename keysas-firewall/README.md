@@ -3,7 +3,7 @@
 The keysas USB firewall is used on Windows client to control that:
 
 - USB devices connected have been enrolled in the system
-- That files on USB devices have been validated by a Keysas station
+- Files on USB devices have been validated by a Keysas station
 
 ## Architecture
 
@@ -11,9 +11,9 @@ The firewall is composed of four elements:
 
 - In kernel space
   - A USB bus filter driver
-  - A minifilter (driver to filter system call towards the filesystem)
+  - A minifilter (driver to filter system calls towards the filesystem)
 - In userspace
-  - A daemon that supervise the two drivers and performs the checking based on the system security policy
+  - A daemon that supervises the two drivers and checks files and reports based on the system security policy
   - A tray application to allow the end user to control the security settings
 
 ## Security Policy configuration
@@ -22,13 +22,19 @@ System security policy is configured from a TOML file at the base of the Daemon 
 The policy is configured with:
 
 - 'disable_unsigned_usb': if set to 'true' unsigned usb devices are allowed. No checks are performed on files on these devices.
-- 'allow_user_usb_authorization': if set to 'true' grant the user the ability to manualy allow unsigned USB devices. No checks are performed on files on these devices.
-- 'allow_user_file_read': if set to 'true' grant the user the ability to manualy allow read access to an unsigned file.
-- 'allow_user_file_write': if set to 'true' grant the user the ability to manualy allow write access to file on a USB device. 'allow_user_file_read' must also be set to true.
+- 'allow_user_usb_authorization': if set to 'true' grant the user the ability to manually allow unsigned USB devices. No checks are performed on files on these devices.
+- 'allow_user_file_read': if set to 'true' grant the user the ability to manually allow read access to an unsigned file.
+- 'allow_user_file_write': if set to 'true' grant the user the ability to manually allow write access to file on a USB device. 'allow_user_file_read' must also be set to true.
 
 If parameters are missing from the configuration file they are considered to be set to 'false'.
 
 CA certificates must be provided to the daemon. The path to the pem files is given as arguments to the command line.
+
+The comple command line is
+
+```bash
+./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Dilithium5 certificate>
+```
 
 ## TODO List
 

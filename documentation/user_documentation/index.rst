@@ -35,5 +35,6 @@ User documentation
    networkgw
    raspberry
    keysas-admin
+   windows_firewall
 
 
