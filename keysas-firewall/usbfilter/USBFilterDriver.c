@@ -16,6 +16,7 @@ Environment:
 
 --*/
 
+#include <ntifs.h>
 #include <wdm.h>
 #include <wdf.h>
 
@@ -26,6 +27,16 @@ Environment:
 -----------------------------------------*/
 #define KEYSAS_USBFILTER_POOL_TAG 'FUeK'
 
+/*---------------------------------------
+-
+- Type definitions
+-
+-----------------------------------------*/
+
+typedef struct _KEYSAS_USBFILTER_CONTEXT {
+	WDFQUEUE NotificationQueue;
+	// TODO - add access protection to the queue via a Resource
+} KEYSAS_USBFILTER_CONTEXT, * PKEYSAS_USBFILTER_CONTEXT;
 
 /*---------------------------------------
 -
@@ -33,17 +44,9 @@ Environment:
 -
 -----------------------------------------*/
 
-NTSTATUS
-DriverEntry(
-	_In_ PDRIVER_OBJECT DriverObject,
-	_In_ PUNICODE_STRING RegistryPath
-);
+DRIVER_INITIALIZE DriverEntry;
 
-NTSTATUS
-KUFDeviceAddEvt(
-	_In_ WDFDRIVER Driver,
-	_Inout_ PWDFDEVICE_INIT DeviceInit
-);
+EVT_WDF_DRIVER_DEVICE_ADD KUFDeviceAddEvt;
 
 VOID
 KUFEvtDeviceControl(
@@ -122,7 +125,7 @@ IRQL:
 
 	// Test inputs provided
 	if (NULL == Device || NULL == Information) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFGetDeviceInfo: Invalid inputs\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFGetDeviceInfo: Invalid inputs\n");
 		goto cleanup;
 	}
 
@@ -139,7 +142,7 @@ IRQL:
 	);
 
 	if (NULL == irp) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFGetDeviceInfo: Failed to allocate IRP\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFGetDeviceInfo: Failed to allocate IRP\n");
 		goto cleanup;
 	}
 
@@ -148,7 +151,7 @@ IRQL:
 	stack = IoGetNextIrpStackLocation(irp);
 
 	if (NULL == stack) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFGetDeviceInfo: Failed to get stack location\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFGetDeviceInfo: Failed to get stack location\n");
 		goto cleanup;
 	}
 
@@ -163,13 +166,13 @@ IRQL:
 
 	if (NT_SUCCESS(nts)) {
 		bufferLength = (wcslen((WCHAR*)ios.Information)+1) * sizeof(WCHAR);
-		*Information = (PWCHAR)ExAllocatePool2(NonPagedPool, bufferLength, KEYSAS_USBFILTER_POOL_TAG);
+		*Information = (PWCHAR)ExAllocatePool2(POOL_FLAG_NON_PAGED, bufferLength, KEYSAS_USBFILTER_POOL_TAG);
 		if (NULL != *Information) {
 			RtlCopyMemory(*Information, (PWCHAR) ios.Information, bufferLength - 2);
 			result = STATUS_SUCCESS;
 		}
 		else {
-			KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFGetDeviceInfo: Failed to allocate output buffer\n"));
+			DbgPrint("\nKeysas - USBFilter!KUFGetDeviceInfo: Failed to allocate output buffers\n");
 		}
 	}
 
@@ -206,7 +209,7 @@ IRQL:
 
 	// Test inputs
 	if (NULL == Device || NULL == IsHub) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFIsUsbHub: Invalid inputs\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFIsUsbHub: Invalid inputs\n");
 		goto cleanup;
 	}
 	// Set default to FALSE
@@ -218,16 +221,21 @@ IRQL:
 		BusQueryDeviceID,
 		&deviceId
 	)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFIsUsbHub: Failed to get Device ID\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFIsUsbHub: Failed to get Device ID\n");
 		goto cleanup;
 	}
 
+	DbgPrint("\nKeysas - USBFilter!KUFIsUsbHub: Device ID: %wS\n", deviceId);
+
 	// Compare with reference strings
-	if (!wcsncmp(deviceId, L"USB\\ROOT_HUB", 13)
-		|| !wcsncmp(deviceId, L"NUSB3\\ROOT_HUB", 15)
-		|| !wcsncmp(deviceId, L"IUSB3\\ROOT_HUB", 15)) {
+	if (!wcscmp(deviceId, L"USB\\ROOT_HUB")
+		|| !wcscmp(deviceId, L"USB\\ROOT_HUB20")
+		|| !wcscmp(deviceId, L"USB\\ROOT_HUB30")
+		|| !wcscmp(deviceId, L"NUSB3\\ROOT_HUB30")
+		|| !wcscmp(deviceId, L"IUSB3\\ROOT_HUB30")) {
 		// It is a USB Hub
 		*IsHub = TRUE;
+		DbgPrint("\nKeysas - USBFilter!KUFIsUsbHub: is a hub\n");
 	}
 
 	result = STATUS_SUCCESS;
@@ -266,7 +274,7 @@ IRQL:
 
 	NTSTATUS status = STATUS_SUCCESS;
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!DriverEntry: Entered\n"));
+	DbgPrint("\nKeysas - USBFilter!DriverEntry: Entered\n");
 
 	WDF_DRIVER_CONFIG_INIT(&config, KUFDeviceAddEvt);
 
@@ -279,8 +287,7 @@ IRQL:
 	);
 
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!DriverEntry: WdfDriverCreate failed with status: %0x8x\n",
-			status));
+		DbgPrint("\nKeysas - USBFilter!DriverEntry: WdfDriverCreate failed with status: %0x8x\n", status);
 	}
 
 	status = STATUS_SUCCESS;
@@ -313,12 +320,13 @@ IRQL:
 	WDF_IO_QUEUE_CONFIG ioQueueConfig = { 0 };
 	WDF_OBJECT_ATTRIBUTES wdfObjectAttr = { 0 };
 	UCHAR minorFunctions = 0;
+	BOOLEAN isHub = FALSE;
 
 	UNREFERENCED_PARAMETER(Driver);
 
 	PAGED_CODE();
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: Entered\n"));
+	DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: Entered\n");
 
 	// Set the new instance as a filter
 	WdfDeviceInitSetDeviceType(DeviceInit, FILE_DEVICE_BUS_EXTENDER);
@@ -334,8 +342,7 @@ IRQL:
 	);
 
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: WdfDeviceInitAssignWdmIrpPreprocessCallback failed with status: %0x8x\n",
-			status));
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: WdfDeviceInitAssignWdmIrpPreprocessCallback failed with status: %0x8x\n", status);
 		goto cleanup;
 	}
 
@@ -347,12 +354,52 @@ IRQL:
 		&wdfObjectAttr,
 		&wdfDevice
 	);
-
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: WdfDeviceCreate failed with status: %0x8x\n",
-			status));
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: WdfDeviceCreate failed with status: %0x8x\n", status);
 		goto cleanup;
 	}
+
+	// Test if it is a USB Hub Device, if not do not attach
+	status = KUFIsUsbHub(
+		WdfDeviceWdmGetPhysicalDevice(wdfDevice),
+		&isHub
+	);
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: KUFIsUsbHub failed with status: %0x8x\n", status);
+		goto cleanup;
+	}
+
+	if (FALSE == isHub) {
+		// Not a hub, do not attach
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: Not a Hub, do not attach\n");
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+
+	// Give a name to the device so that it can be accessible from userspace
+	/*
+	if (FALSE == RtlCreateUnicodeString(
+		&deviceName,
+		L"\\DosDevice\\KeysasUSBFilter"
+	)) {
+		KdPrintEx((DPFLTR_IHVBUS_ID, DPFLTR_ERROR_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: RtlUnicodeStringInit failed with status: %0x8x\n",
+			status));
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: RtlUnicodeStringInit failed with status: %0x8x\n", status);
+		goto cleanup;
+	}
+
+	status = WdfDeviceCreateSymbolicLink(
+		wdfDevice,
+		&deviceName
+		);
+	if (!NT_SUCCESS(status)) {
+		KdPrintEx((DPFLTR_IHVBUS_ID, DPFLTR_ERROR_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: WdfDeviceCreateSymbolicLink failed with status: %0x8x\n",
+			status));
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: WdfDeviceCreateSymbolicLink failed with status: %0x8x\n", status);
+		goto cleanup;
+	}
+	*/
 
 	// Create a queue to handle the requests
 	WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(
@@ -361,6 +408,7 @@ IRQL:
 	);
 
 	ioQueueConfig.EvtIoDeviceControl = KUFEvtDeviceControl;
+	ioQueueConfig.PowerManaged = WdfFalse;
 
 	status = WdfIoQueueCreate(
 		wdfDevice,
@@ -370,11 +418,11 @@ IRQL:
 	);
 
 	if (!NT_SUCCESS(status)) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFDeviceAddEvt: WdfIoQueueCreate failed with status: %0x8x\n",
-			status));
+		DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: WdfIoQueueCreate failed with status: %0x8x\n", status);
 		goto cleanup;
 	}
 
+	DbgPrint("\nKeysas - USBFilter!KUFDeviceAddEvt: Success\n");
 	status = STATUS_SUCCESS;
 
 cleanup:
@@ -416,10 +464,9 @@ IRQL:
 	UNREFERENCED_PARAMETER(InputBufferLength);
 	UNREFERENCED_PARAMETER(IoControlCode);
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFEvtDeviceControl: Entered\n"));
+	DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Entered\n");
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFEvtDeviceControl: Request 0x%p - IoControlCode 0x%p\n",
-		Request, IoControlCode));
+	DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Request 0x%p - IoControlCode 0x%ul\n", Request, IoControlCode);
 
 	WDF_REQUEST_SEND_OPTIONS_INIT(&sendOpts, WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET);
 
@@ -429,7 +476,7 @@ IRQL:
 		status = WdfRequestGetStatus(Request);
 		WdfRequestComplete(Request, STATUS_SUCCESS);
 
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFEvtDeviceControl: WdfRequestSend failed\n"));
+		DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: WdfRequestSend failed\n");
 	}
 
 }
@@ -457,7 +504,7 @@ Arguments:
 	UNREFERENCED_PARAMETER(Device);
 	UNREFERENCED_PARAMETER(Irp);
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFDeviceRelationsPostProcessing: Entered\n"));
+	DbgPrint("\nKeysas - USBFilter!KUFDeviceRelationsPostProcessing: Entered\n");
 
 	return result;
 }
@@ -485,7 +532,7 @@ IRQL:
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION irpStack = NULL;
 
-	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Keysas - USBFilter!KUFPnpQueryDeviceCallback: Entered\n"));
+	DbgPrint("\nKeysas - USBFilter!KUFPnpQueryDeviceCallback: Entered\n");
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
 
 	if (NULL != irpStack

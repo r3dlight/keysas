@@ -9,7 +9,7 @@ ClassGuid = {36fc9e60-c465-11cf-8056-444553540000}
 Provider=%ManufacturerName%
 CatalogFile=usbfilter.cat
 DriverVer = 05/10/2023,16.21.56.700
-PnpLockdown=0
+PnpLockdown=1
 
 [DefaultInstall.NTamd64]
 CopyFiles=@usbfilter.sys
