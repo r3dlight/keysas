@@ -86,7 +86,10 @@ pub fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
     let rules = Path::new(rule_path);
     let rules = match rules.parent() {
         Some(rules) => rules,
-        None => process::exit(1),
+        None => {
+            log::error!("Error getting Yara rules directory for Landlock");
+            process::exit(1);
+        }
     };
     let abi = ABI::V2;
     let status = Ruleset::new()
