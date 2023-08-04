@@ -13,6 +13,8 @@ use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
 };
+use std::path::Path;
+use std::process;
 
 #[cfg(target_os = "linux")]
 use syscallz::{Context, Syscall};
@@ -81,13 +83,21 @@ pub fn init() -> Result<()> {
 }
 
 pub fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
+    let rules = Path::new(rule_path);
+    let rules = match rules.parent() {
+        Some(rules) => rules,
+        None => {
+            log::error!("Error getting Yara rules directory for Landlock");
+            process::exit(1);
+        }
+    };
     let abi = ABI::V2;
     let status = Ruleset::new()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, rule_path],
+            &[CONFIG_DIRECTORY, &rules.to_string_lossy()],
             AccessFs::from_read(abi),
         ))?
         .restrict_self()?;
