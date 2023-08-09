@@ -7,7 +7,7 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "keysas-minifilter",
+    "productName": "keysas-tray-app",
     "version": "0.0.0"
   },
   "tauri": {
