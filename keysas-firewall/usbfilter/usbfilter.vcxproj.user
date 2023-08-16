@@ -16,12 +16,12 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <RemoveDriver>True</RemoveDriver>
-    <InstallMode>None</InstallMode>
+    <InstallMode>InstallAndVerify</InstallMode>
     <HardwareIdString />
     <CommandLine />
     <ScriptPath>C:\Program Files (x86)\Windows Kits\10\Testing\Tests\Utilities\DefaultDriverPackageInstallationTask.dll</ScriptPath>
-    <DbgengRemoteMachineName>TestVM</DbgengRemoteMachineName>
-    <DbgengKernelMachineName>TestVM</DbgengKernelMachineName>
+    <DbgengRemoteMachineName>Test_computer</DbgengRemoteMachineName>
+    <DbgengKernelMachineName>Test_computer</DbgengKernelMachineName>
     <DeployFiles />
     <ScriptName>Microsoft.DriverKit.DefaultDriverPackageInstallationClass.PerformDefaultDriverPackageInstallation</ScriptName>
     <ScriptDeviceQuery />

@@ -313,7 +313,7 @@ cleanup:
 	return result;
 }
   
-NTSTATUS SyncCompletionRoutine(
+NTSTATUS KUFSyncCompletionRoutine(
 	_In_ PDEVICE_OBJECT DeviceObject,
 	_In_ PIRP           Irp,
 	_In_ PVOID          Context)
@@ -344,7 +344,7 @@ Return:
 	return STATUS_MORE_PROCESSING_REQUIRED;
 }
 
-NTSTATUS SubmitUrbSync(
+NTSTATUS KUFSubmitUrbSync(
 	_In_ PDEVICE_OBJECT UsbPDO,
 	_In_ USBD_HANDLE UsbDevice,
 	_In_ PURB Urb)
@@ -409,7 +409,7 @@ IRQL:
 	ntStatus = IoSetCompletionRoutineEx(
 		UsbPDO,
 		irp,
-		SyncCompletionRoutine,
+		KUFSyncCompletionRoutine,
 		(PVOID)&kEvent,
 		TRUE,
 		TRUE,
@@ -476,7 +476,7 @@ IRQL:
 	// Validate inputs
 	if (NULL == UsbPDO || NULL == UsbHandle || NULL == UsbConfigDescriptor) {
 		DbgPrint("\nKeysas - USBFilter!KUFGetUsbConfigurationDescriptor: Invalid inputs\n");
-		status = STATUS_UNSUCCESSFUL;
+		status = STATUS_INVALID_PARAMETER;
 		goto cleanup;
 	}
 
@@ -502,7 +502,7 @@ IRQL:
 	);
 
 	// Submit the URB
-	status = SubmitUrbSync(UsbPDO, UsbHandle, urb);
+	status = KUFSubmitUrbSync(UsbPDO, UsbHandle, urb);
 
 	if (!NT_SUCCESS(status) || NULL == urb) {
 		DbgPrint("\nKeysas - USBFilter!KUFGetUsbConfigurationDescriptor: Failed to get configuration descriptor: %0x\n", status);
@@ -550,7 +550,7 @@ IRQL:
 	);
 
 	// Submit the URB
-	status = SubmitUrbSync(UsbPDO, UsbHandle, urb);
+	status = KUFSubmitUrbSync(UsbPDO, UsbHandle, urb);
 
 	if (!NT_SUCCESS(status) || NULL == urb) {
 		DbgPrint("\nKeysas - USBFilter!KUFGetUsbConfigurationDescriptor: Failed to get full configuration descriptor: %0x\n", status);
@@ -595,7 +595,7 @@ IRQL:
 	// Validate inputs
 	if (NULL == UsbPDO || NULL == UsbHandle || NULL == UsbDeviceDescriptor) {
 		DbgPrint("\nKeysas - USBFilter!KUFGetUsbDeviceDescriptor: Invalid inputs\n");
-		status = STATUS_UNSUCCESSFUL;
+		status = STATUS_INVALID_PARAMETER;
 		goto cleanup;
 	}
 
@@ -621,7 +621,7 @@ IRQL:
 	);
 
 	// Submit the URB
-	status = SubmitUrbSync(UsbPDO, UsbHandle, urb);
+	status = KUFSubmitUrbSync(UsbPDO, UsbHandle, urb);
 
 	if (!NT_SUCCESS(status) || NULL == urb) {
 		DbgPrint("\nKeysas - USBFilter!KUFGetUsbDeviceDescriptor: Failed to get Device descriptor: %0x\n", status);
@@ -638,9 +638,151 @@ cleanup:
 }
 
 NTSTATUS
+KUFSelectUsbReadConfiguration(
+	_In_ PDEVICE_OBJECT UsbPDO,
+	_In_ USBD_HANDLE UsbHandle,
+	_In_ PUSB_CONFIGURATION_DESCRIPTOR ConfigurationDescriptor,
+	_Out_ USBD_PIPE_HANDLE **ReadPipeHandle
+)
+/*++
+Routine Description:
+	Select the Mass Storage configuration in a USB device and return a handle to a pipe in Bulk read mode.
+
+Arguments:
+	UsbPDO - Pointer to the USB device object
+	UsbHandle - Handle to the USB device
+	ConfigurationDescriptor - Pointer to the Mass Storage configuration descriptor
+	ReadPipeInformation - Handle to the pipe in bulk read mode if found, else set to NULL
+
+Return Value:
+	Returns STATUS_SUCCESS or error code
+
+IRQL:
+	Must be called at PASSIVE_LEVEL
+--*/
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PURB urb = NULL;
+	PUSBD_INTERFACE_LIST_ENTRY interfaceList = NULL;
+	PUSB_INTERFACE_DESCRIPTOR interfaceDescriptor = NULL;
+	PUCHAR startPosition = NULL;
+	ULONG i = 0;
+	ULONG j = 0;
+
+	// Validate inputs
+	if (NULL == UsbPDO || NULL == UsbHandle || NULL == ConfigurationDescriptor
+		|| NULL == ReadPipeHandle) {
+		DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Invalid inputs\n");
+		status = STATUS_INVALID_PARAMETER;
+		goto cleanup;
+	}
+
+	// Allocate and initialize the interface list for the configuration
+	interfaceList = (PUSBD_INTERFACE_LIST_ENTRY)ExAllocatePool2(
+		POOL_FLAG_NON_PAGED,
+		sizeof(USBD_INTERFACE_LIST_ENTRY) * (ConfigurationDescriptor->bNumInterfaces + 1),
+		KEYSAS_USBFILTER_POOL_TAG);
+	if (NULL == interfaceList) {
+		DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Failed to allocate interface list\n");
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto cleanup;
+	}
+
+	// Fill the interface list
+	startPosition = (PUCHAR)ConfigurationDescriptor;
+	for (i = 0; i < ConfigurationDescriptor->bNumInterfaces; i++) {
+		if (NULL != (interfaceDescriptor = USBD_ParseConfigurationDescriptorEx(
+			ConfigurationDescriptor,
+			startPosition,
+			-1,
+			-1,
+			-1,
+			-1,
+			-1
+		))) {
+			interfaceList[i].InterfaceDescriptor = interfaceDescriptor;
+			interfaceList[i].Interface = NULL;
+			startPosition = (PUCHAR) interfaceDescriptor + interfaceDescriptor->bLength;
+		}
+	}
+
+	// Set the last to NULL
+	interfaceList[ConfigurationDescriptor->bNumInterfaces].InterfaceDescriptor = NULL;
+	interfaceList[ConfigurationDescriptor->bNumInterfaces].Interface = NULL;
+
+	// Allocate the selection configuration URB
+	status = USBD_SelectConfigUrbAllocateAndBuild(
+		UsbHandle,
+		ConfigurationDescriptor,
+		interfaceList,
+		&urb
+	);
+
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Failed to allocate URB\n");
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto cleanup;
+	}
+
+	// Send the request
+	status = KUFSubmitUrbSync(UsbPDO, UsbHandle, urb);
+
+	if (!NT_SUCCESS(status)) {
+		DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Failed to send URB\n");
+		status = STATUS_UNSUCCESSFUL;
+		goto cleanup;
+	}
+
+	DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Selected configuration\n");
+
+	// Interface list should now be filled with pipe informations
+	status = STATUS_UNSUCCESSFUL;
+	*ReadPipeHandle = NULL;
+	for (j = 0; j < ConfigurationDescriptor->bNumInterfaces; j++) {
+		if (NULL != interfaceList[j].Interface) {
+			for (i = 0; i < interfaceList[j].Interface->NumberOfPipes; i++) {
+				if (UsbdPipeTypeControl == interfaceList[j].Interface->Pipes[i].PipeType) {
+					DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Interface %ul pipe %ul of type Control\n", j, i);
+				}
+				else if (UsbdPipeTypeInterrupt == interfaceList[j].Interface->Pipes[i].PipeType) {
+					DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Interface %ul pipe %ul of type Interrupt\n", j, i);
+				}
+				else if (UsbdPipeTypeIsochronous == interfaceList[j].Interface->Pipes[i].PipeType) {
+					DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Interface %ul pipe %ul of type Isochronous\n", j, i);
+				}
+				else if (UsbdPipeTypeBulk == interfaceList[j].Interface->Pipes[i].PipeType
+					&& USB_ENDPOINT_DIRECTION_IN(interfaceList[j].Interface->Pipes[i].EndpointAddress)) {
+					DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Interface %ul pipe %ul of type Bulk IN\n", j, i);
+					*ReadPipeHandle = &interfaceList[j].Interface->Pipes[i].PipeHandle;
+					status = STATUS_SUCCESS;
+				}
+				else if (UsbdPipeTypeBulk == interfaceList[j].Interface->Pipes[i].PipeType
+					&& USB_ENDPOINT_DIRECTION_OUT(interfaceList[j].Interface->Pipes[i].EndpointAddress)) {
+					DbgPrint("\nKeysas - USBFilter!KUFSelectUsbReadConfiguration: Interface %ul pipe %ul of type Bulk OUT\n", j, i);
+				}
+			}
+		}
+	}
+
+cleanup:
+	if (NULL != urb) {
+		USBD_UrbFree(UsbHandle, urb);
+		urb = NULL;
+	}
+
+	if (NULL != interfaceList) {
+		ExFreePoolWithTag(interfaceList, KEYSAS_USBFILTER_POOL_TAG);
+		interfaceList = NULL;
+	}
+
+	return status;
+}
+
+NTSTATUS
 KUFInspectUsbDevice(
 	_In_ PDEVICE_OBJECT DriverDevice,
-	_In_ PDEVICE_OBJECT TargetDevice
+	_In_ PDEVICE_OBJECT TargetDevice,
+	_Out_ PBOOLEAN AllowDevice
 )
 /*++
 Routine Description:
@@ -649,6 +791,7 @@ Routine Description:
 Arguments:
 	DriverDevice - Pointer to the instance of the driver
 	Device - Pointer to the USB Device PDO targeted
+	AllowDevice - Pointer to caller allocated boolean indicating if the device should be allowed or not
 
 Return Value:
 	Returns STATUS_SUCCESS or error code
@@ -661,27 +804,20 @@ IRQL:
 	USBD_HANDLE usbHandle = NULL;
 	USB_DEVICE_DESCRIPTOR usbDeviceDescriptor = { 0 };
 	PUSB_CONFIGURATION_DESCRIPTOR usbConfigurationDescriptor = NULL;
+	PUSB_INTERFACE_DESCRIPTOR usbInterfaceDescriptor = NULL;
 	UCHAR index = 0;
+	USBD_PIPE_HANDLE *readPipeHandle = NULL;
 
 	// Validate inputs
-	if (NULL == DriverDevice || NULL == TargetDevice) {
+	if (NULL == DriverDevice || NULL == TargetDevice || NULL == AllowDevice) {
 		DbgPrint("\nKeysas - USBFilter!KUFInspectUsbDevice: Invalid parameters\n");
 		status = STATUS_INVALID_PARAMETER;
 		goto cleanup;
 	}
 
-	// TODO -
-	// 1. Create function to collect complete USB device descriptor, configurations, interfaces...
-	// https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-configuration-descriptors
-	// https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-device-layout
-	// 
-	// 2. Parse configurations to isolate those with Class 08 (Mass Storage)
-	// 
-	// 3. Open read pipe and collect first 2MB for checking
-	// 
-	// 4. Send information for scanning to user space
-	// 
-	// Create a handle to the target USB device
+	// Set default return value to TRUE
+	*AllowDevice = TRUE;
+
 	status = USBD_CreateHandle(
 		DriverDevice,
 		TargetDevice,
@@ -718,14 +854,46 @@ IRQL:
 			&usbConfigurationDescriptor
 		);
 
-		if (!NT_SUCCESS(status)) {
+		if (!NT_SUCCESS(status) || NULL == usbConfigurationDescriptor) {
 			DbgPrint("\nKeysas - USBFilter!KUFInspectUsbDevice: Failed to get configuration descriptor %hhu: %0x\n", index, status);
 			goto cleanup;
 		}
 
 		// Parse configuration descriptor to detect Mass Storage
-		if (0x08 == usbDeviceDescriptor.bDeviceClass) {
+		if (NULL != (usbInterfaceDescriptor = USBD_ParseConfigurationDescriptorEx(
+			usbConfigurationDescriptor,
+			usbConfigurationDescriptor,
+			-1,
+			-1,
+			8, // Mass storage class is 0x08
+			-1,
+			-1
+		))) {
 			DbgPrint("\nKeysas - USBFilter!KUFInspectUsbDevice: Found Mass storage device\n");
+
+			// Select the Mass Storage interface
+			status = KUFSelectUsbReadConfiguration(
+				TargetDevice,
+				usbHandle,
+				usbConfigurationDescriptor,
+				&readPipeHandle
+			);
+
+			if (NT_SUCCESS(status) && NULL != readPipeHandle) {
+				// Read the start of device memory to find Keysas signature
+				DbgPrint("\nKeysas - USBFilter!KUFInspectUsbDevice: Selected read mode\n");
+
+				//*AllowDevice = FALSE;
+
+				// Get first 4 KB of the Mass Storage to see if there is a valid Keysas signature
+
+				// Send the data for checking in user space
+
+				// Depending on result, allow device or remove it from the list
+			}
+			else {
+				DbgPrint("\nKeysas - USBFilter!KUFInspectUsbDevice: Failed to select read mode\n");
+			}
 		}
 
 		if (NULL != usbConfigurationDescriptor) {
@@ -964,9 +1132,9 @@ IRQL:
 	UNREFERENCED_PARAMETER(InputBufferLength);
 	UNREFERENCED_PARAMETER(IoControlCode);
 
-	DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Entered\n");
+	// DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Entered\n");
 
-	DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Request 0x%p - IoControlCode 0x%ul\n", Request, IoControlCode);
+	// DbgPrint("\nKeysas - USBFilter!KUFEvtDeviceControl: Request 0x%p - IoControlCode 0x%ul\n", Request, IoControlCode);
 
 	WDF_REQUEST_SEND_OPTIONS_INIT(&sendOpts, WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET);
 
@@ -1000,8 +1168,12 @@ Arguments:
 {
 	KIRQL irql = KeGetCurrentIrql();
 	PDEVICE_RELATIONS deviceRelations = NULL;
+	PDEVICE_RELATIONS newDeviceRelations = NULL;
 	ULONG i = 0;
-	BOOLEAN isMassStorage = FALSE;
+	ULONG newIndex = 0;
+	PBOOLEAN allowDeviceList = NULL;
+	ULONG nbAllowedDevices = 0;
+	ULONG nbDeviceInList = 0;
 
 	UNREFERENCED_PARAMETER(Context);
 	UNREFERENCED_PARAMETER(Device);
@@ -1016,8 +1188,9 @@ Arguments:
 		goto cleanup;
 	}
 
-	// Double check pre-condition, it should OK because the callback is registered only for the correct conditions
+	// Parse device relation and rebuild it with the allowed devices
 
+	// Double check pre-condition, it should OK because the callback is registered only for the correct conditions
 	// Check that it is called at PASSIVE_LEVEL, needed to inspect relations
 	if (PASSIVE_LEVEL == irql) {
 		DbgPrint("\nKeysas - USBFilter!KUFDeviceRelationsPostProcessing: Called at PASSIVE_LEVEL\n");
@@ -1025,15 +1198,46 @@ Arguments:
 		if (STATUS_SUCCESS == Irp->IoStatus.Status) {
 			deviceRelations = (PDEVICE_RELATIONS)Irp->IoStatus.Information;
 			if (NULL != deviceRelations) {
+				// Allocate a list of authorization for each device
+				allowDeviceList = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(BOOLEAN) * deviceRelations->Count, KEYSAS_USBFILTER_POOL_TAG);
+				if (NULL == allowDeviceList) {
+					DbgPrint("\nKeysas - USBFilter!KUFDeviceRelationsPostProcessing: Failed to allocate allow device list\n");
+					goto cleanup;
+				}
+
+				// Go through the incoming list of devices to validate them
 				for (i = 0; i < deviceRelations->Count; i++) {
-					// Get DeviceID
-					if (STATUS_SUCCESS == KUFIsUsbMassStorage(deviceRelations->Objects[i], &isMassStorage)) {
-						if (isMassStorage) {
-							DbgPrint("\nKeysas - USBFilter!KUFDeviceRelationsPostProcessing: Found Mass storage\n");
-							//KUFInspectUsbDevice(Device, deviceRelations->Objects[i]);
+					KUFInspectUsbDevice(Device, deviceRelations->Objects[i], &allowDeviceList[i]);
+					if (TRUE == allowDeviceList[i]) {
+						nbAllowedDevices++;
+					}
+				}
+
+				// If some devices have been rejected, rebuild a new list
+				if (nbAllowedDevices != deviceRelations->Count) {
+					// Beware the underflow
+					nbDeviceInList = nbAllowedDevices > 0 ? nbAllowedDevices - 1 : 0;
+					newDeviceRelations = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(DEVICE_RELATIONS)+sizeof(PDEVICE_OBJECT)*(nbDeviceInList), KEYSAS_USBFILTER_POOL_TAG);
+					if (NULL == newDeviceRelations) {
+						DbgPrint("\nKeysas - USBFilter!KUFDeviceRelationsPostProcessing: Failed to allocate new device list\n");
+						goto cleanup;
+					}
+					
+					// Rebuild the new list
+					newDeviceRelations->Count = nbAllowedDevices;
+					newIndex = 0;
+					for (i = 0; i < deviceRelations->Count; i++) {
+						if (TRUE == allowDeviceList[i]) {
+							newDeviceRelations->Objects[newIndex] = deviceRelations->Objects[i];
+							newIndex += 1;
 						}
 					}
-					KUFInspectUsbDevice(Device, deviceRelations->Objects[i]);
+
+					// Free the old list
+					ExFreePool((PDEVICE_RELATIONS) Irp->IoStatus.Information);
+
+					// Change the list in the IRP
+					Irp->IoStatus.Information = (ULONG_PTR) newDeviceRelations;				
 				}
 			}
 		}
@@ -1043,6 +1247,10 @@ Arguments:
 	}
 
 cleanup:
+	if (NULL != allowDeviceList) {
+		ExFreePoolWithTag(allowDeviceList, KEYSAS_USBFILTER_POOL_TAG);
+		allowDeviceList = NULL;
+	}
 
 	// Resume completion of IRP upward
 	return STATUS_CONTINUE_COMPLETION;
