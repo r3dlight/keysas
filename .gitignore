@@ -52,3 +52,4 @@ keysas-usbfilter/minifilter/SDV-default.xml
 keysas-usbfilter/minifilter/sdv-user.sdv
 keysas-usbfilter/minifilter/smvstats.txt
 keysas-usbfilter/tray-app/package-lock.json
+keysas-firewall/install/Output/*
