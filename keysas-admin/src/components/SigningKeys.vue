@@ -27,7 +27,7 @@
     </div>
   <!--</div>-->
   <div v-if="showLoadPKIForm">
-    <!--<form class="add-form" @submit.prevent="onSubmit">
+    <form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
@@ -35,6 +35,8 @@
       </div>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
+      <label type="text"> Your #PKCS8 password:</label>
+      <input type="password" required v-model="p8Password" id="p8Password"/>
       <br><br>
       <div class="submit">
         <button class="send btn btn-outline-success btn-lg shadow"
@@ -44,10 +46,15 @@
         <br><br>
         <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
       </div>
-    </form>-->
+    </form>
     <div>
       <br>
-       Not implemented yet !
+      <div v-if="pkiRestore == 'waiting'">
+        Wait while importing IKPQPKI... <span class="spinner-border text-info"></span>
+      </div>
+      <div v-if="pkiRestore === false">
+       <h3 class="text-danger"> Error while importing IKPQPKI !</h3>
+      </div>
    </div>
   </div>
   <div v-if="showRootKeyForm">
@@ -129,6 +136,7 @@ export default {
       validity: '',
       adminPwd: '',
       pkiFolder: '',
+      pkiRestore: '',
       keysError: '',
       show: false,
       waiting: false,
@@ -137,6 +145,7 @@ export default {
       showPkiDirForm: false,
       passwordError: '',
       countryError: '',
+      p8Password: '',
     }
   },
 
@@ -154,6 +163,12 @@ export default {
       this.pkiDir = await getPKIDir();
     },
     async submitPKIFolderForm() {
+      this.pkiRestore = 'waiting';
+      await invoke('restore_pki', {
+          basePath: this.pkiFolder,
+         })
+        .then((res) => this.pkiRestore = res)
+        .catch((error) => console.error(error));
       console.log('PKI Folder form submission');
     },
     async submitRootCAForm() {

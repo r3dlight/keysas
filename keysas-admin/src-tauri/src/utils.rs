@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use keysas_lib::certificate_field::validate_signing_certificate;
 use pkcs8::der::EncodePem;
 use ssh_rs::LocalSession;
 use std::fs::File;
@@ -113,5 +114,58 @@ pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::E
     let output = String::from_utf8(cert.to_pem(pkcs8::LineEnding::LF)?.into())?;
     let mut file = File::create(path)?;
     write!(file, "{}", output)?;
+    Ok(())
+}
+
+/// Load a previously created PKI.
+/// Test if every directories and p8 and pem files are presents
+/// Try to load it
+/// Change the database
+pub fn check_pki(base_directory: &String) -> Result<(), anyhow::Error> {
+    let base_directory = Path::new(base_directory);
+    // Step 1: Any directories or files bellow must be found
+    let directories_and_files = [
+        ("root", "root-cl.p8"),
+        ("root", "root-cl.pem"),
+        ("root", "root-pq.p8"),
+        ("root", "root-pq.pem"),
+        ("st", "st-ca-cl.p8"),
+        ("st", "st-ca-cl.pem"),
+        ("st", "st-ca-pq.p8"),
+        ("st", "st-ca-pq.pem"),
+        ("usb", "usb-cl.p8"),
+        ("usb", "usb-cl.pem"),
+        ("usb", "usb-pq.p8"),
+        ("usb", "usb-pq.pem"),
+    ];
+    if base_directory.join("CA").is_dir() {
+        for (directory, file) in directories_and_files.iter() {
+            let subdirectory_path = base_directory.join("CA").join(directory);
+            let file_path = subdirectory_path.join(file);
+
+            if subdirectory_path.exists() && subdirectory_path.is_dir() {
+                if file_path.exists() && file_path.is_file() {
+                    log::info!("Found file {} in directory {}.", file, directory);
+                } else {
+                    log::error!("File {} not found in directory {}.", file, directory);
+                    return Err(anyhow!("Invalid algorithm OID"));
+                }
+            } else {
+                log::error!("Directory {:?} doesn't exist.", subdirectory_path);
+                return Err(anyhow!("Directory do not exist"));
+            }
+        }
+    } else {
+        return Err(anyhow!("Directory CA does not exist."));
+    }
+    // Now let's validate the certificates before importing them into db
+    let root_pq_pem = validate_signing_certificate(
+        &base_directory
+            .join("CA")
+            .join("root")
+            .join("root-pq-pem")
+            .to_string_lossy(),
+        None,
+    );
     Ok(())
 }
