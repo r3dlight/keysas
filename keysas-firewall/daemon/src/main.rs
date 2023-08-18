@@ -30,8 +30,10 @@
 pub mod driver_interface;
 pub mod tray_interface;
 pub mod controller;
+pub mod usb_monitor;
 
 use crate::controller::ServiceController;
+use crate::usb_monitor::KeysasUsbMonitor;
 
 use clap::{crate_version, Arg, ArgAction, Command};
 use anyhow::anyhow;
@@ -108,6 +110,11 @@ fn main() -> Result<(), anyhow::Error> {
     // Initialize the logger
     simple_logger::init()?;
 
+    if let Err(e) = KeysasUsbMonitor::start_usb_monitor() {
+        println!("Failed to start usb monitor: {e}");
+    }
+
+    /*
     // Get command arguments
     let mut config = Config::default();
     command_args(&mut config);
@@ -118,8 +125,8 @@ fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow!("Failed to start the service: {e}"));
     }
 
+    */
     // Put the service in sleep until it receives request from the driver or the HMI
-
     loop {
         std::thread::sleep(std::time::Duration::from_secs(10));
     }

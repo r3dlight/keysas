@@ -206,8 +206,9 @@ impl WindowsDriverInterface {
                 0,
                 &mut nb_bytes_ret as *mut u32
             ) {
-                let err = GetLastError();
-                println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
+                if let Err(e) = GetLastError() {
+                    println!("Error: {:?}", e.message().to_string_lossy());
+                }
                 return Err(anyhow!("Failed to send message to driver"));
             }
         }
@@ -220,7 +221,7 @@ impl WindowsDriverInterface {
     /// Close the communication with the driver
     pub fn close_driver_com(&self) {
         unsafe {
-            CloseHandle::<HANDLE>(self.handle);
+            let _ = CloseHandle::<HANDLE>(self.handle);
         }
     }
 }

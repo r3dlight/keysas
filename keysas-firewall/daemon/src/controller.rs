@@ -22,22 +22,13 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use libc::c_void;
-use std::mem::size_of;
 use std::path::PathBuf;
 use std::path::{Component, Path};
 use std::ffi::OsStr;
 use std::sync::Arc;
 use std::fs;
 use windows::core::PCSTR;
-use windows::s;
-use windows::Win32::Foundation::GetLastError;
-use windows::Win32::Storage::FileSystem::{
-    CreateFileA, ReadFile, FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_READ, FILE_SHARE_WRITE,
-    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, OPEN_EXISTING,
-};
-use windows::Win32::System::Ioctl::VOLUME_DISK_EXTENTS;
-use windows::Win32::System::IO::DeviceIoControl;
+use windows::core::s;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use anyhow::anyhow;
 use serde::Deserialize;
@@ -213,7 +204,9 @@ impl ServiceController {
     /// # Arguments
     /// 
     /// * 'content' - Content of the request from the driver
-    fn authorize_usb(&self, content: &[u16]) -> Result<bool, anyhow::Error> {
+    fn authorize_usb(&self, _content: &[u16]) -> Result<bool, anyhow::Error> {
+        return Ok(true);
+        /*
         println!("Received USB scan request: {:?}", content);
         let mut buffer: [u8; 4096] = [0; 4096];
         let mut byte_read: u32 = 0;
@@ -232,8 +225,9 @@ impl ServiceController {
                 Ok(d) => d,
                 Err(_) => {
                     println!("Failed to open device");
-                    let err = GetLastError();
-                    println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
+                    if let Err(e) = GetLastError() {
+                        println!("Error: {:?}", e.message().to_string_lossy());
+                    }
                     return Err(anyhow!("Failed to open device"));
                 }
             }
@@ -246,8 +240,8 @@ impl ServiceController {
 
         let mut vde = VOLUME_DISK_EXTENTS::default();
         let mut dw: u32 = 0;
-        match unsafe {
-            DeviceIoControl(
+        unsafe {
+            if let Err(e) = DeviceIoControl(
                 device,
                 IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
                 None,
@@ -256,13 +250,9 @@ impl ServiceController {
                 u32::try_from(size_of::<VOLUME_DISK_EXTENTS>())?,
                 Some(&mut dw),
                 None,
-            ).as_bool()
-        } {
-            true => (),
-            false => {
-                println!("Failed to query device");
-                return Err(anyhow!("Failed to query device"));
-
+            ) {
+                println!("Error: {:?}", e.message().to_string_lossy());
+                return Err(anyhow!("Failed to open device"));
             }
         }
 
@@ -289,8 +279,9 @@ impl ServiceController {
                 Ok(d) => d,
                 Err(_) => {
                     println!("Failed to open usb");
-                    let err = GetLastError();
-                    println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
+                    if let Err(e) = GetLastError() {
+                        println!("Error: {:?}", e.message().to_string_lossy());
+                    }
                     return Err(anyhow!("Failed to open usb"));
                 }
             }
@@ -307,7 +298,7 @@ impl ServiceController {
             //SetFilePointer(device, 512, None, FILE_BEGIN);
             ReadFile(
                 handle_usb,
-                Some(buffer.as_mut_ptr() as *mut c_void),
+                Some(&mut buffer),
                 4096,
                 Some(&mut byte_read),
                 None,
@@ -325,6 +316,7 @@ impl ServiceController {
         }
 
         Ok(true)
+        */
     }
 
     /// Decide to authorize a file
