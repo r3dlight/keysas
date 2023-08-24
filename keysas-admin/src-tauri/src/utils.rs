@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use keysas_lib::certificate_field::validate_signing_certificate;
 use pkcs8::der::EncodePem;
 use ssh_rs::LocalSession;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
@@ -117,11 +118,10 @@ pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::E
     Ok(())
 }
 
-/// Load a previously created PKI.
 /// Test if every directories and p8 and pem files are presents
-/// Try to load it
-/// Change the database
-pub fn check_pki(base_directory: &String) -> Result<(), anyhow::Error> {
+/// into the right path.
+/// Returns an error if not
+pub fn check_pki_structure(base_directory: &String) -> Result<(), anyhow::Error> {
     let base_directory = Path::new(base_directory);
     // Step 1: Any directories or files bellow must be found
     let directories_and_files = [
@@ -145,7 +145,7 @@ pub fn check_pki(base_directory: &String) -> Result<(), anyhow::Error> {
 
             if subdirectory_path.exists() && subdirectory_path.is_dir() {
                 if file_path.exists() && file_path.is_file() {
-                    log::info!("Found file {} in directory {}.", file, directory);
+                    log::debug!("Found file {} in directory {}.", file, directory);
                 } else {
                     log::error!("File {} not found in directory {}.", file, directory);
                     return Err(anyhow!("Invalid algorithm OID"));
@@ -159,13 +159,64 @@ pub fn check_pki(base_directory: &String) -> Result<(), anyhow::Error> {
         return Err(anyhow!("Directory CA does not exist."));
     }
     // Now let's validate the certificates before importing them into db
-    let root_pq_pem = validate_signing_certificate(
-        &base_directory
-            .join("CA")
-            .join("root")
-            .join("root-pq-pem")
-            .to_string_lossy(),
-        None,
-    );
+    let root_pq_file_content =
+        match fs::read_to_string(base_directory.join("CA").join("root").join("root-pq.pem")) {
+            Ok(rpp) => rpp,
+            Err(why) => return Err(anyhow!("Root Dilithium certificate not found: {why}")),
+        };
+
+    let root_pq_pem = match validate_signing_certificate(&root_pq_file_content, None) {
+        Ok(rpp) => rpp,
+        Err(why) => {
+            return Err(anyhow!(
+                "Error validating root Dilithium certificate: {:?}",
+                why,
+            ))
+        }
+    };
+    log::debug!("Root Dilithium certificate validated.");
+    let root_cl_file_content =
+        match fs::read_to_string(base_directory.join("CA").join("root").join("root-cl.pem")) {
+            Ok(rcp) => rcp,
+            Err(why) => return Err(anyhow!("Root Ed25519 certificate not found: {why}")),
+        };
+    let root_cl_pem = match validate_signing_certificate(&root_cl_file_content, None) {
+        Ok(rcp) => rcp,
+        Err(why) => {
+            return Err(anyhow!(
+                "Error validating root Ed25519 certificate: {:?}",
+                why
+            ))
+        }
+    };
+    log::debug!("Root Ed25519 certificate validated.");
+    let st_pq_file_content =
+        match fs::read_to_string(base_directory.join("CA").join("st").join("st-ca-pq.pem")) {
+            Ok(spp) => spp,
+            Err(why) => return Err(anyhow!("Station Dilithium certificate not found: {why}")),
+        };
+    match validate_signing_certificate(&st_pq_file_content, Some(&root_pq_pem)) {
+        Ok(_) => log::debug!("Dilithium station certificate signature is valid."),
+        Err(why) => {
+            return Err(anyhow!(
+                "Error validating station Dilithium certificate signature: {:?}",
+                why
+            ))
+        }
+    }
+    let st_cl_file_content =
+        match fs::read_to_string(base_directory.join("CA").join("st").join("st-ca-cl.pem")) {
+            Ok(scp) => scp,
+            Err(why) => return Err(anyhow!("Station Ed25519 certificate not found: {why}")),
+        };
+    match validate_signing_certificate(&st_cl_file_content, Some(&root_cl_pem)) {
+        Ok(_) => log::debug!("Ed25519 station certificate signature is valid."),
+        Err(why) => {
+            return Err(anyhow!(
+                "Error validating station Ed25519 certificate signature: {:?}",
+                why
+            ))
+        }
+    }
     Ok(())
 }
