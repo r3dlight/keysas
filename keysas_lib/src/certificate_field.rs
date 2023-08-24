@@ -77,8 +77,6 @@ pub fn validate_signing_certificate(
 ) -> Result<Certificate, anyhow::Error> {
     // Parse the certificate
     let cert = Certificate::from_pem(pem)?;
-
-    // If there is a CA, validate the certificate signature
     if let Some(ca) = ca_cert {
         match std::str::from_utf8(
             ca.tbs_certificate
