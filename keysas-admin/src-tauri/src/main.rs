@@ -883,7 +883,7 @@ async fn revoke_usb() -> bool {
 #[command]
 fn restore_pki(base_path: String) -> bool {
     let base = base_path.to_owned();
-    match check_pki(&base) {
+    match check_pki_structure(&base) {
         Ok(d) => d,
         Err(e) => {
             log::error!("Cannot restore PKI in database: {e}.");
