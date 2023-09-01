@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 anyhow = "1.0"
-ed25519-dalek = "1.0"
+ed25519-dalek = "2.0"
 pkcs8 = { version = "0.10", features = ["encryption", "pem"]}
 keysas_lib = { path = "../keysas_lib" }
 tempfile = "3.5"

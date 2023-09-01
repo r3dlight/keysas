@@ -86,20 +86,37 @@ pub fn validate_signing_certificate(
                 .as_bytes(),
         )? {
             ED25519_OID => {
-                // Extract the CA public key
-                let ca_key = ed25519_dalek::PublicKey::from_bytes(
+                let ca_key_bytes =// Extract the CA public key
                     cert.tbs_certificate
                         .subject_public_key_info
                         .subject_public_key
-                        .raw_bytes(),
-                )?;
+                        .raw_bytes();
+                // Prepare for the copy
+                let mut ca_key_bytes_casted: [u8; 32] = [0; 32];
+                if ca_key_bytes.len() == 32 {
+                    ca_key_bytes_casted.copy_from_slice(ca_key_bytes);
+                } else {
+                    return Err(anyhow!(
+                        "Cannot copy slice into ca_key_bytes_casted, not 32 bytes long"
+                    ));
+                }
+                let ca_key = ed25519_dalek::VerifyingKey::from_bytes(&ca_key_bytes_casted)?;
 
                 // Verify the certificate signature
-                let sig = ed25519_dalek::Signature::from_bytes(
-                    cert.signature
-                        .as_bytes()
-                        .ok_or_else(|| anyhow!("Signature field is empty"))?,
-                )?;
+                let cert_signature_bytes = cert
+                    .signature
+                    .as_bytes()
+                    .ok_or_else(|| anyhow!("Signature field is empty"))?;
+                let mut cert_signature_casted: [u8; 64] = [0; 64];
+                if cert_signature_bytes.len() == 64 {
+                    cert_signature_casted.copy_from_slice(cert_signature_bytes);
+                } else {
+                    return Err(anyhow!(
+                        "Cannot copy slice into cert_signature_casted, not 64 bytes long"
+                    ));
+                }
+
+                let sig = ed25519_dalek::Signature::from_bytes(&cert_signature_casted);
                 ca_key.verify(&cert.tbs_certificate.to_der()?, &sig)?;
                 // If the signature is invalid an error is thrown
             }

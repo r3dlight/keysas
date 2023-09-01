@@ -1,6 +1,6 @@
 use ed25519_dalek::Digest;
-use ed25519_dalek::Keypair;
 use ed25519_dalek::Sha512;
+use ed25519_dalek::SigningKey;
 use hex_literal::hex;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
@@ -45,15 +45,15 @@ fn test_pkcs8_decrypt_der() {
 fn test_pkcs8_create_and_decrypt_der() {
     // Create a random keypair
     let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let keypair = SigningKey::generate(&mut csprng);
 
     println!(
         "Test DER private only - Private key: {:?}",
-        &keypair.secret.to_bytes()
+        &keypair.to_bytes()
     );
     println!(
         "Test DER private only  - Public key: {:?}",
-        &keypair.public.to_bytes()
+        &keypair.verifying_key().to_bytes()
     );
 
     // Store the key as DER in PKCS8
@@ -77,7 +77,7 @@ fn test_pkcs8_create_and_decrypt_der() {
             oid: oid,
             parameters: None,
         },
-        private_key: &keypair.secret.to_bytes(),
+        private_key: &keypair.to_bytes(),
         public_key: None,
     };
 
@@ -103,22 +103,22 @@ fn test_pkcs8_create_and_decrypt_der() {
         pk.private_key
     );
 
-    assert_eq!(pk.private_key, keypair.secret.to_bytes());
+    assert_eq!(pk.private_key, keypair.to_bytes());
 }
 
 #[test]
 fn test_pkcs8_create_and_decrypt_with_public_der() {
     // Create a random keypair
     let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let keypair = SigningKey::generate(&mut csprng);
 
     println!(
         "Test DER with public - Private key: {:?}",
-        &keypair.secret.to_bytes()
+        &keypair.to_bytes()
     );
     println!(
         "Test DER with public - Public key: {:?}",
-        &keypair.public.to_bytes()
+        &keypair.verifying_key().to_bytes()
     );
 
     // Store the key as DER in PKCS8
@@ -137,14 +137,14 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
 
     let oid = ObjectIdentifier::new("1.3.101.112").unwrap();
 
-    let pub_value = keypair.public.to_bytes();
+    let pub_value = keypair.verifying_key().to_bytes();
 
     let pk_info = PrivateKeyInfo {
         algorithm: pkcs8::AlgorithmIdentifierRef {
             oid: oid,
             parameters: None,
         },
-        private_key: &keypair.secret.to_bytes(),
+        private_key: &keypair.to_bytes(),
         public_key: Some(&pub_value),
     };
 
@@ -174,15 +174,15 @@ fn test_pkcs8_create_and_decrypt_with_public_der() {
         pk.public_key
     );
 
-    assert_eq!(pk.private_key, keypair.secret.to_bytes());
-    assert_eq!(pk.public_key.unwrap(), keypair.public.to_bytes());
+    assert_eq!(pk.private_key, keypair.to_bytes());
+    assert_eq!(pk.public_key.unwrap(), keypair.verifying_key().to_bytes());
 }
 
 #[test]
 fn test_generate_csr_ed25519() {
     // Create a random keypair
     let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let keypair = SigningKey::generate(&mut csprng);
 
     // Generate a CSR
     let subject = RdnSequence::default();
@@ -216,7 +216,7 @@ fn test_generate_csr_ed25519() {
     // Test CSR public key value
     assert_eq!(
         csr.info.public_key.subject_public_key,
-        BitString::from_bytes(&keypair.public.to_bytes()).unwrap()
+        BitString::from_bytes(&keypair.verifying_key().to_bytes()).unwrap()
     );
     assert_eq!(csr.info.public_key.algorithm, ref_algo);
 
@@ -282,7 +282,7 @@ fn test_generate_csr_dilithium5() {
 fn test_save_and_load_ed25519() {
     // Create a random keypair
     let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let keypair = SigningKey::generate(&mut csprng);
 
     // Store the key as DER in PKCS8
     let file = NamedTempFile::new().unwrap();
@@ -292,10 +292,13 @@ fn test_save_and_load_ed25519() {
     keypair.save_keys(&path, &String::from("Test")).unwrap();
 
     // Load the keypair
-    let loaded = Keypair::load_keys(&path, &String::from("Test")).unwrap();
+    let loaded = SigningKey::load_keys(&path, &String::from("Test")).unwrap();
 
-    assert_eq!(loaded.secret.to_bytes(), keypair.secret.to_bytes());
-    assert_eq!(loaded.public.to_bytes(), keypair.public.to_bytes());
+    assert_eq!(loaded.to_bytes(), keypair.to_bytes());
+    assert_eq!(
+        loaded.verifying_key().to_bytes(),
+        keypair.verifying_key().to_bytes()
+    );
 }
 
 #[test]
