@@ -141,14 +141,27 @@ pub fn generate_cert_from_csr(
         .is_ok()
     {
         // Validate CSR authenticity
-        let key = ed25519_dalek::PublicKey::from_bytes(pub_key)?;
+        let mut pub_key_casted: [u8; 32] = [0u8; 32];
+        if pub_key.len() == 32 {
+            pub_key_casted.copy_from_slice(pub_key);
+        } else {
+            return Err(anyhow!("Invalid public key length"));
+        }
+
+        let key = ed25519_dalek::VerifyingKey::from_bytes(&pub_key_casted)?;
         let mut prehashed = Sha512::new();
         prehashed.update(&csr.info.to_der()?);
+        let mut csr_signature_casted: [u8; 64] = [0u8; 64];
+        if csr.signature.raw_bytes().len() == 64 {
+            csr_signature_casted.copy_from_slice(csr.signature.raw_bytes());
+        } else {
+            return Err(anyhow!("Invalid CSR signature: not 64 bytes long"));
+        }
         if key
             .verify_prehashed(
                 prehashed,
                 None,
-                &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?,
+                &ed25519_dalek::Signature::from_bytes(&csr_signature_casted),
             )
             .is_err()
         {

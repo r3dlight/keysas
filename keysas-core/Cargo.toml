@@ -14,13 +14,13 @@ keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
 regex = "1.8"
-infer = "0.13"
+infer = "0.15"
 clamav-tcp = "0.2"
-itertools ="0.10"
+itertools ="0.11"
 serde_json = "1.0"
 time = "0.3"
 base64 = "0.21"
-ed25519-dalek = "1.0"
+ed25519-dalek = "2"
 rand = "0.8"
 pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
@@ -29,7 +29,7 @@ syscallz = "0.16"
 yara = "0.20"
 
 [dependencies.oqs]
-version = "0.7"
+version = "0.8"
 default-features = false
 features = ["dilithium"]
 

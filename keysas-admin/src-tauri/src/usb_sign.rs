@@ -10,7 +10,7 @@
 use crate::get_pki_dir;
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose, Engine as _};
-use ed25519_dalek::Keypair;
+use ed25519_dalek::SigningKey;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use libc::{c_int, c_short, c_ulong, c_void};
@@ -102,7 +102,7 @@ fn sign_device(
     //use nom::AsBytes;
     let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
     // Test the private keys by loading them
-    let classic_struct = Keypair::load_keys(path_cl, password)?;
+    let classic_struct = SigningKey::load_keys(path_cl, password)?;
     let pq_pub_struct = KeysasPQKey::load_keys(path_pq, password)?;
     let classic_sig = classic_struct.message_sign(data.as_bytes())?;
     let pq_sig = pq_pub_struct.message_sign(data.as_bytes())?;

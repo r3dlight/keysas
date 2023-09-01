@@ -313,15 +313,28 @@ pub fn parse_report(
     let signature = general_purpose::STANDARD.decode(&report.binding.report_signature)?;
 
     // Validate the signature with ED25519
-    let pub_cl = ed25519_dalek::PublicKey::from_bytes(
-        cert_cl
-            .tbs_certificate
-            .subject_public_key_info
-            .subject_public_key
-            .raw_bytes(),
-    )?;
-    let sig_cl =
-        ed25519_dalek::Signature::from_bytes(&signature[0..ed25519_dalek::SIGNATURE_LENGTH])?;
+    let cert_cl_bytes = cert_cl
+        .tbs_certificate
+        .subject_public_key_info
+        .subject_public_key
+        .raw_bytes();
+    let mut cert_cl_bytes_casted: [u8; 32] = [0u8; 32];
+    if cert_cl_bytes.len() == 32 {
+        cert_cl_bytes_casted.copy_from_slice(cert_cl_bytes);
+    } else {
+        return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
+    }
+    let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
+
+    let sign_cl_bytes = &signature[0..ed25519_dalek::SIGNATURE_LENGTH];
+    let mut sign_cl_bytes_casted: [u8; 64] = [0u8; 64];
+    if sign_cl_bytes.len() == 64 {
+        sign_cl_bytes_casted.copy_from_slice(sign_cl_bytes);
+    } else {
+        return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
+    }
+
+    let sig_cl = ed25519_dalek::Signature::from_bytes(&sign_cl_bytes_casted);
     pub_cl.verify(message.as_bytes(), &sig_cl)?;
     // If the signature is invalid, an error is thrown
 
@@ -435,14 +448,18 @@ mod tests_out {
         let cert_cl = Certificate::from_pem(certs.next().unwrap()).unwrap();
         let cert_pq = Certificate::from_pem(certs.remainder().unwrap()).unwrap();
 
-        let pub_cl = ed25519_dalek::PublicKey::from_bytes(
-            cert_cl
-                .tbs_certificate
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes(),
-        )
-        .unwrap();
+        let mut pub_cl_casted: [u8; 32] = [0u8; 32];
+        let pub_cl_bytes = cert_cl
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes();
+        if pub_cl_bytes.len() == 32 {
+            pub_cl_casted.copy_from_slice(pub_cl_bytes);
+        } else {
+            panic!("Public key is not 32 bytes long !");
+        }
+        let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&pub_cl_casted).unwrap();
         oqs::init();
         let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
         let pub_pq = pq_scheme
@@ -474,15 +491,18 @@ mod tests_out {
             )
             .unwrap()
         );
+        let mut sig_casted: [u8; 64] = [0u8; 64];
+        if signature[0..ed25519_dalek::SIGNATURE_LENGTH].len() == 64 {
+            sig_casted.copy_from_slice(&signature[0..ed25519_dalek::SIGNATURE_LENGTH]);
+        } else {
+            panic!("Signature is not 64 bytes long!");
+        }
         assert_eq!(
             true,
             pub_cl
                 .verify(
                     concat.as_bytes(),
-                    &ed25519_dalek::Signature::from_bytes(
-                        &signature[0..ed25519_dalek::SIGNATURE_LENGTH]
-                    )
-                    .unwrap()
+                    &ed25519_dalek::Signature::from_bytes(&sig_casted)
                 )
                 .is_ok()
         );
