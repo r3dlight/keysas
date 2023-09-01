@@ -279,7 +279,7 @@ impl KeysasKey<SigningKey> for SigningKey {
             let signing_key = ed25519_dalek::SigningKey::from_bytes(&private_key_casted);
             Ok(signing_key)
         } else {
-            return Err(anyhow!("Key is not 32 bytes long"));
+            Err(anyhow!("Key is not 32 bytes long"))
         }
     }
 
