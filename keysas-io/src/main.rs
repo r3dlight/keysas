@@ -256,7 +256,7 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
         Err(e) => return Err(anyhow!("Cannot decode base64 PQ signature from bytes: {e}")),
     };
     let mut s_cl_decoded_casted: [u8; 64] = [0u8; 64];
-    if s_cl_decoded.len() == 64 as usize {
+    if s_cl_decoded.len() == 64_usize {
         s_cl_decoded_casted.copy_from_slice(&s_cl_decoded);
     } else {
         return Err(anyhow!(" Signature is not 64 bytes long"));
