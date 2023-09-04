@@ -19,7 +19,7 @@ libc = "0.2"
 nom = "7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 crossbeam-utils = "0.8"
-nix = "0.27"
+nix = { version = "0.27", features = ["net"]}
 tempfile = "3.8"
 diacritics = "0.2"
 sys-mount = "2.1"
