@@ -17,7 +17,7 @@ tauri-build = { version = "1.4", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.4", features = ["api-all", "updater"] }
-ssh-rs = "0.3.2" 
+ssh-rs = "0.3" 
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 sha2 ="0.10"
