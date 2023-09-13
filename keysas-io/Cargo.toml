@@ -32,7 +32,7 @@ landlock = "0.2"
 flexi_logger = "0.25"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.8", default-features = false, features =["dilithium"] }
-ed25519-dalek = "2.0"
+ed25519-dalek = "2"
 base64 = "0.21"
 
 [dev-dependencies]
