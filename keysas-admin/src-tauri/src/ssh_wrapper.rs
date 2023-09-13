@@ -25,7 +25,7 @@ pub fn connect_key(ip: &str, private_key: &str) -> Result<LocalSession<TcpStream
         .add_compress_algorithms(algorithm::Compress::None)
         .add_mac_algortihms(algorithm::Mac::HmacSha2_512)
         .add_mac_algortihms(algorithm::Mac::HmacSha2_256)
-        .timeout(TIMEOUT.into())
+        .timeout(Some(std::time::Duration::from_secs(TIMEOUT)))
         .connect(host)?;
     let session = connector.run_local();
     Ok(session)
@@ -46,7 +46,7 @@ pub fn connect_pwd(ip: &str) -> SshResult<LocalSession<TcpStream>> {
         .add_compress_algorithms(algorithm::Compress::None)
         .add_mac_algortihms(algorithm::Mac::HmacSha2_512)
         .add_mac_algortihms(algorithm::Mac::HmacSha2_256)
-        .timeout(TIMEOUT.into())
+        .timeout(Some(std::time::Duration::from_secs(TIMEOUT)))
         .connect(host)?;
     let session = connector.run_local();
     Ok(session)
