@@ -121,7 +121,7 @@ Next, modify the configuration of the **keysas-io** system daemon:
 
  sudo vim /etc/systemd/system/keysas-io.service
 
-Add the option -y true après ExecStart=/usr/bin/keysas-udev, as follows:
+Add the option -y true après ExecStart=/usr/bin/keysas-io, as follows:
 
 .. code-block:: shell-session
 
