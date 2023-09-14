@@ -29,7 +29,7 @@ kv = "0.24"
 yubico_manager = "0.9"
 walkdir = "2.3"
 landlock = "0.2" 
-flexi_logger = "0.25"
+flexi_logger = "0.26"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.8", default-features = false, features =["dilithium"] }
 ed25519-dalek = "2"
