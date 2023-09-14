@@ -26,7 +26,7 @@ pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
 landlock = "0.2"
 syscallz = "0.16"
-yara = "0.20"
+yara = "0.21"
 
 [dependencies.oqs]
 version = "0.8"
