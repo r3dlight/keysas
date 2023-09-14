@@ -11,5 +11,5 @@ anyhow = "1.0"
 ed25519-dalek = "2"
 pkcs8 = { version = "0.10", features = ["encryption", "pem"]}
 keysas_lib = { path = "../keysas_lib" }
-tempfile = "3.5"
+tempfile = "3.8"
 x509-cert = "0.2"
