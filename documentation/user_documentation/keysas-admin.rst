@@ -11,6 +11,8 @@ Keysas-admin application
 .. warning:: 
 
  **Keysas-admin** only work on GNU/Linux based systems for now !
+ Adding your current user to the **plugdev** group (Debian/Ubuntu) is
+ also required to access USB raw devices without being privileged.
 
 SSH configuration
 =================
