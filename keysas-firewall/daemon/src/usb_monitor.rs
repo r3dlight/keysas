@@ -23,7 +23,7 @@
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use std::{thread, time};
+use std::{thread, time, fmt};
 use std::ffi::{CString, CStr, c_void};
 use windows::Win32::Storage::FileSystem::QueryDosDeviceA;
 use windows::Win32::Storage::FileSystem::GetLogicalDrives;
@@ -43,18 +43,46 @@ use windows::Win32::System::Ioctl::VOLUME_DISK_EXTENTS;
 use windows::Win32::System::IO::DeviceIoControl;
 use windows::Win32::Storage::FileSystem::IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS;
 use windows::Win32::System::Ioctl::RemovableMedia;
-use windows::Win32::System::Ioctl::CHANGER_PRODUCT_DATA;
-use windows::Win32::System::Ioctl::IOCTL_CHANGER_GET_PRODUCT_DATA;
+use windows::Win32::Devices::Usb::USB_DEVICE_DESCRIPTOR_TYPE;
+use windows::Win32::Devices::Usb::USB_STRING_DESCRIPTOR_TYPE;
+use windows::Win32::Devices::Usb::USB_DEVICE_DESCRIPTOR;
+use windows::Win32::Devices::Usb::USBSCAN_GET_DESCRIPTOR;
+use windows::Win32::Devices::Usb::IOCTL_GET_USB_DESCRIPTOR;
+use windows::Win32::Devices::Usb::IOCTL_USB_GET_NODE_CONNECTION_INFORMATION;
 use windows::Win32::System::Ioctl::IOCTL_DISK_GET_DRIVE_GEOMETRY;
 use windows::Win32::System::Ioctl::DISK_GEOMETRY;
+use windows::Win32::Devices::Usb::WinUsb_Initialize;
+use windows::Win32::Devices::Usb::WinUsb_GetDescriptor;
+use windows::Win32::Devices::Usb::WinUsb_Free;
+use windows::Win32::Devices::Usb::WINUSB_INTERFACE_HANDLE;
+use windows::Win32::Devices::Usb::URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE;
 use std::mem::size_of;
+
+struct UsbInfo {
+    bcdUSB: u16,
+    idVendor: u16,
+    idProduct: u16,
+    bcdDevice: u16
+}
+
+impl fmt::Debug for UsbInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            "USB version: {}, Vendor ID: {}, Product ID: {}, Device version: {}",
+            self.bcdUSB,
+            self.idVendor,
+            self.idProduct,
+            self.bcdDevice
+        )
+    }
+}
 
 #[derive(Debug)]
 struct UsbDevice {
     volume_index: u8,
     volume_name: CString,
     physical_name: CString,
-    device_data: CHANGER_PRODUCT_DATA,
+    device_info: UsbInfo,
     authorized: bool
 }
 
@@ -166,7 +194,7 @@ fn detect_new_volumes(current_volumes: &mut u32) -> Result<u32, anyhow::Error> {
 /// * 'volume_number' - Index of the volume in the system
 fn get_usb_device_info(volume_number: u8) -> Result<UsbDevice, anyhow::Error> {
     // Create name of the logical volume from the index
-    let mut logical_name: [u8; 3] = [65+volume_number, 58, 0];
+    let mut logical_name: [u8; 7] = [92, 92, 46, 92, 65+volume_number, 58, 0];
 
     println!("Logical name: {:?}", logical_name);
 
@@ -174,7 +202,7 @@ fn get_usb_device_info(volume_number: u8) -> Result<UsbDevice, anyhow::Error> {
     let volume_handle = unsafe {
         match CreateFileA(
             PCSTR(logical_name.as_ptr() as *const u8),
-            0,
+            0x80000000,
             FILE_SHARE_MODE(0x00000003),
             None,
             OPEN_EXISTING,
@@ -234,11 +262,11 @@ fn get_usb_device_info(volume_number: u8) -> Result<UsbDevice, anyhow::Error> {
     let physical_handle = unsafe {
         match CreateFileA(
             PCSTR(physical_name.as_ptr() as *const u8),
-            0xC0000000,
-            FILE_SHARE_MODE(0x00000001),
+            0xC0000000, // GENERIC_WRITE | GENERIC_READ
+            FILE_SHARE_MODE(0x00000003), // FILE_SHARE_READ | FILE_SHARE_WRITE
             None,
             OPEN_EXISTING,
-            FILE_FLAGS_AND_ATTRIBUTES(0),
+            FILE_FLAGS_AND_ATTRIBUTES(0x80 | 0x40000000), // FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_OVERLAPPED
             HANDLE::default()) {
                 Ok(f) => f,
                 Err(e) => {
@@ -279,22 +307,64 @@ fn get_usb_device_info(volume_number: u8) -> Result<UsbDevice, anyhow::Error> {
     }
 
     // Get product information
-    let mut device_data: CHANGER_PRODUCT_DATA = CHANGER_PRODUCT_DATA::default();
+    let mut device_descriptor: USB_DEVICE_DESCRIPTOR = USB_DEVICE_DESCRIPTOR::default();
+    let usb_desc = USBSCAN_GET_DESCRIPTOR {
+        DescriptorType: USB_DEVICE_DESCRIPTOR_TYPE as u8, // Should not overflow (1u32)
+        Index: 0,
+        LanguageId: 0
+    };
+
     unsafe {
         if let Err(e) = DeviceIoControl(
             physical_handle,
-            IOCTL_CHANGER_GET_PRODUCT_DATA,
-            None,
-            0,
-            Some(&mut device_data as *mut _ as *mut c_void),
-            size_of::<CHANGER_PRODUCT_DATA>() as u32, // Should not overflow
+            IOCTL_USB_GET_NODE_CONNECTION_INFORMATION,
+            Some(&usb_desc as *const _ as *const c_void),
+            size_of::<USBSCAN_GET_DESCRIPTOR>() as u32, // Should not overflow
+            Some(&mut device_descriptor as *mut _ as *mut c_void),
+            size_of::<USB_DEVICE_DESCRIPTOR>() as u32, // Should not overflow
             None,
             None
         ) {
             let _ = CloseHandle(physical_handle);
             return Err(anyhow!("Failed to get product information: {:?}", e.message().to_string_lossy()));
         }
-        // No longer need physical handle
+    }
+
+    /*
+    let mut winusb_handle = WINUSB_INTERFACE_HANDLE::default();
+    let mut device_descriptor: [u8; 1024] = [0; 1024];
+    let mut size_read: u32 = 0;
+
+    unsafe {
+        if let Err(e) = WinUsb_Initialize(
+            physical_handle,
+            &mut winusb_handle as *mut _
+        ) {
+            let _ = CloseHandle(physical_handle);
+            return Err(anyhow!("Failed to initialize Win USB handle: {:?}", e.message().to_string_lossy()));
+        }
+
+        if let Err(e) = WinUsb_GetDescriptor(
+            winusb_handle,
+            USB_DEVICE_DESCRIPTOR_TYPE as u8,
+            0,
+            0x409, // Ask for English
+            Some(&mut device_descriptor),
+            &mut size_read as *mut u32
+        ) {
+            let _ = CloseHandle(physical_handle);
+            let _ = WinUsb_Free(winusb_handle);
+            return Err(anyhow!("Failed to get USB descriptor: {:?}", e.message().to_string_lossy()));
+        }
+        
+        let _ = WinUsb_Free(winusb_handle);
+    }
+    */
+
+    //println!("Device descriptor: {:?}", device_descriptor);
+
+    // Close physical handle
+    unsafe {
         let _ = CloseHandle(physical_handle);
     }
     
@@ -303,11 +373,27 @@ fn get_usb_device_info(volume_number: u8) -> Result<UsbDevice, anyhow::Error> {
         volume_index: volume_number,
         volume_name: CString::from_vec_with_nul(logical_name.to_vec())?, // Built the line before so should be ok
         physical_name,
-        device_data,
+        device_info: UsbInfo{
+            bcdUSB: 0, //device_descriptor.bcdUSB,
+            idVendor: 0, //device_descriptor.idVendor,
+            idProduct: 0, //device_descriptor.idProduct,
+            bcdDevice: 0 //device_descriptor.bcdDevice
+        },
         authorized: false
     };
 
     return Ok(device);
+}
+
+/// Validate the signature of the device
+/// 
+/// # Arguments
+/// 
+/// * 'device_data' - Device descriptor of the new USB device
+/// * 'first_sectors' - Content of the first on the device
+fn validate_device_signature(device_descriptor: &USB_DEVICE_DESCRIPTOR, first_sectors: &[u8; 2048]) -> Result<bool, anyhow::Error> {
+
+    Ok(false)
 }
 
 impl KeysasUsbMonitor {
@@ -355,6 +441,8 @@ impl KeysasUsbMonitor {
                                     println!("Failed to read new drive: {e}");
                                 }
                             }
+
+                            // Validate the signature of the MBR
                         }
                     }
                 }
