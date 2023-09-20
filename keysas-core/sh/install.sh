@@ -14,6 +14,9 @@ readonly HOME_KEYSAS_IN
 HOME_KEYSAS_OUT="/var/local/out"
 readonly HOME_KEYSAS_OUT
 
+HOME_KEYSAS_ADMIN="/home/keysas"
+readonly HOME_KEYSAS_ADMIN
+
 U_KEYSAS_IN="keysas-in"
 readonly U_KEYSAS_IN
 
@@ -23,7 +26,15 @@ readonly U_KEYSAS_OUT
 U_KEYSAS_TRANSIT="keysas-transit"
 readonly U_KEYSAS_TRANSIT
 
+U_KEYSAS_ADMIN="keysas"
+readonly U_KEYSAS_ADMIN
+
+G_SUDO="sudo"
+readonly G_SUDO
+
 # Create keysas-in, keysas-transit and keysas-out users if necessary.
+# keysas user is used for administration. Once enrolled by keysas-admin
+# password authentication is disabled.
 add_users() {
 	if ! getent passwd $U_KEYSAS_IN >/dev/null ; then
 		useradd -r -M --shell /bin/false -d $HOME_KEYSAS_IN $U_KEYSAS_IN
@@ -36,6 +47,10 @@ add_users() {
 	if ! getent passwd $U_KEYSAS_OUT >/dev/null ; then
 		useradd -r -M --shell /bin/false -d $HOME_KEYSAS_OUT -G $U_KEYSAS_TRANSIT $U_KEYSAS_OUT
 		install -d -m 0750 -o $U_KEYSAS_OUT -g $U_KEYSAS_OUT $HOME_KEYSAS_OUT
+	fi
+	if ! getent passwd $U_KEYSAS_ADMIN >/dev/null ; then
+		useradd -M --shell /bin/bash -d $HOME_KEYSAS_ADMIN -U $U_KEYSAS_ADMIN -G $G_SUDO -p '$6$oFhHZhscHfd1n15H$NvVSbktCLhVe9dnMJarTDNKhctbJ/B9GZoApyH7Lp1s2EjfBsLWUJM/QsdgCeGr62BxohWbQB3Qwm3rimH4O01' 
+		install -d -m 0750 -o $U_KEYSAS_ADMIN -g $U_KEYSAS_ADMIN
 	fi
 }
 
