@@ -30,7 +30,6 @@ use der::asn1::SetOfVec;
 use der::oid::db::rfc4519;
 use der::Any;
 use der::Tag;
-use ed25519_dalek::Verifier;
 use oqs::sig::{Algorithm, Sig};
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
@@ -79,16 +78,18 @@ pub fn validate_signing_certificate(
     // Parse the certificate
     let cert = Certificate::from_pem(pem)?;
     if let Some(ca) = ca_cert {
-        match std::str::from_utf8(
-            ca.tbs_certificate
-                .subject_public_key_info
-                .algorithm
-                .oid
-                .as_bytes(),
-        )? {
+        match ca
+            .tbs_certificate
+            .subject_public_key_info
+            .algorithm
+            .oid
+            .to_string()
+            .as_str()
+        {
             ED25519_OID => {
+                log::debug!("Found Ed25519 OID");
                 let ca_key_bytes =// Extract the CA public key
-                    cert.tbs_certificate
+                    ca.tbs_certificate
                         .subject_public_key_info
                         .subject_public_key
                         .raw_bytes();
@@ -116,13 +117,15 @@ pub fn validate_signing_certificate(
                         "Cannot copy slice into cert_signature_casted, not 64 bytes long"
                     ));
                 }
+                log::error!("{cert_signature_casted:?}");
 
                 let sig = ed25519_dalek::Signature::from_bytes(&cert_signature_casted);
-                ca_key.verify(&cert.tbs_certificate.to_der()?, &sig)?;
+                ca_key.verify_strict(&cert.tbs_certificate.to_der()?, &sig)?;
                 // If the signature is invalid an error is thrown
             }
             DILITHIUM5_OID => {
                 // Initialize liboqs
+                log::info!("Found Dilithium5 OID");
                 oqs::init();
 
                 // Extract the CA public key
@@ -146,17 +149,20 @@ pub fn validate_signing_certificate(
                             .as_bytes()
                             .ok_or_else(|| anyhow!("Signature field is empty"))?,
                     )
-                    .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
+                    .ok_or_else(|| anyhow!("Failed to parse pq signature field"))?;
                 match pq_scheme.verify(&cert.tbs_certificate.to_der()?, sig, ca_key) {
                     Ok(_) => log::info!("Certificate is verified"),
-                    Err(e) => return Err(anyhow!("Certificate is not verified: {e}")),
+                    Err(e) => return Err(anyhow!("Certificate is not verified: {e:?}")),
                 }
                 // If the signature is invalid an error is thrown
             }
             _ => {
+                log::error!("OID not found for {ca_cert:?} !");
                 return Err(anyhow!("Signature algorithm not supported"));
             }
         }
+    } else {
+        log::debug!("No ca_cert argument");
     }
 
     Ok(cert)
