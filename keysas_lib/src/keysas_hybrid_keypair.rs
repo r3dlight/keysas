@@ -105,9 +105,6 @@ fn generate_root_ed25519(
             .with_context(|| "Failed to convert signature to bytes")?,
     };
 
-    println!("VerifyingKey {:?}", keypair.verifying_key());
-    println!("signature {sig:?}");
-
     Ok((keypair, cert))
 }
 
