@@ -1,7 +1,9 @@
-use ed25519_dalek::Digest;
-use ed25519_dalek::Sha512;
+use ed25519_dalek::Signer;
 use ed25519_dalek::SigningKey;
 use hex_literal::hex;
+use keysas_lib::certificate_field::validate_signing_certificate;
+use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use oqs::sig::Algorithm;
@@ -12,10 +14,11 @@ use pkcs8::der::Encode;
 use pkcs8::pkcs5::pbes2;
 use pkcs8::spki::AlgorithmIdentifier;
 use pkcs8::EncryptedPrivateKeyInfo;
+use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
 use rand_dl::rngs::OsRng;
 use std::fs::read;
-use tempfile::NamedTempFile;
+use tempfile::{tempdir, NamedTempFile};
 use x509_cert::name::RdnSequence;
 use x509_cert::spki::ObjectIdentifier;
 
@@ -190,9 +193,7 @@ fn test_generate_csr_ed25519() {
 
     // Test the CSR signature
     let info = csr.info.to_der().unwrap();
-    let mut prehashed = Sha512::new();
-    prehashed.update(info);
-    let signature = keypair.sign_prehashed(prehashed, None).unwrap();
+    let signature = keypair.try_sign(&info).unwrap();
 
     assert_eq!(
         csr.signature,
@@ -327,4 +328,75 @@ fn test_save_and_load_dilithium5() {
         keypair.private_key.into_vec()
     );
     assert_eq!(loaded.public_key.into_vec(), keypair.public_key.into_vec());
+}
+
+#[test]
+fn test_save_and_load_hybrid_signature() {
+    use pkcs8::der::EncodePem;
+    use std::path::Path;
+    // Create a random keypair
+    let certif_test = CertificateFields::from_fields(
+        Some("org_name"),
+        Some("org_unit"),
+        Some("fr"),
+        Some("common_name"),
+        Some("333"),
+    )
+    .unwrap();
+
+    let hybrid_keypair = HybridKeyPair::generate_root(&certif_test).unwrap();
+
+    // Store the key as DER in PKCS8
+    //let file = NamedTempDirectory::new().unwrap()
+    //let path = file.into_temp_path();
+    let temp_dir = tempdir().unwrap();
+    let path = temp_dir.into_path();
+
+    // Save the keypair
+    hybrid_keypair
+        .save("test", &path, &path, &String::from("Test"))
+        .unwrap();
+
+    // Load the keypair
+    let loaded_hybrid_keypair =
+        HybridKeyPair::load("test", &path, &path, Path::new("/"), &String::from("Test")).unwrap();
+
+    assert_eq!(
+        loaded_hybrid_keypair.classic.to_bytes(),
+        hybrid_keypair.classic.to_bytes()
+    );
+    assert_eq!(
+        loaded_hybrid_keypair.pq.private_key,
+        hybrid_keypair.pq.private_key
+    );
+    assert_eq!(
+        validate_signing_certificate(
+            &hybrid_keypair.classic_cert.to_pem(LineEnding::LF).unwrap(),
+            Some(&hybrid_keypair.classic_cert),
+        )
+        .is_ok(),
+        true
+    );
+
+    println!("Root signature is verified !\n");
+    let subject = RdnSequence::default();
+    let app_hybrid_keypair =
+        HybridKeyPair::generate_signed_keypair(&hybrid_keypair, &subject, &certif_test, true)
+            .unwrap();
+    //app_hybrid_keypair
+    //    .save("test-app", &path, &path, &String::from("App"))
+    //    .unwrap();
+    println!("Now verifying application (usb/station) signature...\n");
+    assert_eq!(
+        validate_signing_certificate(
+            &app_hybrid_keypair
+                .classic_cert
+                .to_pem(LineEnding::LF)
+                .unwrap(),
+            Some(&hybrid_keypair.classic_cert),
+        )
+        .is_ok(),
+        true
+    );
+    println!("Application signature is verified !\n");
 }
