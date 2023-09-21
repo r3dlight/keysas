@@ -27,8 +27,7 @@
 
 use anyhow::anyhow;
 use anyhow::Context;
-use ed25519_dalek::Digest;
-use ed25519_dalek::Sha512;
+use ed25519_dalek::Signer;
 use ed25519_dalek::SigningKey;
 use oqs::sig::Algorithm;
 use oqs::sig::SecretKey;
@@ -92,10 +91,8 @@ fn generate_root_ed25519(
     )?;
 
     let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-    let mut prehashed = Sha512::new();
-    prehashed.update(content);
     let sig = keypair
-        .sign_prehashed(prehashed, None)
+        .try_sign(&content)
         .with_context(|| "Failed to sign certificate content")?;
 
     let cert = Certificate {
@@ -107,6 +104,9 @@ fn generate_root_ed25519(
         signature: BitString::from_bytes(&sig.to_bytes())
             .with_context(|| "Failed to convert signature to bytes")?,
     };
+
+    println!("VerifyingKey {:?}", keypair.verifying_key());
+    println!("signature {sig:?}");
 
     Ok((keypair, cert))
 }
@@ -198,8 +198,8 @@ impl HybridKeyPair {
     }
 
     /// Load the keypair from the disk
-    /// The keys will be loaded in DER encoded PKCS8 files from: keys_path/name-{cl|pq}.p8
-    /// The certificates will be loaded in PEM files from: certs_path/name-{cl|pq}.pem
+    /// The keys will be loaded in DER encoded PKCS8 files from: pki_dir/keys_path/name-{cl|pq}.p8
+    /// The certificates will be loaded in PEM files from: pki_dir/certs_path/name-{cl|pq}.pem
     /// pwd is used for decrypting the PKCS8 files
     pub fn load(
         name: &str,
