@@ -42,7 +42,6 @@ use crate::{
 };
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
-use ed25519_dalek::{self, Verifier};
 use oqs::sig::{Algorithm, Sig};
 use sha2::Sha256;
 use std::fs::File;
@@ -335,7 +334,7 @@ pub fn parse_report(
     }
 
     let sig_cl = ed25519_dalek::Signature::from_bytes(&sign_cl_bytes_casted);
-    pub_cl.verify(message.as_bytes(), &sig_cl)?;
+    pub_cl.verify_strict(message.as_bytes(), &sig_cl)?;
     // If the signature is invalid, an error is thrown
 
     // Validate the signature with Dilithium
@@ -368,7 +367,6 @@ pub fn parse_report(
 mod tests_out {
     use crate::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
     use base64::{engine::general_purpose, Engine};
-    use ed25519_dalek::{self, Verifier};
     use oqs::sig::{Algorithm, Sig};
     use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
@@ -500,7 +498,7 @@ mod tests_out {
         assert_eq!(
             true,
             pub_cl
-                .verify(
+                .verify_strict(
                     concat.as_bytes(),
                     &ed25519_dalek::Signature::from_bytes(&sig_casted)
                 )
