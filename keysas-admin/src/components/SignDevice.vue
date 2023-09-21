@@ -22,7 +22,7 @@
               seconds to sign it. Before signing your first device:</span>
               <li class="tip-text"><b>On GNU/Linux:</b></li>
               <ul>
-                <li class="tip-text">Create a new file <b>/etc/udev/rules.d/71-keysas.conf</b></li>
+                <li class="tip-text">Create a new file <b>/etc/udev/rules.d/71-keysas.rules</b></li>
                 <li class="tip-text">Copy and paste this in the new file: <br><b class="text-secondary">SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"</b></li>
                 <li class="tip-text">Open a terminal and execute this: <br> <b class="text-secondary">udevadm trigger && udevadm control --reload</b></li>
               </ul>
