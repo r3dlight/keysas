@@ -26,8 +26,6 @@
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use ed25519_dalek::Digest;
-use ed25519_dalek::Sha512;
 use oqs::sig::Algorithm;
 use oqs::sig::Sig;
 use rand_dl::rngs::OsRng;
@@ -150,8 +148,8 @@ pub fn generate_cert_from_csr(
         }
 
         let key = ed25519_dalek::VerifyingKey::from_bytes(&pub_key_casted)?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(&csr.info.to_der()?);
+        //let mut prehashed = Sha512::new();
+        //prehashed.update(&csr.info.to_der()?);
         let mut csr_signature_casted: [u8; 64] = [0u8; 64];
         if csr.signature.raw_bytes().len() == 64 {
             csr_signature_casted.copy_from_slice(csr.signature.raw_bytes());
@@ -159,24 +157,14 @@ pub fn generate_cert_from_csr(
             return Err(anyhow!("Invalid CSR signature: not 64 bytes long"));
         }
         if key
-            .verify_prehashed(
-                prehashed,
-                None,
+            .verify_strict(
+                &csr.info.to_der()?,
                 &ed25519_dalek::Signature::from_bytes(&csr_signature_casted),
             )
             .is_err()
         {
             return Err(anyhow!("Invalid CSR signature"));
         }
-        /*if key
-            .verify_strict(
-                &csr.info.to_der()?,
-                &ed25519_dalek::Signature::from_bytes(csr.signature.raw_bytes())?,
-            )
-            .is_err()
-        {
-            return Err(anyhow!("Invalid CSR signature"));
-        }*/
 
         // Generate serial number
         let mut serial = [0u8; 20];
