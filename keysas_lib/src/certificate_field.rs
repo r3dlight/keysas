@@ -117,7 +117,6 @@ pub fn validate_signing_certificate(
                         "Cannot copy slice into cert_signature_casted, not 64 bytes long"
                     ));
                 }
-                log::error!("{cert_signature_casted:?}");
 
                 let sig = ed25519_dalek::Signature::from_bytes(&cert_signature_casted);
                 ca_key.verify_strict(&cert.tbs_certificate.to_der()?, &sig)?;
@@ -135,7 +134,7 @@ pub fn validate_signing_certificate(
                 };
                 let ca_key = pq_scheme
                     .public_key_from_bytes(
-                        cert.tbs_certificate
+                        ca.tbs_certificate
                             .subject_public_key_info
                             .subject_public_key
                             .raw_bytes(),
