@@ -27,12 +27,9 @@
 
 use anyhow::{anyhow, Context};
 use der::DecodePem;
-use ed25519_dalek::Digest;
-use ed25519_dalek::Sha512;
 use ed25519_dalek::Signature as SignatureDalek;
 use ed25519_dalek::Signer;
 use ed25519_dalek::SigningKey;
-use ed25519_dalek::Verifier;
 use ed25519_dalek::VerifyingKey;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey as PqPublicKey;
@@ -153,7 +150,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
     ) -> Result<(), anyhow::Error> {
         pubkeys
             .classic
-            .verify(message, &signatures.classic)
+            .verify_strict(message, &signatures.classic)
             .context("Invalid Ed25519 signature")?;
         oqs::init();
         let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
@@ -316,10 +313,8 @@ impl KeysasKey<SigningKey> for SigningKey {
         };
 
         let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(content);
         let signature = self
-            .sign_prehashed(prehashed, None)
+            .try_sign(&content)
             .with_context(|| "Failed to sign certificate content")?;
 
         let csr = CertReq {
@@ -335,7 +330,9 @@ impl KeysasKey<SigningKey> for SigningKey {
     }
 
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-        let signature = self.sign(message);
+        let signature = self
+            .try_sign(message)
+            .with_context(|| "Failed to sign message content")?;
         Ok(signature.to_bytes().to_vec())
     }
 
@@ -348,7 +345,7 @@ impl KeysasKey<SigningKey> for SigningKey {
         }
 
         let sig = ed25519_dalek::Signature::from_bytes(&signature_casted);
-        self.verify(message, &sig)?;
+        self.verify_strict(message, &sig)?;
         // If no error has been returned then the signature is valid
         Ok(true)
     }
@@ -373,11 +370,9 @@ impl KeysasKey<SigningKey> for SigningKey {
         )?;
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(content);
         let signature = self
-            .sign_prehashed(prehashed, None)
-            .with_context(|| "Failed to sign certificate content")?;
+            .try_sign(&content)
+            .with_context(|| "Failed to sign csr content")?;
 
         let cert = Certificate {
             tbs_certificate: tbs,
