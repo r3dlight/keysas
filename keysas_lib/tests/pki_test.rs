@@ -398,5 +398,13 @@ fn test_save_and_load_hybrid_signature() {
         .is_ok(),
         true
     );
+    assert_eq!(
+        validate_signing_certificate(
+            &app_hybrid_keypair.pq_cert.to_pem(LineEnding::LF).unwrap(),
+            Some(&hybrid_keypair.pq_cert),
+        )
+        .is_ok(),
+        true
+    );
     println!("Application signature is verified !\n");
 }
