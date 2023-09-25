@@ -173,7 +173,6 @@ impl CertificateFields {
     /// The checks done are :
     ///     - Test if country is 2 letters long, if less return error, if more shorten it to the first two letters
     ///     - Test if validity can be converted to u32, if not generate error
-    ///     - Test if sigAlgo is either ed25519 or ed448, if not defaut to ed25519
     pub fn from_fields<'a>(
         org_name: Option<&'a str>,
         org_unit: Option<&'a str>,
