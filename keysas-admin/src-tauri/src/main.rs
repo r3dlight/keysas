@@ -882,9 +882,9 @@ async fn revoke_usb() -> bool {
 
 /// Load a saved PKI into database.
 #[command]
-fn restore_pki(base_path: String) -> bool {
+async fn restore_pki(base_path: String, admin_pwd: String) -> bool {
     let base = base_path.to_owned();
-    match check_pki_structure(&base) {
+    match check_restore_pki(&base, &admin_pwd).await {
         Ok(d) => d,
         Err(e) => {
             log::error!("Cannot restore PKI in database: {e}.");
