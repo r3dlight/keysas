@@ -50,10 +50,13 @@
     <div>
       <br>
       <div v-if="pkiRestore == 'waiting'">
-        Wait while importing IKPQPKI... <span class="spinner-border text-info"></span>
+        Testing IKPQPKI signatures, please wait... <span class="spinner-border text-info"></span>
       </div>
       <div v-if="pkiRestore === false">
        <h3 class="text-danger"> Error while importing IKPQPKI !</h3>
+      </div>
+      <div v-if="pkiRestore === true">
+       <h3 class="text-success">IKPQPKI imported !</h3>
       </div>
    </div>
   </div>
@@ -166,6 +169,7 @@ export default {
       this.pkiRestore = 'waiting';
       await invoke('restore_pki', {
           basePath: this.pkiFolder,
+          adminPwd: this.p8Password,
          })
         .then((res) => this.pkiRestore = res)
         .catch((error) => console.error(error));
