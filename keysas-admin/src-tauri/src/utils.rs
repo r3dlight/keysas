@@ -127,6 +127,7 @@ pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::E
 /// Test if every directories and p8 and pem files are presents
 /// into the right path.
 /// Test station and USB certificat signatures by the root CA
+/// Flush the database and store the new configuration.
 pub async fn check_restore_pki(
     base_directory: &String,
     admin_pwd: &str,
