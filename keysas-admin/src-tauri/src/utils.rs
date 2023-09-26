@@ -5,7 +5,7 @@ use keysas_lib::certificate_field::{validate_signing_certificate, CertificateFie
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use pkcs8::der::EncodePem;
 use pkcs8::LineEnding;
-use ssh_rs::LocalSession;
+use ssh::LocalSession;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
