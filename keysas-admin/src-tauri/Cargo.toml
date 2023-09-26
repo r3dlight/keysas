@@ -17,7 +17,7 @@ tauri-build = { version = "1.4", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.4", features = ["api-all", "updater"] }
-ssh-rs = "0.3.3" 
+ssh-rs = "0.4" 
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 sha2 ="0.10"
@@ -33,7 +33,7 @@ rand_dl = {package = "rand", version = "0.8"}
 rand_core = "0.6"
 hex-literal = "0.4"
 libc = "0.2"
-udev = "0.7"
+udev = "0.8"
 mbrman = "0.5"
 base64 = "0.21"
 keysas_lib = { path = "../../keysas_lib" }
