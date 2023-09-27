@@ -53,6 +53,7 @@ On Debian stable (Bookwoom only):
 apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+source "$HOME/.cargo/env"
 git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
 rustup default nightly
 make help
