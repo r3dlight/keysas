@@ -22,7 +22,7 @@
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
 #![forbid(private_interfaces)]
-#![forbid(private_bounds)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 
