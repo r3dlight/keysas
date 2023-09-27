@@ -50,7 +50,7 @@ add_users() {
 	fi
 	if ! getent passwd $U_KEYSAS_ADMIN >/dev/null ; then
 		useradd -M --shell /bin/bash -d $HOME_KEYSAS_ADMIN -U $U_KEYSAS_ADMIN -G $G_SUDO -p '$6$oFhHZhscHfd1n15H$NvVSbktCLhVe9dnMJarTDNKhctbJ/B9GZoApyH7Lp1s2EjfBsLWUJM/QsdgCeGr62BxohWbQB3Qwm3rimH4O01' 
-		install -d -m 0750 -o $U_KEYSAS_ADMIN -g $U_KEYSAS_ADMIN
+		install -d -m 0750 -o $U_KEYSAS_ADMIN -g $U_KEYSAS_ADMIN $HOME_KEYSAS_ADMIN
 	fi
 }
 
