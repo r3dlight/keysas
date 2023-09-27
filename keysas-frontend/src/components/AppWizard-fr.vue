@@ -42,7 +42,7 @@ Toute perte de ce mot de passe rendra la PKI définitivement inutilisable.
 <p>Pour ce faire, ouvrez un terminal et entrez la ligne de commande suivante:<b></b></p>
 <div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh-keygen -m PEM -t ed25519 -f mykey</span>
 </code></pre></div>
-<p>Rendez-vous ensuite dans <b>Admin configuration/SSH configuration</b> pour renseigner le chemin vers vos clés fraichement générées. Akkez ensuite dans <b>Manage your Keysas</b> puis cliquez sur <b>Export SSH pubkey</b>. Attendez que le status passe en vert à <b class="text-success">Online</b>. Appuyez ensuite sur <b>More...</b> puis <b>Enroll</b> pour générer les clés de signatures nécessaires sur la station distante..</p>
+<p>Rendez-vous ensuite dans <b>Admin configuration/SSH configuration</b> pour renseigner le chemin vers vos clés fraichement générées. Allez ensuite dans <b>Manage your Keysas</b> puis cliquez sur <b>Export SSH pubkey</b>. Attendez que le status passe en vert à <b class="text-success">Online</b>. Appuyez ensuite sur <b>More...</b> puis <b>Enroll</b> pour générer les clés de signatures nécessaires sur la station distante..</p>
 
 
 </section>
