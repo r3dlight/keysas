@@ -67,12 +67,7 @@ pub struct Daemons {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GuichetState {
     pub name: String,
-    //pub detected: bool,
-    //pub waiting: bool,
-    //pub writing: bool,
     pub analysing: bool,
-    //pub reading: bool,
-    //pub done: bool,
     pub files: Vec<String>,
 }
 
@@ -246,7 +241,7 @@ fn main() -> Result<()> {
                 };
 
                 let serialized = serde_json::to_string(&orders)?;
-                websocket.write_message(Message::Text(serialized))?;
+                websocket.send(Message::Text(serialized))?;
                 thread::sleep(Duration::from_millis(300));
             }
         });

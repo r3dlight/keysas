@@ -8,7 +8,7 @@
 <p><b>KEYSAS</b> est une solution de station blanche 100% opensource et écrite en Rust :-) <br> L’image fournie pour Raspberry Pi 4 est basée sur une distribution GNU/Linux Debian 12 (Bookworm) durcie. Le DHCP est activé par défaut: l’adresse IP obtenue est normalement affichée plus haut.</p>
 <p>Afin de prémunir la station blanche d’attaques de type BadUSB, seuls les périphériques USB de type “stockage de masse” comme les clés ou disques durs USB sont reconnus par la station blanche. Les claviers USB et les souris ne peuvent donc <b>pas</b> fonctionner.</p>
 Pour pouvoir administrer vos stations blanches <b>Keysas</b>, vous devez d'abord installer l'application <b>Keysas-admin</b> sur un poste d'administration
-GNU/Linux dédié. Cette application est disponible en téléchargement sur le site keysas.fr au format .AppImage ou .deb.
+GNU/Linux dédié (Debian 12). Cette application est disponible en téléchargement sur github.com/r3dlight/keysas/ dans la rubrique <b>Releases</b> au format .deb.
 <div class="callout callout-warning">
 Si c'est la première fois que vous utilisez une station blanche <b>Keysas</b>, vous devez commencer par générer une <b>IKPQPKI</b> (<b>I</b>ncredible <b>K</b>eysas <b>P</b>ost-<b>Q</b>uantum <b>P</b>rivate <b>K</b>ey <b>I</b>nfrastrcture) avec <b>Keysas-admin</b>, enroller la nouvelle station blanche et signer un(des) périphérique(s) USB de sortie. <br>
 </div>
@@ -19,7 +19,7 @@ Ce tutoriel va vous montrer comment procéder. Vous pourrez le ré-afficher à t
 <h3>1 - Création de la PKI de signature</h3>
 Cette procédure vous permettra de générer une PKI hybride Ed25519-Dilithium5 (IKPQPKI) pour la signatures des clés de sortie et la signature des documents passés dans une station blanche <b>Keysas</b>.
 <div class="callout callout-info">
-  Si vous n'avez jamais créer de PKI avec <b>Keysas-admin</b>, il suffit lancer l'application puis d'aller sur <b>Admin configuration</b> et de cliquer sur <b>IKPQPKI configuration</b>. <br>
+  Si vous n'avez jamais créé de PKI avec <b>Keysas-admin</b>, il suffit lancer l'application puis d'aller sur <b>Admin configuration</b> et de cliquer sur <b>IKPQPKI configuration</b>. <br>
   Cliquez ensuite sur <b>Create a new IKPQPKI</b> puis entrez les paramètres souhaités pour personnaliser votre PKI. 
 </div> 
 <p>La génération des clés de signature prend du temps, donc soyez patient :o)</p>
@@ -42,7 +42,7 @@ Toute perte de ce mot de passe rendra la PKI définitivement inutilisable.
 <p>Pour ce faire, ouvrez un terminal et entrez la ligne de commande suivante:<b></b></p>
 <div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh-keygen -m PEM -t ed25519 -f mykey</span>
 </code></pre></div>
-<p>Rendez-vous ensuite dans <b>"Manage your Keysas".</b> puis cliquez sur <b>Export SSH pubkey</b>. Attendez que le status passe en vert à <b class="text-success">Online</b>. Appuyez ensuite sur <b>More...</b> puis <b>Enroll</b> pour générer les clés de signatures nécessaires sur la station distante..</p>
+<p>Rendez-vous ensuite dans <b>Admin configuration/SSH configuration</b> pour renseigner le chemin vers vos clés fraichement générées. Allez ensuite dans <b>Manage your Keysas</b> puis cliquez sur <b>Export SSH pubkey</b>. Attendez que le status passe en vert à <b class="text-success">Online</b>. Appuyez ensuite sur <b>More...</b> puis <b>Enroll</b> pour générer les clés de signatures nécessaires sur la station distante..</p>
 
 
 </section>
@@ -55,7 +55,7 @@ Branchez simplement la nouvelle clé USB à signer sur la station d'administrati
   L'ensemble des périphériques signés seront valides pour toutes les stations <b>Keysas</b> enrollées avec votre <b>IKPQPKI</b>. 
 </div>
 
-<p>Vous pouvez bien entendu formater le périphérique avec tout système de fichier supporté par la station blanche (ext2, ext3, ext4, fat32, exfat, ntfs)</p>
+<p>Vous pouvez maintenant formater le périphérique avec tout système de fichier supporté par la station blanche (ext2, ext3, ext4, fat32, exfat, ntfs)</p>
 
 <p>Pour plus de documentation, rendez-vous sur <b>keysas.fr</b>.</p>
 </section>

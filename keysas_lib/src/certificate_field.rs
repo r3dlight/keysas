@@ -19,7 +19,7 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
@@ -29,7 +29,6 @@ use der::asn1::SetOfVec;
 use der::oid::db::rfc4519;
 use der::Any;
 use der::Tag;
-use ed25519_dalek::Verifier;
 use oqs::sig::{Algorithm, Sig};
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
@@ -77,36 +76,54 @@ pub fn validate_signing_certificate(
 ) -> Result<Certificate, anyhow::Error> {
     // Parse the certificate
     let cert = Certificate::from_pem(pem)?;
-
-    // If there is a CA, validate the certificate signature
     if let Some(ca) = ca_cert {
-        match std::str::from_utf8(
-            ca.tbs_certificate
-                .subject_public_key_info
-                .algorithm
-                .oid
-                .as_bytes(),
-        )? {
+        match ca
+            .tbs_certificate
+            .subject_public_key_info
+            .algorithm
+            .oid
+            .to_string()
+            .as_str()
+        {
             ED25519_OID => {
-                // Extract the CA public key
-                let ca_key = ed25519_dalek::PublicKey::from_bytes(
-                    cert.tbs_certificate
+                log::debug!("Found Ed25519 OID");
+                let ca_key_bytes =// Extract the CA public key
+                    ca.tbs_certificate
                         .subject_public_key_info
                         .subject_public_key
-                        .raw_bytes(),
-                )?;
+                        .raw_bytes();
+                // Prepare for the copy
+                let mut ca_key_bytes_casted: [u8; 32] = [0; 32];
+                if ca_key_bytes.len() == 32 {
+                    ca_key_bytes_casted.copy_from_slice(ca_key_bytes);
+                } else {
+                    return Err(anyhow!(
+                        "Cannot copy slice into ca_key_bytes_casted, not 32 bytes long"
+                    ));
+                }
+                let ca_key = ed25519_dalek::VerifyingKey::from_bytes(&ca_key_bytes_casted)?;
 
                 // Verify the certificate signature
-                let sig = ed25519_dalek::Signature::from_bytes(
-                    cert.signature
-                        .as_bytes()
-                        .ok_or_else(|| anyhow!("Signature field is empty"))?,
-                )?;
-                ca_key.verify(&cert.tbs_certificate.to_der()?, &sig)?;
+                let cert_signature_bytes = cert
+                    .signature
+                    .as_bytes()
+                    .ok_or_else(|| anyhow!("Signature field is empty"))?;
+                let mut cert_signature_casted: [u8; 64] = [0; 64];
+                if cert_signature_bytes.len() == 64 {
+                    cert_signature_casted.copy_from_slice(cert_signature_bytes);
+                } else {
+                    return Err(anyhow!(
+                        "Cannot copy slice into cert_signature_casted, not 64 bytes long"
+                    ));
+                }
+
+                let sig = ed25519_dalek::Signature::from_bytes(&cert_signature_casted);
+                ca_key.verify_strict(&cert.tbs_certificate.to_der()?, &sig)?;
                 // If the signature is invalid an error is thrown
             }
             DILITHIUM5_OID => {
                 // Initialize liboqs
+                log::info!("Found Dilithium5 OID");
                 oqs::init();
 
                 // Extract the CA public key
@@ -116,7 +133,7 @@ pub fn validate_signing_certificate(
                 };
                 let ca_key = pq_scheme
                     .public_key_from_bytes(
-                        cert.tbs_certificate
+                        ca.tbs_certificate
                             .subject_public_key_info
                             .subject_public_key
                             .raw_bytes(),
@@ -130,17 +147,20 @@ pub fn validate_signing_certificate(
                             .as_bytes()
                             .ok_or_else(|| anyhow!("Signature field is empty"))?,
                     )
-                    .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
+                    .ok_or_else(|| anyhow!("Failed to parse pq signature field"))?;
                 match pq_scheme.verify(&cert.tbs_certificate.to_der()?, sig, ca_key) {
                     Ok(_) => log::info!("Certificate is verified"),
-                    Err(e) => return Err(anyhow!("Certificate is not verified: {e}")),
+                    Err(e) => return Err(anyhow!("Certificate is not verified: {e:?}")),
                 }
                 // If the signature is invalid an error is thrown
             }
             _ => {
+                log::error!("OID not found for {ca_cert:?} !");
                 return Err(anyhow!("Signature algorithm not supported"));
             }
         }
+    } else {
+        log::debug!("No ca_cert argument");
     }
 
     Ok(cert)
@@ -152,7 +172,6 @@ impl CertificateFields {
     /// The checks done are :
     ///     - Test if country is 2 letters long, if less return error, if more shorten it to the first two letters
     ///     - Test if validity can be converted to u32, if not generate error
-    ///     - Test if sigAlgo is either ed25519 or ed448, if not defaut to ed25519
     pub fn from_fields<'a>(
         org_name: Option<&'a str>,
         org_unit: Option<&'a str>,

@@ -162,7 +162,7 @@ fn hmac_challenge() -> Option<String> {
                 device.vendor_id, device.product_id
             );
 
-            let config = Config::default()
+            let config = Config::default_config()
                 .set_vendor_id(device.vendor_id)
                 .set_product_id(device.product_id)
                 .set_variable_size(true)
@@ -255,9 +255,14 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
         Ok(pq) => pq,
         Err(e) => return Err(anyhow!("Cannot decode base64 PQ signature from bytes: {e}")),
     };
+    let mut s_cl_decoded_casted: [u8; 64] = [0u8; 64];
+    if s_cl_decoded.len() == 64_usize {
+        s_cl_decoded_casted.copy_from_slice(&s_cl_decoded);
+    } else {
+        return Err(anyhow!(" Signature is not 64 bytes long"));
+    }
 
-    let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded)
-        .context("Cannot parse classic signature from bytes")?;
+    let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded_casted);
     oqs::init();
     let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
         Ok(pq_s) => pq_s,
@@ -671,7 +676,7 @@ fn main() -> Result<()> {
                 yubikeys: yubi,
             };
             let serialized = serde_json::to_string(&keys)?;
-            websocket.write_message(Message::Text(serialized))?;
+            websocket.send(Message::Text(serialized))?;
 
             loop {
                 let result = unsafe {
@@ -714,7 +719,7 @@ fn main() -> Result<()> {
                         yubikeys: yubi,
                     };
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.write_message(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized))?;
 
                     let id_vendor_id = event
                         .property_value(
@@ -812,7 +817,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket.write_message(Message::Text(serialized))?;
+                                    websocket.send(Message::Text(serialized))?;
                                     if yubikey {
                                         match hmac_challenge() {
                                             Some(name) => {
@@ -853,7 +858,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    match websocket.write_message(Message::Text(serialized)) {
+                                    match websocket.send(Message::Text(serialized)) {
                                         Ok(_) => log::debug!("Data wrote into the websocket"),
                                         Err(e) => {
                                             log::error!("Cannot write data into the websocket: {e}")
@@ -880,7 +885,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket.write_message(Message::Text(serialized))?;
+                                    websocket.send(Message::Text(serialized))?;
                                 }
                             }
                         }
@@ -902,7 +907,7 @@ fn main() -> Result<()> {
                                     yubikeys: yubi,
                                 };
                                 let serialized = serde_json::to_string(&keys)?;
-                                websocket.write_message(Message::Text(serialized))?;
+                                websocket.send(Message::Text(serialized))?;
                                 if yubikey {
                                     match hmac_challenge() {
                                         Some(name) => {
@@ -947,7 +952,7 @@ fn main() -> Result<()> {
                     };
 
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.write_message(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized))?;
                 }
 
                 sthread::sleep(Duration::from_millis(60));

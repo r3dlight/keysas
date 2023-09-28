@@ -1,7 +1,7 @@
 {
   "name": "keysas-frontend",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "animate.css": "^4.1.1",
     "bootstrap": "^5.2.3",
     "bootstrap-icons": "^1.10.2",
-    "vue": "^3.2.45"
+    "vue": "^3.2.45",
+    "vue-i18n": "^9.4.1"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "^4.0.2",

@@ -53,6 +53,7 @@ main() {
 		keysas-out
 		keysas-transit
 		keysas-in
+    keysas
 	"
 
 	readonly files dirs users

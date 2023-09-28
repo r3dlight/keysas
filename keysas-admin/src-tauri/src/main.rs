@@ -19,7 +19,7 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![cfg_attr(
@@ -185,6 +185,7 @@ async fn init_tauri() -> Result<(), anyhow::Error> {
             get_pki_path,
             revoke_usb,
             del_pki,
+            restore_pki,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -872,6 +873,20 @@ async fn revoke_usb() -> bool {
         Ok(d) => d,
         Err(e) => {
             log::error!("Cannot revoke device: {e}.");
+            return false;
+        }
+    };
+    true
+}
+
+/// Load a saved PKI into database.
+#[command]
+async fn restore_pki(base_path: String, admin_pwd: String) -> bool {
+    let base = base_path.to_owned();
+    match check_restore_pki(&base, &admin_pwd).await {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("Cannot restore PKI in database: {e}.");
             return false;
         }
     };

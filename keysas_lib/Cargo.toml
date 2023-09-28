@@ -1,6 +1,6 @@
 [package]
 name = "keysas_lib"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,19 +8,18 @@ edition = "2021"
 [dependencies]
 sha2 = "0.10"
 anyhow = "1.0"
-clap = "4.2"
-walkdir = "2.3"
-regex ="1.8"
+clap = "4.4"
+walkdir = "2.4"
+regex ="1.9"
 simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", default-features = false, features = ["encryption", "pem"] }
 x509-cert = "0.2"
 arbitrary = "1.3"
-ed25519-dalek = "1"
-rand_dl = {package = "rand", version = "0.7"}
-rand_core = "0.6"
+ed25519-dalek = {version = "2", features = ["digest", "rand_core"] }
+rand_dl = {package = "rand", version = "0.8"}
 hex-literal = "0.4"
-tempfile = "3.5"
+tempfile = "3"
 der = "0.7"
 serde_derive = "1.0"
 serde = "1.0"
@@ -29,6 +28,6 @@ time = "0.3"
 base64 = "0.21"
 
 [dependencies.oqs]
-version = "0.7"
+version = "0.8"
 default-features = false
 features = ["dilithium"]
