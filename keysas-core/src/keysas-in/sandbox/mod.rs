@@ -68,6 +68,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::sched_getaffinity)?;
     ctx.allow_syscall(Syscall::landlock_create_ruleset)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }

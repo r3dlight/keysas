@@ -78,6 +78,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::landlock_create_ruleset)?;
     ctx.allow_syscall(Syscall::landlock_add_rule)?;
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }
