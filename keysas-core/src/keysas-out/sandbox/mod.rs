@@ -63,6 +63,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::connect)?;
     ctx.allow_syscall(Syscall::execve)?;
     ctx.allow_syscall(Syscall::copy_file_range)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }
