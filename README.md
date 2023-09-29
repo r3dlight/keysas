@@ -43,7 +43,7 @@ Files are passed between daemons as raw file descriptors and using abstract sock
  - Keysas-fido: Command line utility to manage Yubikeys 5 enrollment
  - Keysas-backend: Create a websocket server to send different json values to the keysas-frontend
  - Keysas-frontend: Readonly Vue.js Frontend for the final user
- - Keysas-firewall (WIP): Provide a Windows 10 application to verify that document has been signed by a Keysas station. 
+ - Keysas-firewall (WIP): Provide a Windows 10 application to verify that documents have been signed by a Keysas station. 
 
 ## Build && Installation
 
