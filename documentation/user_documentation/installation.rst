@@ -39,7 +39,7 @@ Getting **Keysas**
 
 A pre-compiled **Keysas** binary is at your
 disposal. We recommend using the latest version here:
-https://github.com/r3dlight/keysas/tags
+https://github.com/r3dlight/keysas/releases
 
 
 Download the following files of lastest stable version.
