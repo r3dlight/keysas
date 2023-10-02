@@ -61,6 +61,12 @@ Before starting, you must add a new **udev** to allow your current user wrting U
 You can now start signing at least one USB device in **"Admin configuration->USB Signing"**.
 Type the **password** provided during your **IKPQPKI** creation, plug the USB key and wait !
 Once again, be patient, this may take a while !
+Now format your USB key using mkfs.xxx in a terminal:
+
+.. code-block:: shell-session
+ 
+ sudo mkfs.vfat /dev/sda1 #For example
+
 If your **Keysas** station has been previously enrolled, your signed USB key should be now recognized by the station.
 
 You're now ready to go !
