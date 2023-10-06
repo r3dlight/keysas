@@ -402,6 +402,7 @@ mod tests_out {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_bind_and_sign() {
         // Generate temporary keys
         let infos =
