@@ -1,6 +1,6 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
+    <h5 class="text-info text-bold"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
     <br>
     <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
       <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture (IKPQPKI).
@@ -14,7 +14,7 @@
   <br>
   <div v-if="!hide" class="box-custom">
     <div class="text-center">
-      <button class="send btn btn-light shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
+      <button class="send btn btn-secondary shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
         IKPQPKI configuration</span></button>
       <br><br>
       <div class="List">
@@ -36,7 +36,7 @@
           }}</span></li>
         </ul>
       </div>
-      <button class="btn btn-outline-danger btn-lg shadow" @click="removePKI">Delete PKI</button>
+      <button class="btn btn-danger btn-lg shadow" @click="removePKI">Forget PKI</button>
     </div>
   </div>
   <div v-else>
@@ -171,7 +171,7 @@ button {
 .tip-text {
   font-weight: normal;
   color: rgb(158, 161, 163);
-  font-size: 1em;
+  font-size: 1.1em;
 }
 h3 {
   margin: 45px 0 0;

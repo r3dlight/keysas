@@ -5,13 +5,13 @@
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
       <li class="list-group-item list-group-item transparent" v-for="device in stations">
-        <button class="btn btn-outline-dark btn-lg shadow">
+        <button class="btn btn-dark btn-lg shadow">
           {{ device.name }}
         </button>
         <i class="bi bi-arrow-right">
         </i> &nbsp;
         <div class="btn-group" role="group">
-          <button class="btn btn-outline-warning btn-lg shadow" @click="flush();
+          <button class="btn btn-warning btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -20,7 +20,7 @@
           rebootKeysas(device.name)">
             <span class="bi bi-arrow-counterclockwise">Reboot</span>
           </button>
-          <button class="btn btn-outline-primary btn-lg shadow" @click="flush();
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -29,7 +29,7 @@
           shutdownKeysas(device.name)">
             <span class="bi bi-arrow-down-circle-fill"> Shutdown</span>
           </button>
-          <button class="btn btn-outline-info btn-lg shadow" @click="flush();
+          <button class="btn btn-info btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -38,7 +38,7 @@
           AddSSHPubKey(device.name)">
             <span class="bi bi-send"> Export SSH pubkey</span>
           </button>
-          <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device.name);
+          <button class="btn btn-danger btn-lg shadow" @click="removeKeysas(device.name);
           flush();
           hide = true">
             <span class="bi bi-exclamation-circle"> Delete</span>
@@ -82,19 +82,19 @@
       <ul class="list-group">
         <li class="list-group-item list-group-item transparent">
           <div class="btn-group" role="group" aria-label="Basic outlined example">
-            <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
+            <button class="send btn btn-lg btn-info shadow" @click="flush();
             ShowPasswordInit = !ShowPasswordInit">
               <span class="bi bi-magic"> Enroll</span>
             </button>
-            <button class="send btn btn-lg btn-outline-primary shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowAddYubikey = !ShowAddYubikey">
               <span class="bi bi-cart-check"> Add a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-outline-warning shadow" @click="flush();
+            <button class="send btn btn-lg btn-warning shadow" @click="flush();
             ShowRevYubikey = !ShowRevYubikey">
               <span class="bi bi-x-square"> Revoke a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-outline-success shadow" @click="flush();
+            <button class="send btn btn-lg btn-success shadow" @click="flush();
             ShowUpdateKeysas = !ShowUpdateKeysas;
             update_status = undefined;
             updateKeysas(current_keysas)">

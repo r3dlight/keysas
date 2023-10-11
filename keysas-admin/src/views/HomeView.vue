@@ -77,11 +77,6 @@ span {
   font-size: 1em;
 }
 
-.website {
-  font-weight: normal;
-  font-size: 1em;
-  color: rgb(132, 132, 132);
-}
 
 ul.doc {
   color: rgb(134, 134, 132);

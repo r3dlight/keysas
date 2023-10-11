@@ -2,23 +2,24 @@
   <NavBar />
   <div class="container">
     <div class="row">
-      <h1>Administration console configuration</h1>
+      <h1>Administration configuration__</h1>
       <br>
     </div>
   <div class="box">
-    <button class="btn btn-outline-success btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
-      <span class="bi bi-arrows-expand"> USB signing</span>
+    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
+      <span class="bi bi-arrows-expand"> USB signing__</span>
     </button>
-    <button class="btn btn-outline-warning btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
-      <span class="bi bi-arrows-expand"> USB revoking</span>
+    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
+      <span class="bi bi-arrows-expand"> USB revoking__</span>
     </button>
-    <button class="btn btn-outline-primary btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
-      <span class="bi bi-arrows-expand"> SSH configuration</span>
+    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
+      <span class="bi bi-arrows-expand"> SSH configuration__</span>
     </button>
-    <button class="btn btn-outline-danger btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
-      <span class="bi bi-arrows-expand"> IKPQPKI configuration</span>
+    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
+      <span class="bi bi-arrows-expand"> IKPQPKI configuration__</span>
     </button>
   </div>
+  <br>
     <div class="row" v-if="ShowSign">
       <h3>USB device signing</h3>
       <div class="col-sm">
