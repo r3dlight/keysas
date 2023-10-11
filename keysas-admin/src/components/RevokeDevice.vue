@@ -4,7 +4,7 @@
       <div class="row">
         <div class="col-sm">
           <div class="tip">
-            <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
+            <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
             <br><br>
             <span class="tip-text">Click on the button and plug the USB key in your Keysas station within 30 seconds
               to revoke it</span><br>
@@ -12,8 +12,10 @@
         </div>
         <div class="col-sm">
           <div class="tip">
-            <button class="send btn btn-lg btn-outline-danger shadow" @click="onSubmitRevoke()"><i
+            <br>
+            <button class="send btn btn-lg btn-danger shadow" @click="onSubmitRevoke()"><i
                 class="bi bi-check-square"> Revoke !</i></button>
+            <br>
           </div>
         </div>
       </div>
@@ -65,4 +67,11 @@ export default {
 
 
 <style lang="scss">
+  
+.tip-text {
+  font-weight: normal;
+  color: rgb(101, 101, 101);
+  font-size: 1.2em;
+}
+
 </style>

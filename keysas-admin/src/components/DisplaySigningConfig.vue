@@ -1,14 +1,14 @@
 <template>
   <div class="tip">
     <h5 class="text-info text-bold"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
-    <br>
     <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
-      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture (IKPQPKI).
-      Click on <b>Create a new IKPQPKI</b>.</span>
-    <span class="tip-text"> Then, provide all the requested information to allow us to create a new IKPQPKI for you.<br> 
-    When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.<br> 
-    </span>
-    <span class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></span>
+      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture <b>(IKPQPKI)</b>:</span>
+    <ul>
+      <li class="tip-text">Click on <b>Create a new IKPQPKI</b></li>
+      <li class="tip-text"> Provide all the requested information to allow us to create a new IKPQPKI for you.</li> 
+      <li class="tip-text"> When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.</li> 
+      <li class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></li>
+    </ul>
 
   </div>
   <br>

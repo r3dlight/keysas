@@ -3,7 +3,7 @@
     <label type="text"> Path to your SSH public key:</label>
     <input type="text" required v-model="publicKey" id="publicKey"/>
     <div class="text-center">
-      <button class="btn btn-outline-secondary btn-sm shadow" @click="PublicKeyPath">Browse</button>
+      <button class="btn btn-secondary btn-sm shadow" @click="PublicKeyPath">Browse</button>
     </div>
     <div v-if="keysError" class="error"> {{ keysError }}
     </div>
@@ -11,12 +11,12 @@
       <label type="text"> Path to your SSH private key: &nbsp;</label>
       <input type="text" required v-model="privateKey" id="private" />
       <div class="text-center">
-    <button class="btn btn-outline-secondary btn-sm shadow" @click="PrivateKeyPath">Browse</button>
+    <button class="btn btn-secondary btn-sm shadow" @click="PrivateKeyPath">Browse</button>
   </div>
   <div v-if="keysError" class="error"> {{ keysError }}</div>
   <br><br>
   <div class="submit">
-    <button class="send btn btn-outline-success btn-lg shadow"><i class="bi bi-check-square"> Ok</i></button>
+    <button class="send btn btn-success btn-lg shadow"><i class="bi bi-check-square"> Ok</i></button>
     <br><br>
     <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
   </div>

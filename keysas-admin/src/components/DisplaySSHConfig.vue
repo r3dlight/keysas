@@ -1,12 +1,13 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
+    <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
     <br>
-    <span class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
-      stations.</span>
-    <span class="tip-text">Only ED25519 in PEM format is supported.<br> To generate this new SSH keypair on your local
-      machine, open a terminal and enter to following command:</span>
-    <br>
+    <ul>
+    <li class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
+      stations.</li>
+    <li class="tip-text">Only ED25519 in PEM format is supported.<br> To generate this new SSH keypair on your local
+      machine, open a terminal and enter to following command:</li>
+    </ul>
     <span class="tip-text"><b>ssh-keygen -m PEM -t ed25519 -f mykey</b></span>
   </div>
   <br>

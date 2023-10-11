@@ -83,7 +83,7 @@ ul.doc {
   text-align: left;
   display: inline-block;
   margin: 25px 0 15px;
-  font-size: 1.3em;
+  font-size: 1.4em;
 }
 
 h2 {

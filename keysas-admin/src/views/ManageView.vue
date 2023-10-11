@@ -58,23 +58,26 @@
   <div v-if="!hide" class="box animate__animated animate__pulse">
     <ul class="box-small-left">
       <li class="list-group-item list-group-item-action list-group-item-light">
-        <span>Name:</span> {{ current_keysas }}
+        <h4><b>Name:</b> {{ current_keysas }}</h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light">
-        <span>IP:</span> {{ current_ip }}
+        <h4><b>IP:</b> {{ current_ip }}</h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === true">
-        <span>Status: </span>
-        <span class="bi bi-check-square text-success"> Online</span>
+        <h4><b>Status:</b> 
+          <span class="bi bi-check-square text-success"> Online</span>
+        </h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === false">
-        <span>Status: </span>
+        <h4><b>Status: </b>
         <span class="bi bi-x-square text-danger"> Offline</span>
+        </h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light"
         v-if="KeysasAlive != false && KeysasAlive != true">
-        <span>Status: </span>
+        <h4><b>Status:</b>
         <span class="bi bi-x-square text-dark"> Unknown</span>
+        </h4>
       </li>
     </ul>
     <div v-if="ShowActionButtons">
@@ -109,12 +112,11 @@
         <div class="row">
           <div class="col-sm">
             <div class="tip">
-              <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
-              <br>
+              <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
               <span class="tip-text">Type your <b>IKPQPKI</b> password to enroll this <b>Keysas</b> station.
               </span>
               <br><br>
-              <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
+              <h4 class="text-warning"><i class="bi bi-exclamation-triangle"> WARNING</i></h4>
               <span class="tip-text">This action will create private keys and CSRs on this Keysas station. Then, it will sign the CSRs with the PKi. This may be long !</span>
             </div>
           </div>
@@ -124,7 +126,7 @@
               <input type="password" required v-model="password" placeholder="8 characters minimum" id="password" />
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
-                <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Enroll it</i></button>
+                <button class="send btn btn-success btn-lg shadow"><i class="bi bi-check-square"> Enroll it</i></button>
                 <br><br>
                 <p v-if="confirmed === true && !init_status" class="validate animate__animated animate__zoomIn">Processing  <span class="spinner-border text-info"></span></p>
                 <p v-else-if="confirmed === true && init_status == 'true' " class="validate animate__animated animate__zoomIn text-success">Done !</p>
@@ -452,7 +454,7 @@ p {
 .tip-text {
   font-weight: normal;
   color: rgb(101, 101, 101);
-  font-size: 1em;
+  font-size: 1.2em;
 }
 
 .box-small-left {

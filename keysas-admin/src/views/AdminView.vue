@@ -7,33 +7,33 @@
     </div>
   <div class="box">
     <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
-      <span class="bi bi-arrows-expand"> USB signing__</span>
+      <span class="bi bi-arrows-expand"> USB signing</span>
     </button>
     <button class="btn btn-info btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
-      <span class="bi bi-arrows-expand"> USB revoking__</span>
+      <span class="bi bi-arrows-expand"> USB revoking</span>
     </button>
     <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
-      <span class="bi bi-arrows-expand"> SSH configuration__</span>
+      <span class="bi bi-arrows-expand"> SSH configuration</span>
     </button>
     <button class="btn btn-info btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
-      <span class="bi bi-arrows-expand"> IKPQPKI configuration__</span>
+      <span class="bi bi-arrows-expand"> IKPQPKI configuration</span>
     </button>
   </div>
   <br>
     <div class="row" v-if="ShowSign">
-      <h3>USB device signing</h3>
+      <h2>USB device signing</h2>
       <div class="col-sm">
         <SignDevice />
       </div>
     </div>
     <div class="row" v-if="ShowRevoke">
-      <h3>USB device revoking</h3>
+      <h2>USB device revoking</h2>
       <div class="col-sm">
         <RevokeDevice />
       </div>
     </div>  
     <div class="row" v-if="ShowSSH">
-      <h3>SSH configuration</h3>
+      <h2>SSH configuration</h2>
       <div class="col-sm">
         <SSHKeys />
       </div>
@@ -42,7 +42,7 @@
       </div>
     </div>
     <div class="row" v-if="ShowPKI">
-      <h3>IKPQPKI configuration</h3>
+      <h2>IKPQPKI configuration</h2>
       <div class="col-sm">
         <SigningKeys />
       </div>
