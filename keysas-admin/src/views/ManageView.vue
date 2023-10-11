@@ -4,14 +4,19 @@
   <div class="box">
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
-      <li class="list-group-item list-group-item transparent" v-for="device in stations">
-        <button class="btn btn-dark btn-lg shadow">
+      <li class="list-group-item transparent" v-for="device in stations">
+          <button class="btn btn-dark btn-lg shadow" @click="hide = !hide; ShowActionButtons = true;
+          flush();
+          this.current_keysas = device.name;
+          this.current_ip = device.ip;
+          getKeysasIP(device.name);
+          this.current_keysas = device.name">
           {{ device.name }}
         </button>
         <i class="bi bi-arrow-right">
-        </i> &nbsp;
-        <div class="btn-group" role="group">
-          <button class="btn btn-warning btn-lg shadow" @click="flush();
+        </i>
+          <!--<div class="btn-group" role="group">-->
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -29,7 +34,7 @@
           shutdownKeysas(device.name)">
             <span class="bi bi-arrow-down-circle-fill"> Shutdown</span>
           </button>
-          <button class="btn btn-info btn-lg shadow" @click="flush();
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -51,7 +56,6 @@
           this.current_keysas = device.name">
             <span class="bi bi-arrows-expand"> More...</span>
           </button>
-        </div>
       </li>
     </ul>
   </div>
@@ -64,7 +68,7 @@
         <h4><b>IP:</b> {{ current_ip }}</h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === true">
-        <h4><b>Status:</b> 
+        <h4><b>Status: </b> 
           <span class="bi bi-check-square text-success"> Online</span>
         </h4>
       </li>
@@ -75,7 +79,7 @@
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light"
         v-if="KeysasAlive != false && KeysasAlive != true">
-        <h4><b>Status:</b>
+        <h4><b>Status: </b> 
         <span class="bi bi-x-square text-dark"> Unknown</span>
         </h4>
       </li>
@@ -83,9 +87,9 @@
     <div v-if="ShowActionButtons">
 
       <ul class="list-group">
-        <li class="list-group-item list-group-item transparent">
-          <div class="btn-group" role="group" aria-label="Basic outlined example">
-            <button class="send btn btn-lg btn-info shadow" @click="flush();
+        <li class="list-group-item transparent">
+          <div aria-label="Basic outlined example">
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowPasswordInit = !ShowPasswordInit">
               <span class="bi bi-magic"> Enroll</span>
             </button>
@@ -93,11 +97,11 @@
             ShowAddYubikey = !ShowAddYubikey">
               <span class="bi bi-cart-check"> Add a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-warning shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowRevYubikey = !ShowRevYubikey">
               <span class="bi bi-x-square"> Revoke a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-success shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowUpdateKeysas = !ShowUpdateKeysas;
             update_status = undefined;
             updateKeysas(current_keysas)">
@@ -418,10 +422,10 @@ p {
 }
 
 .box {
-  max-width: 1700px;
-  margin: 40px auto;
+  max-width: 1200px;
+  margin: 20px auto;
   background: white;
-  //text-align: center;
+  /*text-align: center;*/
   padding: 40px;
   border-radius: 15px;
   box-shadow: 10px 5px 5px black;

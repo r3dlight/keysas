@@ -1,7 +1,7 @@
 <template>
   <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-warning btn-lg shadow"
+      <button class="send btn btn-primary btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
@@ -18,7 +18,7 @@
       </button>      
     </div>-->
     <div class="col">
-      <button class="send btn btn-success btn-lg shadow" 
+      <button class="send btn btn-primary btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">

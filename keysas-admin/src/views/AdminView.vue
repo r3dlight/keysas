@@ -6,17 +6,17 @@
       <br>
     </div>
   <div class="box">
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
-      <span class="bi bi-arrows-expand"> USB signing</span>
-    </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
-      <span class="bi bi-arrows-expand"> USB revoking</span>
-    </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
+    <button class="btn btn-primary btn-lg shadow" @click="flush(); ShowSSH = !ShowSSH;">
       <span class="bi bi-arrows-expand"> SSH configuration</span>
     </button>
-    <button class="btn btn-info btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
+    <button class="btn btn-primary btn-lg shadow" @click="flush(); ShowPKI = !ShowPKI;">
       <span class="bi bi-arrows-expand"> IKPQPKI configuration</span>
+    </button>
+    <button class="btn btn-primary btn-lg shadow" @click="flush(); ShowSign = !ShowSign;">
+      <span class="bi bi-arrows-expand"> Key signing</span>
+    </button>
+    <button class="btn btn-primary btn-lg shadow" @click="flush(); ShowRevoke = !ShowRevoke;">
+      <span class="bi bi-arrows-expand"> Key revoking</span>
     </button>
   </div>
   <br>
