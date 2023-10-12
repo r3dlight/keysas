@@ -5,17 +5,16 @@
         <div class="col-sm">
           <div class="tip">
             <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
-            <br><br>
+            <br>
             <span class="tip-text">Click on the button and plug the USB key in your Keysas station within 30 seconds
-              to revoke it</span><br>
-          </div>
-        </div>
-        <div class="col-sm">
-          <div class="tip">
+              to revoke it</span>
             <br>
+            <br>
+            <div class="text-center">
             <button class="send btn btn-lg btn-danger shadow" @click="onSubmitRevoke()"><i
-                class="bi bi-check-square"> Revoke !</i></button>
-            <br>
+                class="bi bi-check-square"> Revoke !</i>
+            </button>
+            </div>
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@
       <div class="row">
         <div class="col-sm">
           <form class="add-form" @submit.prevent="onSubmitSign">
-            <label type="text">Password:</label>
+            <label type="text">IKPQPKI Password:</label>
             <input type="password" required v-model="password" placeholder="8 caracters min" id="password" />
             <div v-if="passwordError" class="error"> {{ passwordError }}</div>
             <br>
