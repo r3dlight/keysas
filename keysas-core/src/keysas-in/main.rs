@@ -165,7 +165,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 base_path
             })
             .filter_map(|f| {
-                // FD is opened in read-write mode
+                // FD is opened in read-only mode
                 let fh = match File::open(&f) {
                     Ok(f) => f,
                     Err(e) => {
