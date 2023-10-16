@@ -77,7 +77,6 @@ pub fn init() -> Result<()> {
 pub fn landlock_sandbox(sas_in: &String) -> Result<()> {
     use landlock::{make_bitflags, PathBeneath, PathFd};
     // Still using ABI v2 for now
-    // TODO: check the ABI version dynamically
     let abi = ABI::V2;
     let allow = make_bitflags!(AccessFs::{RemoveFile | RemoveDir | ReadFile | ReadDir});
     let status = Ruleset::default()
