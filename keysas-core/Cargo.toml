@@ -24,8 +24,8 @@ ed25519-dalek = "2"
 rand = "0.8"
 pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
-landlock = "0.2"
-syscallz = "0.16"
+landlock = "0.3"
+syscallz = "0.17"
 yara = "0.21"
 
 [dependencies.oqs]
