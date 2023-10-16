@@ -79,7 +79,7 @@ pub fn landlock_sandbox(sas_in: &String) -> Result<()> {
     // Still using ABI v2 for now
     // TODO: check the ABI version dynamically
     let abi = ABI::V2;
-    let allow = make_bitflags!(AccessFs::{RemoveFile | RemoveDir | ReadFile});
+    let allow = make_bitflags!(AccessFs::{RemoveFile | RemoveDir | ReadFile | ReadDir});
     let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
