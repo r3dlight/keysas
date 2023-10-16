@@ -26,7 +26,7 @@ Environment:
 #include <ntdef.h>
 #include <wdm.h>
 
-#include "keysasDriver.h"
+#include "KeysasMinifilter.h"
 #include "keysasFile.h"
 
 // Name of the port used to communicate with user space

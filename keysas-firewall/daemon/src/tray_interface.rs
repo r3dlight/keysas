@@ -17,17 +17,16 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
-use libmailslot;
-use std::sync::Arc;
 use crate::controller::ServiceController;
 use crate::driver_interface::KeysasAuthorization;
+use anyhow::anyhow;
+use libmailslot;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Message for a file status notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -35,7 +34,7 @@ pub struct FileUpdateMessage {
     device: String,
     pub id: [u16; 16],
     path: String,
-    pub authorization: KeysasAuthorization
+    pub authorization: KeysasAuthorization,
 }
 
 /// Name of the communication pipe
@@ -49,7 +48,7 @@ pub fn init(ctrl: &Arc<ServiceController>) -> Result<(), anyhow::Error> {
     std::thread::spawn(move || {
         let server = match libmailslot::create_mailslot(TRAY_PIPE) {
             Ok(s) => s,
-            Err(_) => return (),
+            Err(_) => return,
         };
 
         loop {
@@ -63,7 +62,6 @@ pub fn init(ctrl: &Arc<ServiceController>) -> Result<(), anyhow::Error> {
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
-
     });
     Ok(())
 }
@@ -72,7 +70,7 @@ pub fn init(ctrl: &Arc<ServiceController>) -> Result<(), anyhow::Error> {
 pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
     let msg_vec = match serde_json::to_string(msg) {
         Ok(m) => m,
-        Err(e) => return Err(anyhow!("Failed to serialize message: {e}"))
+        Err(e) => return Err(anyhow!("Failed to serialize message: {e}")),
     };
 
     if let Err(e) = libmailslot::write_mailslot(SERVICE_PIPE, &msg_vec) {
@@ -84,7 +82,10 @@ pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn send_file_auth_status(file_data: &[u16], authorization: KeysasAuthorization) -> Result<(), anyhow::Error> {
+pub fn send_file_auth_status(
+    file_data: &[u16],
+    authorization: KeysasAuthorization,
+) -> Result<(), anyhow::Error> {
     let file_path = match String::from_utf16(&file_data[17..]) {
         Ok(path) => path,
         Err(_) => {
@@ -101,7 +102,7 @@ pub fn send_file_auth_status(file_data: &[u16], authorization: KeysasAuthorizati
         device: String::from("D:"),
         id,
         path: String::from(file_path),
-        authorization
+        authorization,
     };
 
     send(&msg)

@@ -21,7 +21,7 @@ Environment:
 #ifndef _H_KEYSAS_INSTANCE_
 #define _H_KEYSAS_INSTANCE_
 
-#include "keysasDriver.h"
+#include "KeysasMinifilter.h"
 #include "keysasCommunication.h"
 
 // Instance context data structure

@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 widestring = "1.0"
 anyhow = "1.0"
-simple_logger = "4.1"
+#simple_logger = "4.1"
 log = "0.4"
 wchar = "0.11"
 mbrman = "0.5"
@@ -26,6 +26,9 @@ clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 toml = "0.7"
 libmailslot = {path = "../libmailslot"}
 x509-cert = "0.2"
+windows-service = "0.6"
+eventlog = "0.2"
+registry = "1.2"
 
 [dependencies.windows]
 version = "0.48.0"
