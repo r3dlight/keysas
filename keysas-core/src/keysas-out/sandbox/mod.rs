@@ -71,7 +71,7 @@ pub fn init() -> Result<()> {
 /// Setup the landlock sandboxing
 pub fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.

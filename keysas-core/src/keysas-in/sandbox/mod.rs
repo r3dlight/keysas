@@ -76,7 +76,7 @@ pub fn init() -> Result<()> {
 #[cfg(target_os = "linux")]
 pub fn landlock_sandbox(sas_in: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
