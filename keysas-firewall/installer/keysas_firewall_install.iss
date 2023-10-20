@@ -50,12 +50,12 @@ english.EnterCertif=Enter path to USB CA certificates
 english.CertifCLLocation=Path to ED25519 certificate
 english.CertifPQLocation=Path to Dilithium 5 certificate
 french.SecurityConfigInfo=Configuration du pare-feu Keysas
-french.EnterConfig=Définissez la politique de sécurité du pare-feu
-french.DisableUnsignedUsb=Autorisez toutes les clés USB non signées
-french.AllowUserUsbAuthorization=Autorisez l'utilisateur à  approuver manuellement les clés USB non signées
-french.AllowUserFileRead=Autorisez l'utilisateur à approuver manuellement la lecture des fichiers non vérifiés
-french.AllowUserFileWrite=Autorisez l'utilisateur à modifier ou créer des fichiers sur les clés USB 
-french.CertifConfigInfo=Sélectionner les certificats de la CA USB
+french.EnterConfig=Dï¿½finissez la politique de sï¿½curitï¿½ du pare-feu
+french.DisableUnsignedUsb=Autorisez toutes les clï¿½s USB non signï¿½es
+french.AllowUserUsbAuthorization=Autorisez l'utilisateur ï¿½ approuver manuellement les clï¿½s USB non signï¿½es
+french.AllowUserFileRead=Autorisez l'utilisateur ï¿½approuver manuellement la lecture des fichiers non vï¿½rifiï¿½s
+french.AllowUserFileWrite=Autorisez l'utilisateur ï¿½modifier ou crï¿½er des fichiers sur les clï¿½s USB 
+french.CertifConfigInfo=Sï¿½lectionner les certificats de la CA USB
 french.EnterCertif=Entrer le chemin vers les certificats
 french.CertifCLLocation=Chemin vers le certificat ED25519
 french.CertifPQLocation=Chemin vers le certificat Dilithium 5
@@ -64,11 +64,17 @@ french.CertifPQLocation=Chemin vers le certificat Dilithium 5
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
+; Service executable
 Source: "..\daemon\target\debug\keysas-usbfilter-daemon.exe"; DestDir: "{app}\{#AgentName}\Service"; Flags: ignoreversion
-; Source: ".\keysas-tray-app.exe"; DestDir: "{app}\{#AgentName}\TrayApp"; Flags: ignoreversion
+; Minifilter driver executable and files - Change to Release when the driver is signed
 Source: "..\minifilter\x64\Debug\{#FsFilter}\*"; DestDir:"{app}\{#AgentName}\Minifilter"; Flags: ignoreversion
 Source: "..\minifilter\x64\Debug\{#FsFilter}\{#FsFilter}.sys"; DestDir:"{sys}\drivers\"; Flags: ignoreversion 64bit
+; Tray app installers - Check that version number match the one supplied in tauri configuration file when building the app
+Source: "..\tray-app\src-tauri\target\release\bundle\msi\keysas-tray-app_0.1.0_x64_fr-FR.msi"; DestDir: "{app}\{#AgentName}\TrayApp"; Flags: deleteafterinstall ignoreversion
+Source: "..\tray-app\src-tauri\target\release\bundle\msi\keysas-tray-app_0.1.0_x64_en-US.msi"; DestDir: "{app}\{#AgentName}\TrayApp"; Flags: deleteafterinstall ignoreversion
+; Keysas logo
 Source: ".\logo-keysas-short.ico"; DestDir: "{app}\{#AgentName}"; Flags: ignoreversion
+; USB Certificate Authority certificates, supplied by the user
 Source: {code:GetCLCertif}; DestDir: "{app}\{#AgentName}\config"; Flags: external
 Source: {code:GetPQCertif}; DestDir: "{app}\{#AgentName}\config"; Flags: external
 
@@ -170,16 +176,23 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; Val
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: dword; ValueName: "AllowUserFileWrite"; ValueData: {code:GetConfigWriteAuthorization}; Flags: uninsdeletekey    
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaClCert"; ValueData: {code:GetCLCertif}; Flags: uninsdeletekey 
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaPqCert"; ValueData: {code:GetPQCertif}; Flags: uninsdeletekey
+; Register tray app to automaticaly run at startup
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Keysas-TrayApp"; ValueData: "C:\Programmes\keysas-tray-app\keysas-tray-app.exe"; Flags: uninsdeletekey
 
 [Run]
+; Run Minifilter inf file and install it in system directory
 Filename: "RUNDLL32.EXE"; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultInstall 132 {app}\{#AgentName}\Minifilter\{#FsFilter}.inf"; Flags: runhidden
 Filename: "xcopy.exe"; Parameters: """C:\Windows\SysWOW64\drivers\{#FsFilter}.sys"" ""C:\Windows\System32\drivers"" /y"; Flags: runhidden
+; Install Keysas service and start it
 Filename: {sys}\sc.exe; Parameters: "create ""{#AgentName}"" binPath= ""{app}\{#AgentName}\Service\keysas-usbfilter-daemon.exe"""; Flags: runhidden
 Filename: {sys}\sc.exe; Parameters: "config ""{#AgentName}"" depend= {#FsFilter}"; Flags: runhidden
 Filename: {sys}\sc.exe; Parameters: "config ""{#AgentName}"" start= delayed-auto"; Flags: runhidden
 Filename: {sys}\sc.exe; Parameters: "start ""{#FsFilter}"""; Flags: runhidden
 Filename: {sys}\sc.exe; Parameters: "start ""{#AgentName}"""; Flags: runhidden
 Filename: {sys}\sc.exe; Parameters: "query ""{#AgentName}"""; Flags: runhidden
+; Install tray app
+Filename: "msiexec.exe"; Parameters: "/i ""{app}\{#AgentName}\TrayApp\keysas-tray-app_0.1.0_x64_en-US.msi"" /qb"; WorkingDir: "{app}\{#AgentName}\TrayApp"; Languages: english
+Filename: "msiexec.exe"; Parameters: "/i ""{app}\{#AgentName}\TrayApp\keysas-tray-app_0.1.0_x64_fr-FR.msi"" /qb"; WorkingDir: "{app}\{#AgentName}\TrayApp"; Languages: french
 
 [UninstallRun]
 Filename: {sys}\sc.exe; Parameters: "stop ""{#AgentName}"""; Flags: runhidden

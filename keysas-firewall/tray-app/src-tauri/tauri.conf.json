@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "keysas-tray-app",
-    "version": "0.0.0"
+    "version": "0.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -35,7 +35,12 @@
       ],
       "identifier": "com.keysas.usbfirewall",
       "targets": "all",
-      "category": "Utility"
+      "category": "Utility",
+      "windows": {
+        "wix": {
+          "language": ["fr-FR", "en-US"]
+        }
+      }
     },
     "security": {
       "csp": null

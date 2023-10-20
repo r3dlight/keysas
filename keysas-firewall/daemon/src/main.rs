@@ -114,21 +114,18 @@ fn command_args(config: &mut Config) {
 
 define_windows_service!(ffi_keysas_service, keysas_service_main);
 
-fn keysas_service_main(args: Vec<OsString>) {
+fn keysas_service_main(_args: Vec<OsString>) {
     // Declare service event handler
     let event_handler = move |event| -> ServiceControlHandlerResult {
         match event {
-            ServiceControl::Stop | ServiceControl::Interrogate => {
+            ServiceControl::Stop => {
                 log::info!("Service asked to stop");
                 ServiceControlHandlerResult::NoError
             }
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
             _ => ServiceControlHandlerResult::NotImplemented,
         }
     };
-
-    for arg in args {
-        log::info!("{:?}", arg);
-    }
 
     // Register the service handler
     let status_handle = match service_control_handler::register("Keysas", event_handler) {
@@ -185,7 +182,7 @@ fn keysas_service_main(args: Vec<OsString>) {
         return;
     };
 
-    log::info!("Keysas service stopped");
+    log::warn!("Keysas service stopped");
 }
 
 fn main() -> Result<(), anyhow::Error> {
