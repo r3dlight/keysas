@@ -28,6 +28,6 @@ time = "0.3"
 base64 = "0.21"
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["dilithium"]

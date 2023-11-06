@@ -27,7 +27,7 @@ proc-mounts = "0.3"
 hex = "0.4"
 kv = "0.24"
 walkdir = "2.4"
-landlock = "0.2" 
+landlock = "0.3" 
 flexi_logger = "0.27"
 http = "0.2"
 
