@@ -37,7 +37,6 @@ extern crate serde_derive;
 
 extern crate libc;
 extern crate regex;
-mod errors;
 
 const SAS_IN: &str = "/var/local/in";
 const SAS_OUT: &str = "/var/local/out";
@@ -73,7 +72,7 @@ pub struct GuichetState {
 
 fn landlock_sandbox() -> Result<(), RulesetError> {
     let abi = ABI::V1;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access to /usr, /etc and /dev.

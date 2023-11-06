@@ -35,15 +35,14 @@
 
 pub use anyhow::{anyhow, Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::SigningKey;
 use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::keysas_key::KeysasKey;
+use keysas_lib::keysas_key::KeysasPQKey;
 use pkcs8::der::EncodePem;
 use std::fs::File;
 use std::io::prelude::*;
-mod errors;
-use ed25519_dalek::SigningKey;
-use keysas_lib::keysas_key::KeysasKey;
-use keysas_lib::keysas_key::KeysasPQKey;
 use std::path::Path;
 use std::str;
 
