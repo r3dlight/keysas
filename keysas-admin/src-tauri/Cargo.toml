@@ -39,7 +39,7 @@ base64 = "0.21"
 keysas_lib = { path = "../../keysas_lib" }
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["std", "dilithium"]
 
