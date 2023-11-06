@@ -2,7 +2,7 @@
 /*
  * The "keysas-in".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
