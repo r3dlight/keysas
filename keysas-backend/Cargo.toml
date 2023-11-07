@@ -1,6 +1,6 @@
 [package]
 name = "keysas-backend"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,7 +27,7 @@ proc-mounts = "0.3"
 hex = "0.4"
 kv = "0.24"
 walkdir = "2.4"
-landlock = "0.2" 
+landlock = "0.3" 
 flexi_logger = "0.27"
 http = "0.2"
 

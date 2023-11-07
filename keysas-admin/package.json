@@ -1,6 +1,6 @@
 {
   "name": "keysas-admin",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -26,6 +26,6 @@
     "eslint": "^8.22.0",
     "eslint-plugin-vue": "^9.3.0",
     "prettier": "^2.7.1",
-    "vite": "^4.0.4"
+    "vite": "^4.5.0"
   }
 }

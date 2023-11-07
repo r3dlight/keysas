@@ -1,6 +1,6 @@
 [package]
 name = "keysas-admin"
-version = "2.2.0"
+version = "2.3.0"
 description = "Keysas stations administration application"
 authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
@@ -39,7 +39,7 @@ base64 = "0.21"
 keysas_lib = { path = "../../keysas_lib" }
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["std", "dilithium"]
 

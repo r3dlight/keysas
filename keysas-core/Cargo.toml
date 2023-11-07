@@ -1,6 +1,6 @@
 [package]
 name = "keysas-core"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 
 [dependencies]
@@ -26,10 +26,10 @@ pkcs8 =  {version = "0.10", features = ["encryption", "pem"] }
 x509-cert = "0.2"
 landlock = "0.3"
 syscallz = "0.17"
-yara = "0.21"
+yara = "0.22"
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["dilithium"]
 

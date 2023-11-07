@@ -1,6 +1,6 @@
 [package]
 name = "keysas_lib"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,6 +28,6 @@ time = "0.3"
 base64 = "0.21"
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["dilithium"]

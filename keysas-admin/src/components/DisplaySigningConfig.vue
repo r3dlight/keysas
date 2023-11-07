@@ -1,6 +1,6 @@
 <template>
   <div class="tip">
-    <h5 class="text-info text-bold"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
+    <h4 class="text-info text-bold"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
     <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
       <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture <b>(IKPQPKI)</b>:</span>
     <ul>
@@ -156,16 +156,14 @@ button {
 }
 
 .tip {
-  max-width: 1000px;
-  text-align: left;
-  margin: 30px auto;
+  max-width: 1200px;
+  margin: 20px auto;
   background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 5px 5px 5px black;
+  text-align: left;
+  padding: 1em;
+  border-radius: 18px;
   color: white;
-  display: inline-block;
-  font-size: 1.0em;
+  text-align: left;
 }
 
 .tip-text {

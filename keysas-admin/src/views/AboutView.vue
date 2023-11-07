@@ -21,7 +21,7 @@ export default {
   <NavBar />
   <h2>Keysas-admin. Version 2.3</h2>
   <h2>Please visit <a href="#https://keysas.fr" class="website text-info">keysas.fr</a> to learn more </h2>
-  <h3>Copyright. Keysas 2022-2023.</h3>
+  <h3>Copyright. Keysas 2022-2024.</h3>
 </template>
 
 <style lang="scss">

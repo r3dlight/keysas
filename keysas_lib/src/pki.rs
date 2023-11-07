@@ -2,7 +2,7 @@
 /*
  * The "keysas-lib".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas_lib.
