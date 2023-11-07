@@ -246,6 +246,7 @@ export default {
       this.ShowExportSSH = false;
       this.ShowPasswordGenerateKeypair = false;
       this.ShowPasswordSign = false;
+      this.ShowPasswordInit = false;
       this.password = undefined;
       this.passwordError = '';
       this.confirmed = false;
