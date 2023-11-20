@@ -1,9 +1,11 @@
 # Keysas USB firewall
 
-The keysas USB firewall is used on Windows client to control that:
+The keysas USB firewall is used on end-user computer to control that:
 
 - USB devices connected have been enrolled in the system
 - Files on USB devices have been validated by a Keysas station
+
+It currently supports Windows, addition of Linux support is planned.
 
 ## Architecture
 
@@ -18,7 +20,6 @@ The firewall is composed of four elements:
 
 ## Security Policy configuration
 
-System security policy is configured from a TOML file at the base of the Daemon directory.
 The policy is configured with:
 
 - 'disable_unsigned_usb': if set to 'true' unsigned usb devices are allowed. No checks are performed on files on these devices.
@@ -26,22 +27,26 @@ The policy is configured with:
 - 'allow_user_file_read': if set to 'true' grant the user the ability to manually allow read access to an unsigned file.
 - 'allow_user_file_write': if set to 'true' grant the user the ability to manually allow write access to file on a USB device. 'allow_user_file_read' must also be set to true.
 
-If parameters are missing from the configuration file they are considered to be set to 'false'.
+On Windows the configuration is done via the registry in HKLM\SYSTEM\CurrentControlSet\Services\Keysas Service\config. The Windows installer automatically configures the registry.
+On Linux, system security policy is configured from a TOML file at the base of the Daemon directory.
 
-CA certificates must be provided to the daemon. The path to the pem files is given as arguments to the command line.
+If parameters are missing from the configuration file or the registry they are considered to be set to 'false'.
 
+CA certificates must be provided to the daemon. The path to the pem files is given as arguments to the command line on Linux.
 The comple command line is
 
 ```bash
 ./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Dilithium5 certificate>
 ```
 
+On Windows, path to the CA certificates is configured in the registry at HKLM\SYSTEM\CurrentControlSet\Services\Keysas Service\config in the values UsbCaClCert and UsbCaPqCert.
+
 ## TODO List
 
  This firewall is still a work in progress.
 
 - USB bus filter driver
-  - [ ] Bus call interception
+  - [ ] Bus call interception: WIP
 - Minifilter
   - [X] System call interception and filtering
   - [X] Track per file context
@@ -67,6 +72,10 @@ The comple command line is
 The drivers have been tested on a Windows 10 laptop in debug mode (unsigned driver allowed).
 They have been compiled with Microsoft Visual Studio 2022 with SDK and WDK version 10.0.22621.0.
 
+## Installer creation
+
+An installer can be created with Inno Setup. For that all build artifacts must have been created (minifiler, driver and app), and then use Inno Setup build the script 'installer/keysas_firewall_install.iss'
+
 ### Service and application compilation
 
 The Keysas daemon and tray application have been compiled and tested on Windows 10 with the following dependencies:
@@ -76,3 +85,4 @@ The Keysas daemon and tray application have been compiled and tested on Windows 
 - CMake: <https://cmake.org/>
 - Tauri: <https://tauri.app/>
 - Npm: for example <https://docs.npmjs.com/downloading-and-installing-node-js-and-npm>
+- Inno Setup: <https://jrsoftware.org/> 

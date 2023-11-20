@@ -9,9 +9,13 @@ ClassGuid = {36fc9e60-c465-11cf-8056-444553540000}
 Provider=%ManufacturerName%
 CatalogFile=usbfilter.cat
 DriverVer = 05/10/2023,16.21.56.700
-PnpLockdown=0
+PnpLockdown=1
 
 [DefaultInstall.NTamd64]
+CopyFiles=@usbfilter.sys
+Addreg = usbfilter.AddReg
+
+[DefaultInstall.NTx86]
 CopyFiles=@usbfilter.sys
 Addreg = usbfilter.AddReg
 
@@ -22,15 +26,24 @@ DefaultDestDir = 12
 HKLM, System\CurrentControlSet\Control\Class\{36fc9e60-c465-11cf-8056-444553540000}, UpperFilters, 0x00010008, usbfilter
 
 [DefaultInstall.NTamd64.Services]
-AddService = usbfilter, , usbfilter.Service.Install
+AddService = %ServiceName%, , usbfilter.Service.Install
+
+[DefaultInstall.NTx86.Services]
+AddService = %ServiceName%, , usbfilter.Service.Install
 
 [usbfilter.Service.Install]
 DisplayName = "usbfilter"
 Description = "Keysas USB filter"
 ServiceBinary = %12%\usbfilter.sys
 ServiceType = 1
-StartType = 0
+StartType = 3 ; Start on demand of PnP Manager
 ErrorControl = 1
+
+[defaultUninstall.NTamd64]
+LegacyUninstall=1
+
+[defaultUninstall.NTx86]
+LegacyUninstall=1
 
 [SourceDisksFiles]
 usbfilter.sys=1
@@ -45,3 +58,4 @@ DiskName = "usbfilter Installation Disk"
 usbfilter.DeviceDesc = "usbfilter Device"
 usbfilter.SVCDESC = "usbfilter Service"
 DiskId1 = "USB upper filter driver"
+ServiceName = "usbfilter"
