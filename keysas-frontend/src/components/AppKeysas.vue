@@ -161,9 +161,6 @@ export default {
         }
 
         val.forEach(element => {
-          if(element.endsWith('.krp')) {
-            return;
-          }
 
           let fileProcessed = false;
           Object.entries(errorsMessages).forEach(([key,message]) => {

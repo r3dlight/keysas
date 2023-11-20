@@ -10,7 +10,7 @@
     <div v-if="ipError" class="error"> {{ ipError }}</div>
     <br><br>
     <div class="submit">
-      <button class="send btn btn-outline-success btn-lg shadow"><i class="bi bi-check-square"> Add</i></button>
+      <button class="send btn btn-success btn-lg shadow"><i class="bi bi-check-square"> Add</i></button>
       <br><br>
       <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
     </div>

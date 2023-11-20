@@ -1,12 +1,12 @@
 [package]
 name = "keysas-fido"
-version = "2.0.0"
+version = "2.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yubico_manager = "0.9"
+yubico_manager = { git = "https://github.com/r3dlight/yubico-manager"}
 rand="0.8"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 sled = "0.34"

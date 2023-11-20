@@ -11,6 +11,8 @@ Keysas-admin application
 .. warning:: 
 
  **Keysas-admin** only work on GNU/Linux based systems for now !
+ Adding your current user to the **plugdev** group (Debian/Ubuntu) is
+ also required to access USB raw devices without being privileged.
 
 SSH configuration
 =================
@@ -47,9 +49,24 @@ Be patient, this may take some time !
 
 Sign your outgoing USB keys
 ===========================
-You can now start signing at least one USB device in **"Admin configuration->USB Signing"**
+Before starting, you must add a new **udev** to allow your current user wrting USB devices.
+
+.. code-block:: shell-session
+ 
+ # Add the the new udev rule:
+ echo 'SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"' > /etc/udev/rules.d/71-keysas.rules
+ # Then, add your current user to the disk group:
+ usermod -aG disk $LOGNAME
+
+You can now start signing at least one USB device in **"Admin configuration->USB Signing"**.
 Type the **password** provided during your **IKPQPKI** creation, plug the USB key and wait !
 Once again, be patient, this may take a while !
+Now format your USB key using mkfs.xxx in a terminal:
+
+.. code-block:: shell-session
+ 
+ sudo mkfs.vfat /dev/sda1 #For example
+
 If your **Keysas** station has been previously enrolled, your signed USB key should be now recognized by the station.
 
 You're now ready to go !

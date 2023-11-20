@@ -1,4 +1,4 @@
-use ed25519_dalek::Keypair;
+use ed25519_dalek::SigningKey;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use tempfile::NamedTempFile;
@@ -7,6 +7,7 @@ use crate::generate_signing_keypair;
 use crate::Config;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_generate_signing_keypair() {
     // Generate temporay path to save the keys
 
@@ -31,7 +32,7 @@ fn test_generate_signing_keypair() {
     println!("CSR: {:?}", csrs);
 
     // Test the private keys by loading them
-    Keypair::load_keys(&path_cl, "Test").unwrap();
+    SigningKey::load_keys(&path_cl, "Test").unwrap();
     KeysasPQKey::load_keys(&path_pq, "Test").unwrap();
 
     // Test the CSRs by reconstructing them from the function result

@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -37,7 +37,6 @@ extern crate serde_derive;
 
 extern crate libc;
 extern crate regex;
-mod errors;
 
 const SAS_IN: &str = "/var/local/in";
 const SAS_OUT: &str = "/var/local/out";
@@ -67,18 +66,13 @@ pub struct Daemons {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GuichetState {
     pub name: String,
-    //pub detected: bool,
-    //pub waiting: bool,
-    //pub writing: bool,
     pub analysing: bool,
-    //pub reading: bool,
-    //pub done: bool,
     pub files: Vec<String>,
 }
 
 fn landlock_sandbox() -> Result<(), RulesetError> {
     let abi = ABI::V1;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access to /usr, /etc and /dev.
@@ -246,7 +240,7 @@ fn main() -> Result<()> {
                 };
 
                 let serialized = serde_json::to_string(&orders)?;
-                websocket.write_message(Message::Text(serialized))?;
+                websocket.send(Message::Text(serialized))?;
                 thread::sleep(Duration::from_millis(300));
             }
         });

@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -27,7 +27,7 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
@@ -35,15 +35,14 @@
 
 pub use anyhow::{anyhow, Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::SigningKey;
 use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::keysas_key::KeysasKey;
+use keysas_lib::keysas_key::KeysasPQKey;
 use pkcs8::der::EncodePem;
 use std::fs::File;
 use std::io::prelude::*;
-mod errors;
-use ed25519_dalek::Keypair;
-use keysas_lib::keysas_key::KeysasKey;
-use keysas_lib::keysas_key::KeysasPQKey;
 use std::path::Path;
 use std::str;
 
@@ -147,7 +146,7 @@ fn generate_signing_keypair(
     pwd: &str,
 ) -> Result<String, anyhow::Error> {
     // Generate the private keys
-    let ec_key = Keypair::generate_new()?;
+    let ec_key = SigningKey::generate_new()?;
     let pq_key = KeysasPQKey::generate_new()?;
 
     // Save the keys

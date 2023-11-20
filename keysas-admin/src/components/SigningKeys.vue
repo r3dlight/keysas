@@ -1,11 +1,11 @@
 <template>
   <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-outline-info btn-lg shadow"
+      <button class="send btn btn-primary btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
-        Load from local IKPQPKI
+        Load a local IKPQPKI
       </button>
     </div>
     <!-- No pkcs11 for now-->
@@ -18,7 +18,7 @@
       </button>      
     </div>-->
     <div class="col">
-      <button class="send btn btn-outline-info btn-lg shadow" 
+      <button class="send btn btn-primary btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
@@ -27,27 +27,37 @@
     </div>
   <!--</div>-->
   <div v-if="showLoadPKIForm">
-    <!--<form class="add-form" @submit.prevent="onSubmit">
+    <form class="add-form" @submit.prevent="onSubmit">
       <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
       </div>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
+      <label type="text"> Your #PKCS8 password:</label>
+      <input type="password" required v-model="p8Password" id="p8Password"/>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
+        <button class="send btn btn-success btn-lg shadow"
                 @click="submitPKIFolderForm">
           <i class="bi bi-check-square"> Ok</i>
         </button>
         <br><br>
         <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
       </div>
-    </form>-->
+    </form>
     <div>
       <br>
-       Not implemented yet !
+      <div v-if="pkiRestore == 'waiting'">
+        Testing IKPQPKI signatures, please wait... <span class="spinner-border text-info"></span>
+      </div>
+      <div v-if="pkiRestore === false">
+       <h3 class="text-danger"> Error while importing IKPQPKI !</h3>
+      </div>
+      <div v-if="pkiRestore === true">
+       <h3 class="text-success">IKPQPKI imported !</h3>
+      </div>
    </div>
   </div>
   <div v-if="showRootKeyForm">
@@ -55,13 +65,13 @@
       <label type="text"> Path to your Root CA key file (PKCS#8):</label>
       <input type="text" required v-model="rootKeyPath" id="rootKey"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
       </div>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
+        <button class="send btn btn-success btn-lg shadow"
                 @click="submitRootCAForm">
           <i class="bi bi-check-square"> Ok</i>
         </button>
@@ -84,7 +94,7 @@
       <label type="text"> Select directory:</label>
       <input type="text" required v-model="pkiDir" id="pkiDir"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIDir">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="PKIDir">Browse</button>
       </div>
       <label type="text"> Password:</label>
       <input type="password" required v-model="adminPwd" id="adminPwd"/>
@@ -92,7 +102,7 @@
       </div>
       <br><br>
       <div class="submit">
-        <button v-if="!waiting" class="send btn btn-outline-success btn-lg shadow"
+        <button v-if="!waiting" class="send btn btn-success btn-lg shadow"
                 @click="submit();">
           <i class="bi bi-check-square"> Ok</i>
         </button>
@@ -129,6 +139,7 @@ export default {
       validity: '',
       adminPwd: '',
       pkiFolder: '',
+      pkiRestore: '',
       keysError: '',
       show: false,
       waiting: false,
@@ -137,6 +148,7 @@ export default {
       showPkiDirForm: false,
       passwordError: '',
       countryError: '',
+      p8Password: '',
     }
   },
 
@@ -154,6 +166,13 @@ export default {
       this.pkiDir = await getPKIDir();
     },
     async submitPKIFolderForm() {
+      this.pkiRestore = 'waiting';
+      await invoke('restore_pki', {
+          basePath: this.pkiFolder,
+          adminPwd: this.p8Password,
+         })
+        .then((res) => this.pkiRestore = res)
+        .catch((error) => console.error(error));
       console.log('PKI Folder form submission');
     },
     async submitRootCAForm() {

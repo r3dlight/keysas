@@ -1,20 +1,20 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
-    <br>
+    <h4 class="text-info text-bold"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
     <span class="tip-text">If you are configuring <b>Keysas-admin</b> for the first time, you need to create a
-      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture (IKPQPKI).
-      Click on <b>Create a new IKPQPKI</b>.</span>
-    <span class="tip-text"> Then, provide all the requested information to allow us to create a new IKPQPKI for you.<br> 
-    When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.<br> 
-    </span>
-    <span class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></span>
+      <b>I</b>ncredible <b>K</b>eysas (Hybrid) <b>P</b>ost-<b>Q</b>uantum <b>P</b>ublic <b>K</b>ey <b>I</b>nfrastucture <b>(IKPQPKI)</b>:</span>
+    <ul>
+      <li class="tip-text">Click on <b>Create a new IKPQPKI</b></li>
+      <li class="tip-text"> Provide all the requested information to allow us to create a new IKPQPKI for you.</li> 
+      <li class="tip-text"> When done, you will be able to start signing new outgoing USB devices and enrolling new Keysas stations.</li> 
+      <li class="tip-text">If you want to restore a IKPQPKI from another directory, choose <b>Load from local IKPQPKI</b></li>
+    </ul>
 
   </div>
   <br>
   <div v-if="!hide" class="box-custom">
     <div class="text-center">
-      <button class="send btn btn-light shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
+      <button class="send btn btn-secondary shadow" @click="hide = true; getPKIConfig()"><span class="bi bi-caret-up-fill"> Hide
         IKPQPKI configuration</span></button>
       <br><br>
       <div class="List">
@@ -36,7 +36,7 @@
           }}</span></li>
         </ul>
       </div>
-      <button class="btn btn-outline-danger btn-lg shadow" @click="removePKI">Delete PKI</button>
+      <button class="btn btn-danger btn-lg shadow" @click="removePKI">Forget PKI</button>
     </div>
   </div>
   <div v-else>
@@ -156,22 +156,20 @@ button {
 }
 
 .tip {
-  max-width: 1000px;
-  text-align: left;
-  margin: 30px auto;
+  max-width: 1200px;
+  margin: 20px auto;
   background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 5px 5px 5px black;
+  text-align: left;
+  padding: 1em;
+  border-radius: 18px;
   color: white;
-  display: inline-block;
-  font-size: 1.0em;
+  text-align: left;
 }
 
 .tip-text {
   font-weight: normal;
   color: rgb(158, 161, 163);
-  font-size: 1em;
+  font-size: 1.1em;
 }
 h3 {
   margin: 45px 0 0;

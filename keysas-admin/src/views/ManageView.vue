@@ -4,14 +4,19 @@
   <div class="box">
     <h5 class="text-dark">Check the status, update and manage your Keysas stations here.</h5>
     <ul class="list-group">
-      <li class="list-group-item list-group-item transparent" v-for="device in stations">
-        <button class="btn btn-outline-dark btn-lg shadow">
+      <li class="list-group-item transparent" v-for="device in stations">
+          <button class="btn btn-dark btn-lg shadow" @click="hide = !hide; ShowActionButtons = true;
+          flush();
+          this.current_keysas = device.name;
+          this.current_ip = device.ip;
+          getKeysasIP(device.name);
+          this.current_keysas = device.name">
           {{ device.name }}
         </button>
         <i class="bi bi-arrow-right">
-        </i> &nbsp;
-        <div class="btn-group" role="group">
-          <button class="btn btn-outline-warning btn-lg shadow" @click="flush();
+        </i>
+          <!--<div class="btn-group" role="group">-->
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -20,7 +25,7 @@
           rebootKeysas(device.name)">
             <span class="bi bi-arrow-counterclockwise">Reboot</span>
           </button>
-          <button class="btn btn-outline-primary btn-lg shadow" @click="flush();
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -29,7 +34,7 @@
           shutdownKeysas(device.name)">
             <span class="bi bi-arrow-down-circle-fill"> Shutdown</span>
           </button>
-          <button class="btn btn-outline-info btn-lg shadow" @click="flush();
+          <button class="btn btn-primary btn-lg shadow" @click="flush();
           hide = false;
           ShowActionButtons = false;
           this.current_keysas = device.name;
@@ -38,7 +43,7 @@
           AddSSHPubKey(device.name)">
             <span class="bi bi-send"> Export SSH pubkey</span>
           </button>
-          <button class="btn btn-outline-danger btn-lg shadow" @click="removeKeysas(device.name);
+          <button class="btn btn-danger btn-lg shadow" @click="removeKeysas(device.name);
           flush();
           hide = true">
             <span class="bi bi-exclamation-circle"> Delete</span>
@@ -51,50 +56,52 @@
           this.current_keysas = device.name">
             <span class="bi bi-arrows-expand"> More...</span>
           </button>
-        </div>
       </li>
     </ul>
   </div>
   <div v-if="!hide" class="box animate__animated animate__pulse">
     <ul class="box-small-left">
       <li class="list-group-item list-group-item-action list-group-item-light">
-        <span>Name:</span> {{ current_keysas }}
+        <h4><b>Name:</b> {{ current_keysas }}</h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light">
-        <span>IP:</span> {{ current_ip }}
+        <h4><b>IP:</b> {{ current_ip }}</h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === true">
-        <span>Status: </span>
-        <span class="bi bi-check-square text-success"> Online</span>
+        <h4><b>Status: </b> 
+          <span class="bi bi-check-square text-success"> Online</span>
+        </h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light" v-if="KeysasAlive === false">
-        <span>Status: </span>
+        <h4><b>Status: </b>
         <span class="bi bi-x-square text-danger"> Offline</span>
+        </h4>
       </li>
       <li class="list-group-item list-group-item-action list-group-item-light"
         v-if="KeysasAlive != false && KeysasAlive != true">
-        <span>Status: </span>
+        <h4><b>Status: </b> 
         <span class="bi bi-x-square text-dark"> Unknown</span>
+        </h4>
       </li>
     </ul>
     <div v-if="ShowActionButtons">
 
       <ul class="list-group">
-        <li class="list-group-item list-group-item transparent">
-          <div class="btn-group" role="group" aria-label="Basic outlined example">
-            <button class="send btn btn-lg btn-outline-info shadow" @click="flush();
+        <li class="list-group-item transparent">
+          <div aria-label="Basic outlined example">
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowPasswordInit = !ShowPasswordInit">
               <span class="bi bi-magic"> Enroll</span>
             </button>
-            <button class="send btn btn-lg btn-outline-primary shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowAddYubikey = !ShowAddYubikey">
               <span class="bi bi-cart-check"> Add a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-outline-warning shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowRevYubikey = !ShowRevYubikey">
               <span class="bi bi-x-square"> Revoke a Yubikey</span>
             </button>
-            <button class="send btn btn-lg btn-outline-success shadow" @click="flush();
+            <button class="send btn btn-lg btn-primary shadow" @click="flush();
             ShowUpdateKeysas = !ShowUpdateKeysas;
             update_status = undefined;
             updateKeysas(current_keysas)">
@@ -109,12 +116,11 @@
         <div class="row">
           <div class="col-sm">
             <div class="tip">
-              <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
-              <br>
+              <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
               <span class="tip-text">Type your <b>IKPQPKI</b> password to enroll this <b>Keysas</b> station.
               </span>
               <br><br>
-              <span class="text-warning"><i class="bi bi-exclamation-triangle"> Warning!</i></span><br>
+              <h4 class="text-warning"><i class="bi bi-exclamation-triangle"> WARNING</i></h4>
               <span class="tip-text">This action will create private keys and CSRs on this Keysas station. Then, it will sign the CSRs with the PKi. This may be long !</span>
             </div>
           </div>
@@ -124,7 +130,7 @@
               <input type="password" required v-model="password" placeholder="8 characters minimum" id="password" />
               <div v-if="passwordError" class="error"> {{ passwordError }}</div>
               <div class="submit">
-                <button class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Enroll it</i></button>
+                <button class="send btn btn-success btn-lg shadow"><i class="bi bi-check-square"> Enroll it</i></button>
                 <br><br>
                 <p v-if="confirmed === true && !init_status" class="validate animate__animated animate__zoomIn">Processing  <span class="spinner-border text-info"></span></p>
                 <p v-else-if="confirmed === true && init_status == 'true' " class="validate animate__animated animate__zoomIn text-success">Done !</p>
@@ -240,6 +246,7 @@ export default {
       this.ShowExportSSH = false;
       this.ShowPasswordGenerateKeypair = false;
       this.ShowPasswordSign = false;
+      this.ShowPasswordInit = false;
       this.password = undefined;
       this.passwordError = '';
       this.confirmed = false;
@@ -416,10 +423,10 @@ p {
 }
 
 .box {
-  max-width: 1700px;
-  margin: 40px auto;
+  max-width: 1200px;
+  margin: 20px auto;
   background: white;
-  //text-align: center;
+  /*text-align: center;*/
   padding: 40px;
   border-radius: 15px;
   box-shadow: 10px 5px 5px black;
@@ -452,7 +459,7 @@ p {
 .tip-text {
   font-weight: normal;
   color: rgb(101, 101, 101);
-  font-size: 1em;
+  font-size: 1.2em;
 }
 
 .box-small-left {

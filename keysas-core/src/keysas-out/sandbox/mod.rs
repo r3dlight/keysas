@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -63,6 +63,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::connect)?;
     ctx.allow_syscall(Syscall::execve)?;
     ctx.allow_syscall(Syscall::copy_file_range)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }
@@ -70,7 +71,7 @@ pub fn init() -> Result<()> {
 /// Setup the landlock sandboxing
 pub fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.

@@ -2,7 +2,7 @@
 /*
  * The "keysas-fido".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains the main function.
  */
@@ -20,7 +20,7 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 
@@ -80,7 +80,7 @@ fn manage_db(name: &str, enroll: bool, revoke: bool) -> Result<()> {
             device.vendor_id, device.product_id
         );
 
-        let config = Config::default()
+        let config = Config::default_config()
             .set_vendor_id(device.vendor_id)
             .set_product_id(device.product_id)
             .set_variable_size(true)
@@ -120,7 +120,7 @@ fn init_yubikey() -> Result<()> {
             device.vendor_id, device.product_id
         );
 
-        let config = Config::default()
+        let config = Config::default_config()
             .set_vendor_id(device.vendor_id)
             .set_product_id(device.product_id)
             .set_command(Command::Configuration2);

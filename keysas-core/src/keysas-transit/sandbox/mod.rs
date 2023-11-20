@@ -2,7 +2,7 @@
 /*
  * The "keysas-transit".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -13,6 +13,8 @@ use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
 };
+use std::path::Path;
+use std::process;
 
 #[cfg(target_os = "linux")]
 use syscallz::{Context, Syscall};
@@ -76,18 +78,27 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::landlock_create_ruleset)?;
     ctx.allow_syscall(Syscall::landlock_add_rule)?;
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }
 
 pub fn landlock_sandbox(rule_path: &String) -> Result<(), RulesetError> {
+    let rules = Path::new(rule_path);
+    let rules = match rules.parent() {
+        Some(rules) => rules,
+        None => {
+            log::error!("Error getting Yara rules directory for Landlock");
+            process::exit(1);
+        }
+    };
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(
-            &[CONFIG_DIRECTORY, rule_path],
+            &[CONFIG_DIRECTORY, &rules.to_string_lossy()],
             AccessFs::from_read(abi),
         ))?
         .restrict_self()?;

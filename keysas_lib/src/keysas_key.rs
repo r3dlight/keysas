@@ -2,7 +2,7 @@
 /*
  * The "keysas-lib".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas_lib.
@@ -19,19 +19,17 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
 use anyhow::{anyhow, Context};
 use der::DecodePem;
-use ed25519_dalek::Digest;
-use ed25519_dalek::Keypair;
-use ed25519_dalek::PublicKey;
-use ed25519_dalek::Sha512;
 use ed25519_dalek::Signature as SignatureDalek;
 use ed25519_dalek::Signer;
-use ed25519_dalek::Verifier;
+use ed25519_dalek::SigningKey;
+use ed25519_dalek::VerifyingKey;
 use oqs::sig::Algorithm;
 use oqs::sig::PublicKey as PqPublicKey;
 use oqs::sig::SecretKey;
@@ -69,7 +67,7 @@ pub struct KeysasPQKey {
 
 #[derive(Debug)]
 pub struct KeysasHybridPubKeys {
-    pub classic: PublicKey,
+    pub classic: VerifyingKey,
     pub pq: PqPublicKey,
 }
 
@@ -110,13 +108,19 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
         let cert_cl = Certificate::from_pem(cert_cl_bytes)?;
         let cert_pq = Certificate::from_pem(cert_pq_bytes)?;
 
-        let pub_cl = ed25519_dalek::PublicKey::from_bytes(
-            cert_cl
-                .tbs_certificate
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes(),
-        )?;
+        let cert_cl_bytes = cert_cl
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes();
+        let mut cert_cl_bytes_casted: [u8; 32] = [0u8; 32];
+        if cert_cl_bytes.len() == 32 {
+            cert_cl_bytes_casted.copy_from_slice(cert_cl_bytes);
+        } else {
+            return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
+        }
+
+        let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
         oqs::init();
         let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
             Ok(pq_s) => pq_s,
@@ -145,7 +149,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
     ) -> Result<(), anyhow::Error> {
         pubkeys
             .classic
-            .verify(message, &signatures.classic)
+            .verify_strict(message, &signatures.classic)
             .context("Invalid Ed25519 signature")?;
         oqs::init();
         let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
@@ -234,14 +238,14 @@ pub trait KeysasKey<T> {
 }
 
 // Implementing new methods on top of dalek Keypair
-impl KeysasKey<Keypair> for Keypair {
-    fn generate_new() -> Result<Keypair, anyhow::Error> {
-        let mut csprng = OsRng {};
-        let kp_ed = Keypair::generate(&mut csprng);
+impl KeysasKey<SigningKey> for SigningKey {
+    fn generate_new() -> Result<SigningKey, anyhow::Error> {
+        let mut csprng = OsRng;
+        let kp_ed: SigningKey = ed25519_dalek::SigningKey::generate(&mut csprng);
         Ok(kp_ed)
     }
 
-    fn load_keys(path: &Path, pwd: &str) -> Result<Keypair, anyhow::Error> {
+    fn load_keys(path: &Path, pwd: &str) -> Result<SigningKey, anyhow::Error> {
         // Load the pkcs8 from file
         let cipher = fs::read(path)?;
 
@@ -267,15 +271,10 @@ impl KeysasKey<Keypair> for Keypair {
         };
         // ed25519 is only 32 bytes long
         if decoded_pk.private_key.len() == 32 {
-            match ed25519_dalek::SecretKey::from_bytes(decoded_pk.private_key) {
-                Ok(secret_key) => Ok(Keypair {
-                    public: (&(secret_key)).into(),
-                    secret: secret_key,
-                }),
-                Err(e) => Err(anyhow!(
-                    "Cannot parse private key CLASSIC/ed25519-dalek from pkcs#8: {e}"
-                )),
-            }
+            let mut private_key_casted: [u8; 32] = [0u8; 32];
+            private_key_casted.copy_from_slice(decoded_pk.private_key);
+            let signing_key = ed25519_dalek::SigningKey::from_bytes(&private_key_casted);
+            Ok(signing_key)
         } else {
             Err(anyhow!("Key is not 32 bytes long"))
         }
@@ -285,8 +284,8 @@ impl KeysasKey<Keypair> for Keypair {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
         store_keypair(
-            self.secret.as_bytes(),
-            self.public.as_bytes(),
+            self.to_bytes().as_ref(),
+            self.verifying_key().as_bytes(),
             ed25519_oid,
             pwd,
             path,
@@ -296,7 +295,7 @@ impl KeysasKey<Keypair> for Keypair {
     fn generate_csr(&self, subject: &RdnSequence) -> Result<CertReq, anyhow::Error> {
         let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
-        let pub_key = BitString::from_bytes(&self.public.to_bytes())
+        let pub_key = BitString::from_bytes(&self.verifying_key().to_bytes())
             .with_context(|| "Failed get public key raw value")?;
 
         let info = CertReqInfo {
@@ -313,10 +312,8 @@ impl KeysasKey<Keypair> for Keypair {
         };
 
         let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(content);
         let signature = self
-            .sign_prehashed(prehashed, None)
+            .try_sign(&content)
             .with_context(|| "Failed to sign certificate content")?;
 
         let csr = CertReq {
@@ -332,13 +329,22 @@ impl KeysasKey<Keypair> for Keypair {
     }
 
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-        let signature = self.sign(message);
+        let signature = self
+            .try_sign(message)
+            .with_context(|| "Failed to sign message content")?;
         Ok(signature.to_bytes().to_vec())
     }
 
     fn message_verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, anyhow::Error> {
-        let sig = ed25519_dalek::Signature::from_bytes(signature)?;
-        self.verify(message, &sig)?;
+        let mut signature_casted: [u8; 64] = [0u8; 64];
+        if signature.len() == 64 {
+            signature_casted.copy_from_slice(signature)
+        } else {
+            return Err(anyhow!("Signature is not 64 bytes long"));
+        }
+
+        let sig = ed25519_dalek::Signature::from_bytes(&signature_casted);
+        self.verify_strict(message, &sig)?;
         // If no error has been returned then the signature is valid
         Ok(true)
     }
@@ -363,11 +369,9 @@ impl KeysasKey<Keypair> for Keypair {
         )?;
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-        let mut prehashed = Sha512::new();
-        prehashed.update(content);
         let signature = self
-            .sign_prehashed(prehashed, None)
-            .with_context(|| "Failed to sign certificate content")?;
+            .try_sign(&content)
+            .with_context(|| "Failed to sign csr content")?;
 
         let cert = Certificate {
             tbs_certificate: tbs,

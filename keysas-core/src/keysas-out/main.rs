@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-out binary.
@@ -54,7 +54,7 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]

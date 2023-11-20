@@ -173,7 +173,7 @@ pub async fn drop_pki() -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("DROP TABLE ca_table; CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);");
+                let query = "DROP TABLE ca_table; CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);".to_string();
                 log::debug!("Query: {}", query);
                 connection.execute(query)?;
                 Ok(())

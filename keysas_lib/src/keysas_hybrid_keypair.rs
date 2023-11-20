@@ -2,7 +2,7 @@
 /*
  * The "keysas-lib".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas_lib.
@@ -19,22 +19,21 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
+#![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
 use anyhow::Context;
-use ed25519_dalek::Digest;
-use ed25519_dalek::Keypair;
-use ed25519_dalek::Sha512;
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey;
 use oqs::sig::Algorithm;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
 use pkcs8::LineEnding;
-use rand_dl::rngs::OsRng;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -59,7 +58,7 @@ use crate::pki::ED25519_OID;
 /// The structure also contains the associated certificates
 #[derive(Debug)]
 pub struct HybridKeyPair {
-    pub classic: Keypair,
+    pub classic: SigningKey,
     pub classic_cert: Certificate,
     pub pq: KeysasPQKey,
     pub pq_cert: Certificate,
@@ -70,10 +69,9 @@ pub struct HybridKeyPair {
 /// The function returns the certificate or an openssl error
 fn generate_root_ed25519(
     infos: &CertificateFields,
-) -> Result<(Keypair, Certificate), anyhow::Error> {
+) -> Result<(SigningKey, Certificate), anyhow::Error> {
     // Create the root CA Ed25519 key pair
-    let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
+    let keypair: SigningKey = SigningKey::generate_new()?;
     let ed25519_oid =
         ObjectIdentifier::new(ED25519_OID).with_context(|| "Failed to generate OID")?;
 
@@ -85,17 +83,15 @@ fn generate_root_ed25519(
 
     let tbs = infos.construct_tbs_certificate(
         &subject,
-        &keypair.public.to_bytes(),
+        &keypair.verifying_key().to_bytes(),
         &serial,
         &ed25519_oid,
         true,
     )?;
 
     let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
-    let mut prehashed = Sha512::new();
-    prehashed.update(content);
     let sig = keypair
-        .sign_prehashed(prehashed, None)
+        .try_sign(&content)
         .with_context(|| "Failed to sign certificate content")?;
 
     let cert = Certificate {
@@ -198,8 +194,8 @@ impl HybridKeyPair {
     }
 
     /// Load the keypair from the disk
-    /// The keys will be loaded in DER encoded PKCS8 files from: keys_path/name-{cl|pq}.p8
-    /// The certificates will be loaded in PEM files from: certs_path/name-{cl|pq}.pem
+    /// The keys will be loaded in DER encoded PKCS8 files from: pki_dir/keys_path/name-{cl|pq}.p8
+    /// The certificates will be loaded in PEM files from: pki_dir/certs_path/name-{cl|pq}.pem
     /// pwd is used for decrypting the PKCS8 files
     pub fn load(
         name: &str,
@@ -217,7 +213,7 @@ impl HybridKeyPair {
         let cl_key_path = keys_dir.join(name.to_owned() + "-cl.p8");
         log::debug!("Classic: {cl_key_path:?}");
 
-        let classic = Keypair::load_keys(&cl_key_path, pwd)?;
+        let classic: SigningKey = SigningKey::load_keys(&cl_key_path, pwd)?;
         let pq_key_path = keys_dir.join(name.to_owned() + "-pq.p8");
         log::debug!("PQ: {pq_key_path:?}");
 
@@ -245,7 +241,6 @@ impl HybridKeyPair {
             pq_cert,
         })
     }
-
     /// Generate PKI root keys
     pub fn generate_root(infos: &CertificateFields) -> Result<HybridKeyPair, anyhow::Error> {
         // Generate root ED25519 key and certificate
@@ -276,8 +271,7 @@ impl HybridKeyPair {
     ) -> Result<HybridKeyPair, anyhow::Error> {
         // Generate ED25519 key and certificate
         // Create the ED25519 keypair
-        let mut csprng = OsRng {};
-        let kp_ed = Keypair::generate(&mut csprng);
+        let kp_ed: SigningKey = SigningKey::generate_new()?;
         // Construct a CSR for the ED25519 key
         let csr_ed = kp_ed.generate_csr(subject_name)?;
         // Generate a certificate from the CSR

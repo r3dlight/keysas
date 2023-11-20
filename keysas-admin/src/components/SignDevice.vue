@@ -3,12 +3,12 @@
       <div class="row">
         <div class="col-sm">
           <form class="add-form" @submit.prevent="onSubmitSign">
-            <label type="text">Password:</label>
+            <label type="text">IKPQPKI Password:</label>
             <input type="password" required v-model="password" placeholder="8 caracters min" id="password" />
             <div v-if="passwordError" class="error"> {{ passwordError }}</div>
             <br>
             <div class="submit">
-              <button @click="SignDevice()" class="send btn btn-outline-success shadow"><i class="bi bi-check-square"> Sign !</i></button>
+              <button @click="SignDevice()" class="send btn btn-lg btn-success shadow"><i class="bi bi-check-square"> Sign !</i></button>
               <br><br>
               <h3 v-if="show" class="validate animate__animated animate__zoomIn text-success">Done !</h3>
             </div>
@@ -16,13 +16,12 @@
         </div>
         <div class="col-sm">
           <div class="tip">
-            <span class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></span>
-            <br><br>
+            <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
             <span class="tip-text">Enter your signing password and plug the new device within 30
               seconds to sign it. Before signing your first device:</span>
               <li class="tip-text"><b>On GNU/Linux:</b></li>
               <ul>
-                <li class="tip-text">Create a new file <b>/etc/udev/rules.d/71-keysas</b></li>
+                <li class="tip-text">Create a new file <b>/etc/udev/rules.d/71-keysas.rules</b></li>
                 <li class="tip-text">Copy and paste this in the new file: <br><b class="text-secondary">SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"</b></li>
                 <li class="tip-text">Open a terminal and execute this: <br> <b class="text-secondary">udevadm trigger && udevadm control --reload</b></li>
               </ul>

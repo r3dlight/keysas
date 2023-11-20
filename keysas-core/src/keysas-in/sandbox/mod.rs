@@ -2,7 +2,7 @@
 /*
  * The "keysas-in".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -11,8 +11,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
+    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
+    ABI,
 };
 
 #[cfg(target_os = "linux")]
@@ -68,23 +68,25 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::sigaltstack)?;
     ctx.allow_syscall(Syscall::sched_getaffinity)?;
     ctx.allow_syscall(Syscall::landlock_create_ruleset)?;
+    ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.load()?;
     Ok(())
 }
 
 #[cfg(target_os = "linux")]
-pub fn landlock_sandbox(sas_in: &String) -> Result<(), RulesetError> {
+pub fn landlock_sandbox(sas_in: &String) -> Result<()> {
+    use landlock::{make_bitflags, PathBeneath, PathFd};
+    // Still using ABI v2 for now
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let allow = make_bitflags!(AccessFs::{RemoveFile | RemoveDir | ReadFile | ReadDir});
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
-        // Read-only access.
+        .add_rule(PathBeneath::new(PathFd::new(sas_in)?, allow))?
         .add_rules(path_beneath_rules(
             &[CONFIG_DIRECTORY],
             AccessFs::from_read(abi),
         ))?
-        // Read-write access.
-        .add_rules(path_beneath_rules(&[sas_in], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested.

@@ -86,7 +86,7 @@ main() {
  / \        <\  <\/> __/>     <\/>  _\o__</    <\__  / \  _\o__</   
                                /                                    
                               o                                     
-         IO                __/>                                     
+         Backend           __/>                                     
 	
 	EOF
 	echo "Installation completed !"
