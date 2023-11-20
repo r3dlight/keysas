@@ -18,15 +18,13 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
-use libmailslot;
 
 use crate::app_controller::AppController;
 
@@ -34,35 +32,35 @@ use crate::app_controller::AppController;
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub enum KeysasAuthorization {
     /// Default value
-    AuthUnknown = 0,
+    Unknown = 0,
     /// Authorization request pending
-    AuthPending,
+    Pending,
     /// Access is blocked
-    AuthBlock,
+    Block,
     /// Access is allowed in read mode only
-    AuthAllowRead,
+    AllowRead,
     /// Access is allowed with a warning to the user
-    AuthAllowWarning,
+    AllowWarning,
     /// Access is allowed for all operations
-    AuthAllowAll
+    AllowAll,
 }
 
 impl KeysasAuthorization {
     /// Convert the authorization enum to an unsigned char so that it can be send to javascript
-    pub fn to_u8_file(&self) -> u8 {
+    pub fn to_u8_file(self) -> u8 {
         match self {
-            Self::AuthAllowRead => 1,
-            Self::AuthAllowAll => 2,
-            _ => 0
+            Self::AllowRead => 1,
+            Self::AllowAll => 2,
+            _ => 0,
         }
     }
 
     /// Convert an unsigned char to the authorization enum for a file
     pub fn from_u8_file(auth: u8) -> KeysasAuthorization {
         match auth {
-            1 => Self::AuthAllowRead,
-            2 => Self::AuthAllowAll,
-            _ => Self::AuthBlock
+            1 => Self::AllowRead,
+            2 => Self::AllowAll,
+            _ => Self::Block,
         }
     }
 }
@@ -73,18 +71,17 @@ pub struct FileUpdateMessage {
     pub device: String,
     pub id: [u16; 16],
     pub path: String,
-    pub authorization: KeysasAuthorization
+    pub authorization: KeysasAuthorization,
 }
 
 /// Handle to the service interface client and server
 pub struct ServiceIf {
-    server: Arc<RwLock<libmailslot::MailSlot>>
+    server: Arc<RwLock<libmailslot::MailSlot>>,
 }
 
 /// Name of the communication pipe
 const SERVICE_PIPE: &str = r"\\.\mailslot\keysas\service-to-app";
 const TRAY_PIPE: &str = r"\\.\mailslot\keysas\app-to-service";
-
 
 impl ServiceIf {
     /// Initialize the pipe with Keysas Service
@@ -94,12 +91,14 @@ impl ServiceIf {
             Ok(s) => s,
             Err(e) => return Err(anyhow!("Failed to create server: {e}")),
         };
-    
-        Ok(ServiceIf{server: RwLock::new(server).into()})
+
+        Ok(ServiceIf {
+            server: RwLock::new(server).into(),
+        })
     }
 
     /// Start the server thread to listen for the Keysas service
-    pub fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error> {    
+    pub fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error> {
         // Start listening on the server side
         let ctrl_hdl = ctrl.clone();
         let server = self.server.clone();
@@ -114,7 +113,8 @@ impl ServiceIf {
             println!("Start listening for daemon");
             loop {
                 while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
-                    if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes()) {
+                    if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes())
+                    {
                         ctrl_hdl.notify_file_change(&update);
                         println!("message from service {:?}", update);
                     }
@@ -128,7 +128,7 @@ impl ServiceIf {
     pub fn send_msg(&self, msg: &impl Serialize) -> Result<(), anyhow::Error> {
         let msg_vec = match serde_json::to_string(msg) {
             Ok(m) => m,
-            Err(e) => return Err(anyhow!("Failed to serialize message: {e}"))
+            Err(e) => return Err(anyhow!("Failed to serialize message: {e}")),
         };
 
         if let Err(e) = libmailslot::write_mailslot(TRAY_PIPE, &msg_vec) {

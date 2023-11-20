@@ -5,7 +5,7 @@
  *
  */
 
-//! KeysasDriverInterface is a generic interface to send and receive messages
+//! KeysasMinifilterInterface is a generic interface to send and receive messages
 //! to the firewall driver in kernel space.
 //! The interface must be specialized for Linux or Windows
 
@@ -19,25 +19,22 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use std::mem::size_of;
-use std::thread;
 use libc::c_void;
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::mem::size_of;
+use std::sync::Arc;
+use std::thread;
 use widestring::U16CString;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{
-    CloseHandle, HANDLE, STATUS_SUCCESS, GetLastError
-};
+use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, STATUS_SUCCESS};
 use windows::Win32::Storage::InstallableFileSystems::{
     FilterConnectCommunicationPort, FilterGetMessage, FilterReplyMessage, FilterSendMessage,
-    FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER
+    FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER,
 };
 
 use crate::controller::ServiceController;
@@ -48,7 +45,7 @@ pub enum KeysasFilterOperation {
     /// Validate the signature of the file and the report
     ScanFile = 0,
     /// Ask to validate the USB drive signature
-    ScanUsb
+    ScanUsb,
 }
 
 /// Authorization states for files and USB devices
@@ -66,7 +63,7 @@ pub enum KeysasAuthorization {
     /// Access is allowed with a warning to the user
     AuthAllowWarning,
     /// Access is allowed for all operations
-    AuthAllowAll
+    AuthAllowAll,
 }
 
 impl KeysasAuthorization {
@@ -77,7 +74,7 @@ impl KeysasAuthorization {
             Self::AuthBlock => 2,
             Self::AuthAllowRead => 3,
             Self::AuthAllowWarning => 4,
-            Self::AuthAllowAll => 5
+            Self::AuthAllowAll => 5,
         }
     }
 }
@@ -157,21 +154,21 @@ impl WindowsDriverInterface {
                 };
 
                 unsafe {
-                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err()
-                    {
+                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err() {
                         println!("Failed to get message from driver");
                         continue;
                     }
                 }
 
                 // Dispatch the request
-                let result = match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        println!("Failed to handle driver request: {e}");
-                        KeysasAuthorization::AuthBlock
-                    }
-                };
+                let result =
+                    match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            println!("Failed to handle driver request: {e}");
+                            KeysasAuthorization::AuthBlock
+                        }
+                    };
 
                 println!("Sending authorization: {:?}", result);
 
@@ -198,14 +195,16 @@ impl WindowsDriverInterface {
     pub fn send_msg(&self, msg: &[u8]) -> Result<(), anyhow::Error> {
         let mut nb_bytes_ret: u32 = 0;
         unsafe {
-            if let Err(_) = FilterSendMessage(
+            if FilterSendMessage(
                 self.handle,
                 msg as *const _ as *const c_void,
                 msg.len().try_into()?,
                 None,
                 0,
-                &mut nb_bytes_ret as *mut u32
-            ) {
+                &mut nb_bytes_ret as *mut u32,
+            )
+            .is_err()
+            {
                 let err = GetLastError();
                 println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
                 return Err(anyhow!("Failed to send message to driver"));

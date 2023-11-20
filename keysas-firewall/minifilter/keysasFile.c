@@ -25,7 +25,7 @@ Environment:
 #include <ntstrsafe.h>
 #include <ntdef.h>
 
-#include "keysasDriver.h"
+#include "KeysasMinifilter.h"
 #include "keysasCommunication.h"
 #include "keysasUtils.h"
 #include "keysasInstance.h"

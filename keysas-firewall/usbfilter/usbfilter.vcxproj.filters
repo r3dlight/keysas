@@ -19,13 +19,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="usbfilter.inf">
-      <Filter>Driver Files</Filter>
-    </Inf>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="USBFilterDriver.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="usbfilter.inf">
+      <Filter>Driver Files</Filter>
+    </Inf>
   </ItemGroup>
 </Project>

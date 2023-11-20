@@ -21,7 +21,7 @@ Environment:
 #ifndef _H_KEYSAS_FILE_
 #define _H_KEYSAS_FILE_
 
-#include "keysasDriver.h"
+#include "KeysasMinifilter.h"
 #include "keysasCommunication.h"
 
 typedef struct _KEYSAS_FILE_CTX {
