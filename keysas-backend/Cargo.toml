@@ -29,7 +29,7 @@ kv = "0.24"
 walkdir = "2.4"
 landlock = "0.3" 
 flexi_logger = "0.27"
-http = "0.2"
+http = "1"
 
 [dev-dependencies]
 criterion = "0.5"
