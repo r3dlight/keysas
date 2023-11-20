@@ -71,6 +71,7 @@ use yubico_manager::Yubico;
 mod errors;
 //use std::process::exit;
 
+#[allow(non_camel_case_types)]
 #[repr(C)]
 struct pollfd {
     fd: c_int,
@@ -78,6 +79,7 @@ struct pollfd {
     revents: c_short,
 }
 
+#[allow(non_camel_case_types)]
 #[repr(C)]
 struct sigset_t {
     __private: c_void,
