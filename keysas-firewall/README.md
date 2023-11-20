@@ -46,7 +46,7 @@ On Windows, path to the CA certificates is configured in the registry at HKLM\SY
  This firewall is still a work in progress.
 
 - USB bus filter driver
-  - [ ] Bus call interception
+  - [ ] Bus call interception: WIP
 - Minifilter
   - [X] System call interception and filtering
   - [X] Track per file context
@@ -71,6 +71,10 @@ On Windows, path to the CA certificates is configured in the registry at HKLM\SY
 
 The drivers have been tested on a Windows 10 laptop in debug mode (unsigned driver allowed).
 They have been compiled with Microsoft Visual Studio 2022 with SDK and WDK version 10.0.22621.0.
+
+## Installer creation
+
+An installer can be created with Inno Setup. For that all build artifacts must have been created (minifiler, driver and app), and then use Inno Setup build the script 'installer/keysas_firewall_install.iss'
 
 ### Service and application compilation
 
