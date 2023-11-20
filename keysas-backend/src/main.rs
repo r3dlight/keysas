@@ -10,7 +10,6 @@
 use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
-use http::header::HeaderValue;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -82,8 +81,6 @@ fn landlock_sandbox() -> Result<(), RulesetError> {
             ],
             AccessFs::from_read(abi),
         ))?
-        // Read-write access to /home and /tmp.
-        //.add_rules(path_beneath_rules(&["/home", "/tmp"], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested by the developer.
@@ -181,14 +178,10 @@ fn main() -> Result<()> {
             }
         };
         spawn(move || -> Result<()> {
-            let callback = |_req: &Request, mut response: Response| {
+            let callback = |_req: &Request, response: Response| {
                 log::info!("keysas-backend: Received a new websocket handshake.");
                 //let headers = response.headers_mut();
-                //headers.append("KeysasBackend", "true".parse().unwrap());
-                response.headers_mut().append(
-                    "Sec-WebSocket-Protocol",
-                    HeaderValue::from_static("websocket"),
-                );
+                //headers.append("Sec-WebSocket-Protocol", "websocket".parse().unwrap());
                 //println!("Response: {response:?}");
                 Ok(response)
             };
