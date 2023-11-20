@@ -11,8 +11,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
-    ABI,
+    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
+    RulesetCreatedAttr, RulesetStatus, ABI,
 };
 
 #[cfg(target_os = "linux")]
@@ -82,6 +82,7 @@ pub fn landlock_sandbox(sas_in: &String) -> Result<()> {
     let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
+        .set_compatibility(CompatLevel::HardRequirement)
         .add_rule(PathBeneath::new(PathFd::new(sas_in)?, allow))?
         .add_rules(path_beneath_rules(
             &[CONFIG_DIRECTORY],
