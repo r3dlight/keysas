@@ -51,6 +51,11 @@ Driver compilation
 The drivers have been tested on a Windows 10 laptop in debug mode (unsigned driver allowed).
 They have been compiled with Microsoft Visual Studio 2022 with SDK and WDK version 10.0.22621.0.
 
+Installer creation
+------------------
+
+An installer can be created with Inno Setup. For that all build artifacts must have been created (minifiler, driver and app), and then use Inno Setup build the script 'installer/keysas_firewall_install.iss'
+
 Service and application compilation
 -----------------------------------
 
@@ -61,3 +66,36 @@ The Keysas daemon and tray application have been compiled and tested on Windows 
 - CMake: <https://cmake.org/>
 - Tauri: <https://tauri.app/>
 - Npm: for example <https://docs.npmjs.com/downloading-and-installing-node-js-and-npm>
+
+TODO List
+----------
+
+ This USB firewall application is still in progress:
+
+- USB bus filter driver
+
+  - [ ] Bus call interception: WIP
+
+- Minifilter
+
+  - [X] System call interception and filtering
+  - [X] Track per file context
+  - [X] Allow authorization changes
+  - [X] Filter file open and create operations
+  - [X] Filter write operation
+  - [ ] Clean code: check IRQL, check paging, check fastIO, check sparse file API, check all flags in the pre-op filters...
+
+- Daemon
+
+  - [X] Check report and files
+  - [X] Use CA certificate to check report certificate
+  - [X] Enforce system security policy
+  - [ ] Check USB devices
+
+- Tray app
+
+  - [X] Display files
+  - [~] Display USB devices
+  - [X] Allow authorization changes
+  - [X] Add drop down menu for authorization selection:w
+
