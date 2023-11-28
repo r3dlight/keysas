@@ -13,7 +13,7 @@ nix = { version = "0.27", features = ["fs"]}
 keysas_lib = { path = "../keysas_lib" }
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 log = "0.4"
-regex = "1.9"
+regex = "1"
 infer = "0.15"
 clamav-tcp = "0.2"
 itertools ="0.12"

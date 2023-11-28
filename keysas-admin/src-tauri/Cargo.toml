@@ -21,7 +21,7 @@ ssh-rs = { version = "0.4", features = ["scp"] }
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 sha2 ="0.10"
-regex="1.9"
+regex="1"
 sqlite = "0.32"
 simple_logger = "4"
 log = "0.4"
