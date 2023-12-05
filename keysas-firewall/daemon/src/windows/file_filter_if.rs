@@ -5,7 +5,7 @@
  *
  */
 
-//! KeysasMinifilterInterface is a generic interface to send and receive messages
+//! KeysasDriverInterface is a generic interface to send and receive messages
 //! to the firewall driver in kernel space.
 //! The interface must be specialized for Linux or Windows
 
@@ -24,20 +24,25 @@
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use libc::c_void;
-use serde::{Deserialize, Serialize};
 use std::mem::size_of;
-use std::sync::Arc;
 use std::thread;
+use std::boxed::Box;
+use libc::c_void;
+use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use widestring::U16CString;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, STATUS_SUCCESS};
+use windows::Win32::Foundation::{
+    CloseHandle, HANDLE, STATUS_SUCCESS, GetLastError
+};
 use windows::Win32::Storage::InstallableFileSystems::{
     FilterConnectCommunicationPort, FilterGetMessage, FilterReplyMessage, FilterSendMessage,
-    FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER,
+    FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER
 };
 
-use crate::controller::ServiceController;
+use crate::controller::{ServiceController, KeysasAuthorization,
+                        KeysasFilterOperation, FilteredFile};
+use crate::file_filter_if::FileFilterInterface;
 
 /// Operation code for the request from a driver to userland
 #[derive(Debug, Clone, Copy)]
@@ -45,38 +50,7 @@ pub enum KeysasFilterOperation {
     /// Validate the signature of the file and the report
     ScanFile = 0,
     /// Ask to validate the USB drive signature
-    ScanUsb,
-}
-
-/// Authorization states for files and USB devices
-#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
-#[repr(u8)]
-pub enum KeysasAuthorization {
-    /// Default value
-    AuthUnknown,
-    /// Authorization request pending
-    AuthPending,
-    /// Access is blocked
-    AuthBlock,
-    /// Access is allowed in read mode only
-    AuthAllowRead,
-    /// Access is allowed with a warning to the user
-    AuthAllowWarning,
-    /// Access is allowed for all operations
-    AuthAllowAll,
-}
-
-impl KeysasAuthorization {
-    pub fn as_u8(&self) -> u8 {
-        match self {
-            Self::AuthUnknown => 0,
-            Self::AuthPending => 1,
-            Self::AuthBlock => 2,
-            Self::AuthAllowRead => 3,
-            Self::AuthAllowWarning => 4,
-            Self::AuthAllowAll => 5,
-        }
-    }
+    ScanUsb
 }
 
 /// Format of a request from the driver to the service scanner
@@ -103,18 +77,15 @@ struct UserReply {
 
 /// Handle to the driver interface
 #[derive(Debug, Copy, Clone)]
-pub struct WindowsDriverInterface {
+pub struct WindowsFileFilterInterface {
     /// Handle to the communication port
     handle: HANDLE,
 }
 
-/// Name of the communication port with the driver
-const DRIVER_COM_PORT: &str = "\\KeysasPort";
-
-impl WindowsDriverInterface {
+impl WindowsFileFilterInterface {
     /// Initialize the interface to the Windows driver
     /// The connection is made with the name in DRIVER_COM_PORT
-    pub fn open_driver_com() -> Result<WindowsDriverInterface, anyhow::Error> {
+    pub fn init() -> Result<WindowsFileFilterInterface, anyhow::Error> {
         // Open communication canal with the driver
         let com_port_name = U16CString::from_str(DRIVER_COM_PORT).unwrap().into_raw();
 
@@ -128,22 +99,28 @@ impl WindowsDriverInterface {
             }
         };
 
-        Ok(Self { handle })
+        Ok(Box::new(Self { handle }))
     }
+}
 
+
+/// Name of the communication port with the driver
+const DRIVER_COM_PORT: &str = "\\KeysasPort";
+
+impl FileFilterInterface for WindowsFileFilterInterface {
     /// Start listening to the drivers' requests
     ///
     /// # Arguments
     ///
     /// * `cb` - Callback to handle the driver requests
-    pub fn start_driver_com(&self, ctrl: &Arc<ServiceController>) -> Result<(), anyhow::Error> {
+    fn start(&self, ctrl: &Arc<Mutex<ServiceController>>) -> Result<(), anyhow::Error> {
         let handle = self.handle;
         let ctrl_hdl = ctrl.clone();
         thread::spawn(move || -> Result<(), anyhow::Error> {
             // Pre compute the request and response size
             let request_size = u32::try_from(size_of::<DriverRequest>())?;
             let reply_size = u32::try_from(size_of::<FILTER_REPLY_HEADER>())?
-                + u32::try_from(size_of::<KeysasAuthorization>())?;
+                + u32::try_from(size_of::<UsbAuthorization>())?;
 
             loop {
                 // Wait for a request from the driver
@@ -154,21 +131,21 @@ impl WindowsDriverInterface {
                 };
 
                 unsafe {
-                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err() {
+                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err()
+                    {
                         println!("Failed to get message from driver");
                         continue;
                     }
                 }
 
                 // Dispatch the request
-                let result =
-                    match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            println!("Failed to handle driver request: {e}");
-                            KeysasAuthorization::AuthBlock
-                        }
-                    };
+                // let result = match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
+                //     Ok(r) => r,
+                //     Err(e) => {
+                //         println!("Failed to handle driver request: {e}");
+                //         KeysasAuthorization::AuthBlock
+                //     }
+                // };
 
                 println!("Sending authorization: {:?}", result);
 
@@ -192,32 +169,36 @@ impl WindowsDriverInterface {
         Ok(())
     }
 
-    pub fn send_msg(&self, msg: &[u8]) -> Result<(), anyhow::Error> {
-        let mut nb_bytes_ret: u32 = 0;
-        unsafe {
-            if FilterSendMessage(
-                self.handle,
-                msg as *const _ as *const c_void,
-                msg.len().try_into()?,
-                None,
-                0,
-                &mut nb_bytes_ret as *mut u32,
-            )
-            .is_err()
-            {
-                let err = GetLastError();
-                println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
-                return Err(anyhow!("Failed to send message to driver"));
-            }
-        }
+    /// Update the control policy on a file
+    ///
+    /// # Arguments
+    ///
+    /// `update` - Information on the file and the new authorization status
+    fn update_file_auth(&self, update: &FilteredFile) -> Result<(), anyhow::Error> {
+        todo!()
+        // let mut nb_bytes_ret: u32 = 0;
+        // unsafe {
+        //     if let Err(_) = FilterSendMessage(
+        //         self.handle,
+        //         msg as *const _ as *const c_void,
+        //         msg.len().try_into()?,
+        //         None,
+        //         0,
+        //         &mut nb_bytes_ret as *mut u32
+        //     ) {
+        //         let err = GetLastError();
+        //         println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
+        //         return Err(anyhow!("Failed to send message to driver"));
+        //     }
+        // }
 
-        // TODO - Handle response from driver
+        // // TODO - Handle response from driver
 
-        Ok(())
+        // Ok(())
     }
 
     /// Close the communication with the driver
-    pub fn close_driver_com(&self) {
+    fn stop(self: Box<Self>) {
         unsafe {
             CloseHandle::<HANDLE>(self.handle);
         }

@@ -28,7 +28,7 @@ The policy is configured with:
 - 'allow_user_file_write': if set to 'true' grant the user the ability to manually allow write access to file on a USB device. 'allow_user_file_read' must also be set to true.
 
 On Windows the configuration is done via the registry in HKLM\SYSTEM\CurrentControlSet\Services\Keysas Service\config. The Windows installer automatically configures the registry.
-On Linux, system security policy is configured from a TOML file at the base of the Daemon directory.
+On Linux, system security policy is configured from a TOML file at the base of the Daemon directory. The default name for the file is 'keysas-firewall-conf.toml'. It can be changed via the command line.
 
 If parameters are missing from the configuration file or the registry they are considered to be set to 'false'.
 
@@ -36,8 +36,10 @@ CA certificates must be provided to the daemon. The path to the pem files is giv
 The comple command line is
 
 ```bash
-./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Dilithium5 certificate>
+./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Dilithium5 certificate> -usb_cl <path to the USB CA ED25519 certificate> -usb_pq <path to the USB CA Dilithium5 certificate>
 ```
+
+TODO: Detail certificate usage in the firewall and the security policy
 
 On Windows, path to the CA certificates is configured in the registry at HKLM\SYSTEM\CurrentControlSet\Services\Keysas Service\config in the values UsbCaClCert and UsbCaPqCert.
 
