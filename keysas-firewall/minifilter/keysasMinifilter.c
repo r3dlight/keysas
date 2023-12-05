@@ -17,12 +17,6 @@ Environment:
 
 --*/
 
-/*
-	TODO:
-		- Assign all values in the declaration with defaults
-		- Rename memory pool tags
-*/
-
 #include <fltKernel.h>
 #include <ntddstor.h>
 #include <dontuse.h>

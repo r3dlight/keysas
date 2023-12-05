@@ -26,22 +26,17 @@
 use anyhow::anyhow;
 use std::mem::size_of;
 use std::thread;
-use std::boxed::Box;
-use libc::c_void;
+use std::ffi::OsString;
 use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
 use widestring::U16CString;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{
-    CloseHandle, HANDLE, STATUS_SUCCESS, GetLastError
-};
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Storage::InstallableFileSystems::{
-    FilterConnectCommunicationPort, FilterGetMessage, FilterReplyMessage, FilterSendMessage,
-    FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER
+    FilterConnectCommunicationPort, FilterGetMessage, FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER, FilterReplyMessage
 };
+use windows::Win32::Foundation::STATUS_SUCCESS;
 
-use crate::controller::{ServiceController, KeysasAuthorization,
-                        KeysasFilterOperation, FilteredFile};
+use crate::controller::{FileAuthorization, FilteredFile, ServiceController};
 use crate::file_filter_if::FileFilterInterface;
 
 /// Operation code for the request from a driver to userland
@@ -50,7 +45,7 @@ pub enum KeysasFilterOperation {
     /// Validate the signature of the file and the report
     ScanFile = 0,
     /// Ask to validate the USB drive signature
-    ScanUsb
+    ScanUsb,
 }
 
 /// Format of a request from the driver to the service scanner
@@ -72,7 +67,7 @@ struct UserReply {
     /// Header of the message, managed by Windows
     header: FILTER_REPLY_HEADER,
     /// Result of the request => the authorization state to apply to the file or USB device
-    result: KeysasAuthorization,
+    result: FileAuthorization,
 }
 
 /// Handle to the driver interface
@@ -99,10 +94,9 @@ impl WindowsFileFilterInterface {
             }
         };
 
-        Ok(Box::new(Self { handle }))
+        Ok(Self { handle })
     }
 }
-
 
 /// Name of the communication port with the driver
 const DRIVER_COM_PORT: &str = "\\KeysasPort";
@@ -120,7 +114,7 @@ impl FileFilterInterface for WindowsFileFilterInterface {
             // Pre compute the request and response size
             let request_size = u32::try_from(size_of::<DriverRequest>())?;
             let reply_size = u32::try_from(size_of::<FILTER_REPLY_HEADER>())?
-                + u32::try_from(size_of::<UsbAuthorization>())?;
+                + u32::try_from(size_of::<FileAuthorization>())?;
 
             loop {
                 // Wait for a request from the driver
@@ -131,21 +125,38 @@ impl FileFilterInterface for WindowsFileFilterInterface {
                 };
 
                 unsafe {
-                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err()
-                    {
+                    if FilterGetMessage(handle, &mut request.header, request_size, None).is_err() {
                         println!("Failed to get message from driver");
                         continue;
                     }
                 }
 
-                // Dispatch the request
-                // let result = match ctrl_hdl.handle_driver_request(request.operation, &request.content) {
-                //     Ok(r) => r,
-                //     Err(e) => {
-                //         println!("Failed to handle driver request: {e}");
-                //         KeysasAuthorization::AuthBlock
-                //     }
-                // };
+                println!("Minifilter request: {:?}", request);
+
+                // Extract information about the file
+                let mut file = FilteredFile {
+                    path: Some(OsString::from(String::from_utf16(&request.content[32..])?)),
+                    id: [0; 32]
+                };
+
+                for i in 0..16 {
+                    let bytes = request.content[i].to_le_bytes();
+                    file.id[i*2] = bytes[0];
+                    file.id[i*2+1] = bytes[1]; 
+                }
+
+                // Ask controler for authorization
+                let result = {
+                    let controler = ctrl_hdl.lock().unwrap();
+                
+                    match controler.authorize_file(&file, true) {
+                        Ok(r) => FileAuthorization::AllowRead,
+                        Err(e) => {
+                            println!("Failed to handle driver request: {e}");
+                            FileAuthorization::Block
+                        }
+                    }
+                };
 
                 println!("Sending authorization: {:?}", result);
 
@@ -174,7 +185,7 @@ impl FileFilterInterface for WindowsFileFilterInterface {
     /// # Arguments
     ///
     /// `update` - Information on the file and the new authorization status
-    fn update_file_auth(&self, update: &FilteredFile) -> Result<(), anyhow::Error> {
+    fn update_file_auth(&self, _update: &FilteredFile) -> Result<(), anyhow::Error> {
         todo!()
         // let mut nb_bytes_ret: u32 = 0;
         // unsafe {

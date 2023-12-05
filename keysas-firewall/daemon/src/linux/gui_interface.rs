@@ -24,7 +24,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::controller::ServiceController;
-use crate::gui_interface::{GuiInterface, UsbUpdateMessage, FileUpdateMessage};
+use crate::gui_interface::{FileUpdateMessage, GuiInterface, UsbUpdateMessage};
 
 #[derive(Debug, Copy, Clone)]
 pub struct LinuxGuiInterface {}
@@ -51,7 +51,7 @@ impl LinuxGuiInterface {
         //         std::thread::sleep(std::time::Duration::from_secs(1));
         //     }
         // });
-        Ok(LinuxGuiInterface{})
+        Ok(LinuxGuiInterface {})
     }
 }
 
@@ -98,7 +98,7 @@ impl GuiInterface for LinuxGuiInterface {
     }
 
     /// Stop listening for user notifications and free the interface
-    fn stop(self: Box<Self>)  {
+    fn stop(self: Box<Self>) {
         todo!()
     }
 }

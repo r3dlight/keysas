@@ -5,8 +5,8 @@
  *
  */
 
-//! Keysas daemon is the main component of the firewall. It orchestrates the 
-//! firewall filters in the kernel based on the security policy and bridges the 
+//! Keysas daemon is the main component of the firewall. It orchestrates the
+//! firewall filters in the kernel based on the security policy and bridges the
 //! kernel components with the user interface. The main function initialize the
 //! daemon or service and then launch the ServiceController wich is the main
 //! orchestrator.
@@ -27,9 +27,14 @@
 #![feature(vec_into_raw_parts)]
 #![feature(str_split_remainder)]
 
+#[macro_use]
+extern crate rust_i18n;
+// Initialize user strings
+i18n!("locales");
+
 pub mod controller;
-pub mod gui_interface;
 pub mod file_filter_if;
+pub mod gui_interface;
 pub mod usb_monitor;
 
 #[cfg(target_os = "windows")]
@@ -40,11 +45,7 @@ use crate::windows::service;
 #[cfg(target_os = "linux")]
 pub mod linux;
 
-
-use crate::controller::ServiceController;
-
 use clap::{crate_version, Arg, ArgAction, Command};
-use anyhow::anyhow;
 
 use log::*;
 
@@ -60,8 +61,7 @@ pub struct Config {
     /// Path to the USB CA ED25519 certificate
     usb_ca_cl: String,
     /// Path to the USB CA Dilithium 5 certificate
-    usb_ca_pq: String
-    // TODO - Add revocation mecanism configuration (OCSP IP or CRL IP)
+    usb_ca_pq: String, // TODO - Add revocation mecanism configuration (OCSP IP or CRL IP)
 }
 
 /// Set default path for the configuration files on linux
@@ -70,7 +70,7 @@ pub struct Config {
 /// - Station CA Dilithium 5 certificate in ./st-ca-pq.pem
 /// - USB CA ED25519 certificate in ./usb-ca-cl.pem
 /// - USB CA Dilithium 5 certificate in ./usb-ca-pq.pem
-/// 
+///
 /// Note: on Windows the default configuration is set via Registry keys
 impl Default for Config {
     fn default() -> Self {
@@ -179,7 +179,7 @@ fn main() -> Result<(), anyhow::Error> {
             log::error!("Failed to start the service: {e}");
             return Err(anyhow!("Failed to start the service: {e}"));
         }
-    
+
         // Put this thread to sleep
         loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
@@ -189,7 +189,7 @@ fn main() -> Result<(), anyhow::Error> {
     #[cfg(target_os = "windows")]
     {
         // Register Keysas service with the system and start the service
-        start_windows_service();
+        service::start_windows_service(true)?;
 
         Ok(())
     }

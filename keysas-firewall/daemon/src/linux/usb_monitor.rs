@@ -21,22 +21,22 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
+use anyhow::anyhow;
+use libc::{c_int, c_short, c_ulong, c_void};
 use std::{
+    ffi::{OsStr, OsString},
+    fs::{read_to_string, File},
+    io::{self, Read, Seek, SeekFrom},
+    os::fd::AsRawFd,
+    ptr,
     sync::{Arc, Mutex},
     thread,
-    io::{self, Read, Seek, SeekFrom},
     time::Duration,
-    ptr,
-    os::fd::AsRawFd,
-    ffi::{OsStr, OsString},
-    fs::{read_to_string, File}
 };
-use libc::{c_int, c_short, c_ulong, c_void};
-use udev::{MonitorBuilder, Event};
-use anyhow::anyhow;
+use udev::{Event, MonitorBuilder};
 
-use crate::usb_monitor::UsbMonitor;
 use crate::controller::{ServiceController, UsbDevice};
+use crate::usb_monitor::UsbMonitor;
 
 #[repr(C)]
 struct pollfd {
@@ -83,10 +83,12 @@ fn get_mount_point(devnode: &OsStr) -> Result<OsString, anyhow::Error> {
 
     for line in mnt_points.lines() {
         let mut tokens = line.split_ascii_whitespace();
-        if let Some(node) = tokens.next(){
+        if let Some(node) = tokens.next() {
             if node.eq(devnode) {
-                let mnt = tokens.next().ok_or(anyhow!("failed to parse mounts file"))?;
-                return Ok(OsString::from(mnt))
+                let mnt = tokens
+                    .next()
+                    .ok_or(anyhow!("failed to parse mounts file"))?;
+                return Ok(OsString::from(mnt));
             }
         }
     }
@@ -103,16 +105,22 @@ fn extract_usb_info(event: Event) -> Result<(UsbDevice, Option<String>), anyhow:
     // Extract Usb device metadata
     let device = event.device();
 
-    let devnode = device.devnode().ok_or_else(|| anyhow!("Devnode not found"))?;
+    let devnode = device
+        .devnode()
+        .ok_or_else(|| anyhow!("Devnode not found"))?;
 
-    let vendor = device.property_value(OsStr::new("ID_VENDOR_ID"))
-                    .ok_or_else(|| anyhow!("Vendor ID not found"))?;
-    let model = device.property_value(OsStr::new("ID_MODEL_ID"))
-                    .ok_or_else(|| anyhow!("Model ID not found"))?;
-    let revision = device.property_value(OsStr::new("ID_REVISION"))
-                    .ok_or_else(|| anyhow!("Revision not found"))?;
-    let serial = device.property_value(OsStr::new("ID_SERIAL"))
-                    .ok_or_else(|| anyhow!("Serial number not found"))?;
+    let vendor = device
+        .property_value(OsStr::new("ID_VENDOR_ID"))
+        .ok_or_else(|| anyhow!("Vendor ID not found"))?;
+    let model = device
+        .property_value(OsStr::new("ID_MODEL_ID"))
+        .ok_or_else(|| anyhow!("Model ID not found"))?;
+    let revision = device
+        .property_value(OsStr::new("ID_REVISION"))
+        .ok_or_else(|| anyhow!("Revision not found"))?;
+    let serial = device
+        .property_value(OsStr::new("ID_SERIAL"))
+        .ok_or_else(|| anyhow!("Serial number not found"))?;
 
     let usb_device = UsbDevice {
         device_id: devnode.as_os_str().to_os_string(),
@@ -120,7 +128,7 @@ fn extract_usb_info(event: Event) -> Result<(UsbDevice, Option<String>), anyhow:
         vendor: vendor.to_os_string(),
         model: model.to_os_string(),
         revision: revision.to_os_string(),
-        serial: serial.to_os_string()
+        serial: serial.to_os_string(),
     };
 
     // Try to extract a signature
@@ -136,10 +144,8 @@ fn extract_usb_info(event: Event) -> Result<(UsbDevice, Option<String>), anyhow:
             let mut sig_buf = vec![0u8; sig_size as usize];
             f.read_exact(&mut sig_buf)?;
             Some(String::from_utf8(sig_buf.to_vec())?)
-        },
-        false => {
-            None
         }
+        false => None,
     };
 
     Ok((usb_device, signature))
@@ -151,9 +157,7 @@ impl UsbMonitor for LinuxUsbMonitor {
         let ctrl_hdl = ctrl.clone();
         thread::spawn(move || -> Result<(), anyhow::Error> {
             // Look for usb device
-            let monitor = MonitorBuilder::new()?
-                            .match_subsystem("block")?
-                            .listen()?;
+            let monitor = MonitorBuilder::new()?.match_subsystem("block")?.listen()?;
 
             let mut fds = vec![pollfd {
                 fd: monitor.as_raw_fd(),
@@ -173,8 +177,7 @@ impl UsbMonitor for LinuxUsbMonitor {
                 };
 
                 if res < 0 {
-                    return Err(anyhow!("ppol error: {}",
-                                        io::Error::last_os_error()));
+                    return Err(anyhow!("ppol error: {}", io::Error::last_os_error()));
                 }
 
                 let event = match monitor.iter().next() {
@@ -188,10 +191,11 @@ impl UsbMonitor for LinuxUsbMonitor {
                 // TODO - Work on event selection
                 if event.action() == Some(OsStr::new("add"))
                     && event.device().property_value(OsStr::new("DEVTYPE"))
-                            == Some(OsStr::new("partition")) {
+                        == Some(OsStr::new("partition"))
+                {
                     // Fetch information from the device
                     let (mut device, signature) = match extract_usb_info(event) {
-                        Ok((d,s)) => (d,s),
+                        Ok((d, s)) => (d, s),
                         Err(e) => {
                             println!("Error while parsing event: {e}");
                             continue;
@@ -200,13 +204,17 @@ impl UsbMonitor for LinuxUsbMonitor {
 
                     println!("Usb device: {:?}", device);
 
-                    match ctrl_hdl.lock().unwrap().authorize_usb(&device, signature.as_deref()) {
+                    match ctrl_hdl
+                        .lock()
+                        .unwrap()
+                        .authorize_usb(&device, signature.as_deref())
+                    {
                         Ok(true) => {
                             println!("USB device authorized");
-                        },
+                        }
                         Ok(false) => {
                             println!("USB device blocked");
-                        },
+                        }
                         Err(e) => {
                             println!("Failed to verify USB device: {e}");
                             continue;

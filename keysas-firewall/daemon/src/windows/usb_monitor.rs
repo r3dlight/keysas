@@ -21,22 +21,50 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    ffi::OsString
+};
+use anyhow::anyhow;
+use log::*;
 
+use crate::controller::{ServiceController, UsbDevice};
 use crate::usb_monitor::UsbMonitor;
-use crate::controller::ServiceController;
 
 pub struct WindowsUsbMonitor {}
 
 impl WindowsUsbMonitor {
     pub fn init() -> Result<WindowsUsbMonitor, anyhow::Error> {
-
+        Ok(Self {})
     }
 }
 
 impl UsbMonitor for WindowsUsbMonitor {
     fn start(&self, ctrl: &Arc<Mutex<ServiceController>>) -> Result<(), anyhow::Error> {
-        todo!()
+        // For now register a fake Usb device to allow file classification
+        let fake = UsbDevice {
+            device_id: OsString::from("\\\\.\\PhysicalDrive1"),
+            mnt_point: Some(OsString::from("\\\\.\\D:")),
+            vendor: OsString::from("Kingston"),
+            model: OsString::from("Test"),
+            revision: OsString::from("1"),
+            serial: OsString::from("Test")
+        };
+
+        let mut ctrl_hdl = ctrl.lock().unwrap();
+
+        match ctrl_hdl.authorize_usb(&fake, None) {
+            Ok(decision) => {
+                info!("Authorization granted: {decision}");
+            },
+            Err(e) => {
+                error!("Failed to validate Usb device: {e}");
+            }
+        }
+
+        Ok(())
+        
+
         // let mut buffer: [u8; 4096] = [0; 4096];
         // let mut byte_read: u32 = 0;
 
@@ -152,12 +180,11 @@ impl UsbMonitor for WindowsUsbMonitor {
     /// # Arguments
     ///
     /// `update` - Information on the usb key and the new authorization status
-    fn update_usb_auth(&self, update: &UsbDevice) -> Result<(), anyhow::Error> {
-        todo!()
+    fn update_usb_auth(&self, _update: &UsbDevice) -> Result<(), anyhow::Error> {
+        Err(anyhow!("USB authorization update not implemented"))
     }
 
     /// Stop the monitor
     fn stop(self: Box<Self>) {
-        todo!()
     }
 }

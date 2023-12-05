@@ -23,24 +23,19 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use std::{
-    sync::{Arc, Mutex},
-    boxed::Box,
-    thread,
-    path::Path,
-    fs::create_dir_all
-};
+use aya::{include_bytes_aligned, programs::lsm::Lsm, BpfLoader, Btf};
+use aya_log::BpfLogger;
 use log::*;
-use aya::{
-    programs::lsm::Lsm,
-    Btf,
-    include_bytes_aligned,
-    BpfLoader
+use std::{
+    boxed::Box,
+    fs::create_dir_all,
+    path::Path,
+    sync::{Arc, Mutex},
+    thread,
 };
 use tokio::runtime::Runtime;
-use aya_log::BpfLogger;
 
-use crate::controller::{ServiceController, FilteredFile};
+use crate::controller::{FilteredFile, ServiceController};
 use crate::file_filter_if::FileFilterInterface;
 
 #[derive(Debug, Copy, Clone)]
@@ -70,16 +65,16 @@ async fn start_bpf() -> Result<(), anyhow::Error> {
 
     #[cfg(debug_assertions)]
     let mut bpf = BpfLoader::new()
-                    .map_pin_path(lsm_base_path)
-                    .load(include_bytes_aligned!(
-        "../../../ebpfilter/target/bpfel-unknown-none/debug/lsm-file"
-    ))?;
+        .map_pin_path(lsm_base_path)
+        .load(include_bytes_aligned!(
+            "../../../ebpfilter/target/bpfel-unknown-none/debug/lsm-file"
+        ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf = BpfLoader::new()
-                    .map_pin_path(lsm_base_path)
-                    .load(include_bytes_aligned!(
-        "../../../ebpfilter/target/bpfel-unknown-none/release/lsm-file"
-    ))?;
+        .map_pin_path(lsm_base_path)
+        .load(include_bytes_aligned!(
+            "../../../ebpfilter/target/bpfel-unknown-none/release/lsm-file"
+        ))?;
 
     if let Err(e) = BpfLogger::init(&mut bpf) {
         // This can happen if you remove all log statements from your eBPF program.
@@ -118,7 +113,6 @@ impl FileFilterInterface for LinuxFileFilterInterface {
         Ok(())
     }
 
-
     /// Update the control policy on a file
     ///
     /// # Arguments
@@ -129,6 +123,5 @@ impl FileFilterInterface for LinuxFileFilterInterface {
     }
 
     /// Stop the interface and free resources
-    fn stop(self: Box<Self>) {
-    }
+    fn stop(self: Box<Self>) {}
 }

@@ -78,10 +78,10 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use crate::controller::{ServiceController, UsbAuthorization, FileAuthorization};
+use crate::controller::{FileAuthorization, ServiceController, UsbAuthorization};
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use cfg_if::cfg_if;
 
 #[cfg(target_os = "windows")]
 use crate::windows::gui_interface::WindowsGuiInterface;
@@ -93,24 +93,24 @@ use crate::linux::gui_interface::LinuxGuiInterface;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UsbUpdateMessage {
     /// Usb device system identifier
-    device: String,
+    pub device: String,
     /// Mount point for the partition on the device
-    path: String,
+    pub path: String,
     /// Usb device name made from vendor, model, revision and serial number
-    name: String,
+    pub name: String,
     /// Authorization status
-    pub authorization: UsbAuthorization
+    pub authorization: UsbAuthorization,
 }
 
 /// Message for a file notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FileUpdateMessage {
     /// Usb device identifier
-    device: String,
+    pub device: String,
     /// File ID based on sha-256 hash of full path
     pub id: [u16; 16],
     /// Path to the file
-    path: String,
+    pub path: String,
     /// Authorization status
     pub authorization: FileAuthorization,
 }
@@ -148,54 +148,36 @@ pub trait GuiInterface {
     /// # Arguments
     ///
     /// * `update` - File update message
-    fn send_file_update(&self, update: FileUpdateMessage) -> Result<(), anyhow::Error>;
+    fn send_file_update(&self, update: &FileUpdateMessage) -> Result<(), anyhow::Error>;
 
     /// Send a usb update notification to the user
     ///
     /// # Arguments
     ///
     /// * `update` - USB update message
-    fn send_usb_update(&self, update: UsbUpdateMessage) -> Result<(), anyhow::Error>;
+    fn send_usb_update(&self, update: &UsbUpdateMessage) -> Result<(), anyhow::Error>;
 
     /// Send a request to the user to authorize a file
     ///
     /// # Arguments
     ///
     /// * `file` - Contains information on the file and the requested authorization
-    fn request_file_auth(&self, file: FileUpdateMessage) -> Result<bool, anyhow::Error>;
+    fn request_file_auth(&self, file: &FileUpdateMessage) -> Result<bool, anyhow::Error>;
 
     /// Send a request to the user to authorize a usb key
     ///
     /// # Arguments
     ///
     /// * `usb` - Contains information on the usb key and the requested authorization
-    fn request_usb_auth(&self, usb: UsbUpdateMessage) -> Result<bool, anyhow::Error>;
+    fn request_usb_auth(&self, usb: &UsbUpdateMessage) -> Result<bool, anyhow::Error>;
 
     /// Stop listening for user notifications and free the interface
     fn stop(self: Box<Self>);
 }
 
-/// Initialize the server behind the interface
-
-/// Try to send a message to the connected socket
-pub fn send(msg: &impl Serialize) -> Result<(), anyhow::Error> {
-    // let msg_vec = match serde_json::to_string(msg) {
-    //     Ok(m) => m,
-    //     Err(e) => return Err(anyhow!("Failed to serialize message: {e}")),
-    // };
-
-    // if let Err(e) = libmailslot::write_mailslot(SERVICE_PIPE, &msg_vec) {
-    //     return Err(anyhow!("Failed to post message to the mailslot: {e}"));
-    // }
-
-    // println!("Message sent");
-
-    Ok(())
-}
-
 pub fn send_file_auth_status(
-    file_data: &[u16],
-    authorization: UsbAuthorization,
+    _file_data: &[u16],
+    _authorization: UsbAuthorization,
 ) -> Result<(), anyhow::Error> {
     todo!()
     // let file_path = match String::from_utf16(&file_data[17..]) {

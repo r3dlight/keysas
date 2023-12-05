@@ -47,18 +47,22 @@ english.AllowUserFileRead=Authorize user to manualy approve unchecked file read
 english.AllowUserFileWrite=Authorize user to modify or create file
 english.CertifConfigInfo=Select USB CA certificates
 english.EnterCertif=Enter path to USB CA certificates
-english.CertifCLLocation=Path to ED25519 certificate
-english.CertifPQLocation=Path to Dilithium 5 certificate
+english.StCertifCLLocation=Path to ED25519 station CA certificate
+english.StCertifPQLocation=Path to Dilithium 5 station CA certificate
+english.UsbCertifCLLocation=Path to ED25519 USB signing certificate
+english.UsbCertifPQLocation=Path to Dilithium 5 USB signing certificate
 french.SecurityConfigInfo=Configuration du pare-feu Keysas
-french.EnterConfig=Dï¿½finissez la politique de sï¿½curitï¿½ du pare-feu
-french.DisableUnsignedUsb=Autorisez toutes les clï¿½s USB non signï¿½es
-french.AllowUserUsbAuthorization=Autorisez l'utilisateur ï¿½ approuver manuellement les clï¿½s USB non signï¿½es
-french.AllowUserFileRead=Autorisez l'utilisateur ï¿½approuver manuellement la lecture des fichiers non vï¿½rifiï¿½s
-french.AllowUserFileWrite=Autorisez l'utilisateur ï¿½modifier ou crï¿½er des fichiers sur les clï¿½s USB 
-french.CertifConfigInfo=Sï¿½lectionner les certificats de la CA USB
+french.EnterConfig=Dï¿½finissez la politique de sécurité du pare-feu
+french.DisableUnsignedUsb=Autorisez toutes les clés USB non signï¿½es
+french.AllowUserUsbAuthorization=Autorisez l'utilisateur à approuver manuellement les clés USB non signées
+french.AllowUserFileRead=Autorisez l'utilisateur à approuver manuellement la lecture des fichiers non vérifiés
+french.AllowUserFileWrite=Autorisez l'utilisateur à modifier ou créer des fichiers sur les clés USB 
+french.CertifConfigInfo=Sélectionner les certificats de la CA USB
 french.EnterCertif=Entrer le chemin vers les certificats
-french.CertifCLLocation=Chemin vers le certificat ED25519
-french.CertifPQLocation=Chemin vers le certificat Dilithium 5
+french.StCertifCLLocation=Chemin vers le certificat ED25519 de la CA des stations
+french.StCertifPQLocation=Chemin vers le certificat Dilithium 5 de la CA des station
+french.UsbCertifCLLocation=Chemin vers le certificat ED25519 de la CA USB
+french.UsbCertifPQLocation=Chemin vers le certificat Dilithium 5 de la CA USB
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -96,8 +100,10 @@ begin
     // Select admin certificates
     CertifPage := CreateInputFilePage(SecuConfigPage.ID, ExpandConstant('{cm:CertifConfigInfo}'), '', ExpandConstant('{cm:EnterCertif}'));
 
-    CertifPage.Add(ExpandConstant('{cm:CertifCLLocation}'), 'All files', '.pem');
-    CertifPage.Add(ExpandConstant('{cm:CertifPQLocation}'), 'All files', '.pem'); 
+    CertifPage.Add(ExpandConstant('{cm:StCertifCLLocation}'), 'All files', '.pem');
+    CertifPage.Add(ExpandConstant('{cm:StCertifPQLocation}'), 'All files', '.pem'); 
+    CertifPage.Add(ExpandConstant('{cm:UsbCertifCLLocation}'), 'All files', '.pem');
+    CertifPage.Add(ExpandConstant('{cm:UsbCertifPQLocation}'), 'All files', '.pem'); 
 end;
 
 { TODO - Add configuration check between parameters}
@@ -150,14 +156,24 @@ begin
     Result := IntToStr(Config);
 end;
 
-function GetCLCertif(Param: String): String;
+function StGetCLCertif(Param: String): String;
 begin
     Result := CertifPage.Values[0];
 end;
 
-function GetPQCertif(Param: String): String;
+function StGetPQCertif(Param: String): String;
 begin
     Result := CertifPage.Values[1];
+end;
+
+function UsbGetCLCertif(Param: String): String;
+begin
+    Result := CertifPage.Values[2];
+end;
+
+function UsbGetPQCertif(Param: String): String;
+begin
+    Result := CertifPage.Values[3];
 end;
 
 [Icons]
@@ -174,8 +190,10 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; Val
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: dword; ValueName: "AllowUserUsbAuthorization"; ValueData: {code:GetConfigUsbAuthorization}; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: dword; ValueName: "AllowUserFileRead"; ValueData: {code:GetConfigReadAuthorization}; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: dword; ValueName: "AllowUserFileWrite"; ValueData: {code:GetConfigWriteAuthorization}; Flags: uninsdeletekey    
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaClCert"; ValueData: {code:GetCLCertif}; Flags: uninsdeletekey 
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaPqCert"; ValueData: {code:GetPQCertif}; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "StCaClCert"; ValueData: {code:StGetCLCertif}; Flags: uninsdeletekey 
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "StCaPqCert"; ValueData: {code:StGetPQCertif}; Flags: uninsdeletekey  
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaClCert"; ValueData: {code:UsbGetCLCertif}; Flags: uninsdeletekey 
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#AgentName}\config"; ValueType: string; ValueName: "UsbCaPqCert"; ValueData: {code:UsbGetPQCertif}; Flags: uninsdeletekey
 ; Register tray app to automaticaly run at startup
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Keysas-TrayApp"; ValueData: "C:\Programmes\keysas-tray-app\keysas-tray-app.exe"; Flags: uninsdeletekey
 

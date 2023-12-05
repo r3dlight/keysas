@@ -93,38 +93,34 @@
 #![warn(unused_imports)]
 
 use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
-use std::{
-    ffi::{OsStr, OsString},
-    path::{PathBuf, Component, Path},
-    sync::{Arc, Mutex},
-    collections::HashMap
-};
-use log::*;
 use base64::{engine::general_purpose, Engine as _};
 use ed25519_dalek::Signature as SignatureDalek;
+use log::*;
 use oqs::sig::{Algorithm, Sig};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    ffi::{OsStr, OsString},
+    path::{Component, Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 use crate::file_filter_if::{FileFilterInterface, FileFilterInterfaceBuilder};
+use crate::gui_interface::{
+    FileUpdateMessage, GuiInterface, GuiInterfaceBuilder, UsbUpdateMessage,
+};
 use crate::usb_monitor::{UsbMonitor, UsbMonitorBuilder};
-use crate::gui_interface::{UsbUpdateMessage, FileUpdateMessage, GuiInterface, GuiInterfaceBuilder};
 use crate::Config;
 use keysas_lib::{
     // file_report::parse_report,
-    keysas_key::{KeysasHybridPubKeys, KeysasHybridSignature, PublicKeys}
+    keysas_key::{KeysasHybridPubKeys, KeysasHybridSignature, PublicKeys},
 };
 
 #[cfg(target_os = "windows")]
-use crate::windows::service::{
-    load_security_policy,
-    load_certificates
-};
+use crate::windows::service::{load_certificates, load_security_policy};
 
 #[cfg(target_os = "linux")]
-use crate::linux::service::{
-    load_security_policy,
-    load_certificates
-};
+use crate::linux::service::{load_certificates, load_security_policy};
 
 /// Authorization states for USB devices
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
@@ -139,7 +135,7 @@ pub enum UsbAuthorization {
     /// Access is allowed with a warning to the user
     AllowRW,
     /// Access is allowed for all operations
-    AllowAll
+    AllowAll,
 }
 
 impl UsbAuthorization {
@@ -159,7 +155,7 @@ pub enum FileAuthorization {
     /// Access is allowed in read mode only
     AllowRead,
     /// Access is allowed in read/write mode
-    AllowRW
+    AllowRW,
 }
 
 impl FileAuthorization {
@@ -168,12 +164,18 @@ impl FileAuthorization {
     }
 }
 
+/// Main firewall security configuration
+/// It set on start up by the administrator
 #[derive(Debug, Deserialize, Clone, Copy, Default)]
 pub struct SecurityPolicy {
-    disable_unsigned_usb: bool,
-    allow_user_usb_authorization: bool,
-    allow_user_file_read: bool,
-    allow_user_file_write: bool,
+    /// If true disable USB signature verification, all USB keys are allowed
+    pub disable_unsigned_usb: bool,
+    /// If true allow the user to manualy authorize unsigned USB keys
+    pub allow_user_usb_authorization: bool,
+    /// If true allow the user to grant read access to unverified file
+    pub allow_user_file_read: bool,
+    /// If true allow the user to grant write access to files
+    pub allow_user_file_write: bool,
 }
 
 /// Service controller object, it contains handles to the service communication interfaces and data
@@ -185,7 +187,7 @@ pub struct ServiceController {
     st_ca_pub: KeysasHybridPubKeys,
     usb_ca_pub: KeysasHybridPubKeys,
     unmounted_usb: HashMap<OsString, UsbDevicePolicy>,
-    mounted_usb: HashMap<OsString, UsbDevicePolicy>
+    mounted_usb: HashMap<OsString, UsbDevicePolicy>,
 }
 
 /// Representation of USB device in the firewall
@@ -198,7 +200,7 @@ pub struct UsbDevice {
     pub vendor: OsString,
     pub model: OsString,
     pub revision: OsString,
-    pub serial: OsString
+    pub serial: OsString,
 }
 
 /// Firewall policy for one USB device
@@ -206,7 +208,7 @@ pub struct UsbDevicePolicy {
     /// Usb device information
     device: UsbDevice,
     /// Authorization status
-    auth: UsbAuthorization
+    auth: UsbAuthorization,
 }
 
 /// Representation of a file in the firewall
@@ -215,13 +217,13 @@ pub struct FilteredFile {
     /// Path to the file
     pub path: Option<OsString>,
     /// Identifier based on SHA-256 of path
-    pub id: [u8; 32]
+    pub id: [u8; 32],
 }
 
 /// Firewall policy for one file
 pub struct FilePolicy {
     file: FilteredFile,
-    auth: FileAuthorization
+    auth: FileAuthorization,
 }
 
 impl ServiceController {
@@ -263,15 +265,15 @@ impl ServiceController {
             st_ca_pub,
             usb_ca_pub,
             unmounted_usb: HashMap::new(),
-            mounted_usb: HashMap::new()
+            mounted_usb: HashMap::new(),
         }));
 
         // Start the interfaces
         {
             let mut ctrl_hdl = ctrl.lock().unwrap();
+            ctrl_hdl.gui.start(&ctrl)?;
             ctrl_hdl.driver_if.start(&ctrl)?;
             ctrl_hdl.usb_monitor.start(&ctrl)?;
-            ctrl_hdl.gui.start(&ctrl)?;
         }
 
         Ok(ctrl)
@@ -282,7 +284,7 @@ impl ServiceController {
     /// # Arguments
     ///
     /// * `update` - Contains the new authorization status requested by the user
-    pub fn request_usb_update(&self, update: UsbUpdateMessage) -> Result<(), anyhow::Error> {
+    pub fn request_usb_update(&self, _update: &UsbUpdateMessage) -> Result<(), anyhow::Error> {
         todo!()
     }
 
@@ -291,7 +293,7 @@ impl ServiceController {
     /// # Arguments
     ///
     /// * `update` - Contains the new authorization status requested by the user
-    pub fn request_file_update(&self, update: FileUpdateMessage) -> Result<(), anyhow::Error> {
+    pub fn request_file_update(&self, _update: &FileUpdateMessage) -> Result<(), anyhow::Error> {
         todo!()
     }
 
@@ -301,8 +303,11 @@ impl ServiceController {
     /// # Arguments
     ///
     /// * `device` - Usb device info
-    pub fn authorize_usb(&mut self, mut device: &UsbDevice, signature: Option<&str>)
-            -> Result<bool, anyhow::Error> {
+    pub fn authorize_usb(
+        &mut self,
+        device: &UsbDevice,
+        signature: Option<&str>,
+    ) -> Result<bool, anyhow::Error> {
         info!("Received USB device request: {:?}", device);
 
         // TODO - Improve list of USB device
@@ -314,42 +319,37 @@ impl ServiceController {
         }
 
         // Insert the new device in the list of unmounted devices
-        self.unmounted_usb.insert(device.device_id.clone(), UsbDevicePolicy {
-            device: device.clone(),
-            auth: UsbAuthorization::Pending
-        });
+        self.unmounted_usb.insert(
+            device.device_id.clone(),
+            UsbDevicePolicy {
+                device: device.clone(),
+                auth: UsbAuthorization::Pending,
+            },
+        );
 
         // Evaluate USB key policy
         let auth = match signature {
-            Some(sig) => {
-                match self.validate_usb_signature(&device, &sig) {
-                    Ok(true) => {
-                        match self.policy.allow_user_file_write {
-                            true => UsbAuthorization::AllowRW,
-                            false => UsbAuthorization::AllowRead
-                        }
-                    },
-                    Ok(false) => {
-                        match self.policy.disable_unsigned_usb {
-                            true => UsbAuthorization::AllowAll,
-                            false => UsbAuthorization::Block
-                        }
-                    },
-                    Err(e) => {
-                        let mut dev_policy = self.unmounted_usb.get_mut(&device.device_id).unwrap();
-                        dev_policy.auth = UsbAuthorization::Block;
-                        return Err(e);
-                    }
+            Some(sig) => match self.validate_usb_signature(&device, &sig) {
+                Ok(true) => match self.policy.allow_user_file_write {
+                    true => UsbAuthorization::AllowRW,
+                    false => UsbAuthorization::AllowRead,
+                },
+                Ok(false) => match self.policy.disable_unsigned_usb {
+                    true => UsbAuthorization::AllowAll,
+                    false => UsbAuthorization::Block,
+                },
+                Err(e) => {
+                    let dev_policy = self.unmounted_usb.get_mut(&device.device_id).unwrap();
+                    dev_policy.auth = UsbAuthorization::Block;
+                    return Err(e);
                 }
             },
-            None => {
-                match self.policy.disable_unsigned_usb {
-                    true => UsbAuthorization::AllowAll,
-                    false => UsbAuthorization::Block
-                }
-            }
+            None => match self.policy.disable_unsigned_usb {
+                true => UsbAuthorization::AllowAll,
+                false => UsbAuthorization::Block,
+            },
         };
-        let mut dev_policy = self.unmounted_usb.get_mut(&device.device_id).unwrap();
+        let dev_policy = self.unmounted_usb.get_mut(&device.device_id).unwrap();
         dev_policy.auth = auth;
 
         // TODO - Update HMI
@@ -357,7 +357,7 @@ impl ServiceController {
         // Return authorization decision as boolean
         match auth {
             UsbAuthorization::Block | UsbAuthorization::Pending => Ok(false),
-            _ => Ok(true)
+            _ => Ok(true),
         }
     }
 
@@ -366,7 +366,7 @@ impl ServiceController {
     /// # Arguments
     ///
     /// * `device` - information on the usb key
-    pub fn update_usb(&self, device: &UsbDevice) -> Result<(), anyhow::Error> {
+    pub fn update_usb(&self, _device: &UsbDevice) -> Result<(), anyhow::Error> {
         todo!()
     }
 
@@ -384,27 +384,20 @@ impl ServiceController {
     ///
     /// * `path` - Path to the file
     /// * `write` - If write access is requested
-    pub fn authorize_file(
-        &self,
-        path: &OsString,
-        write: bool,
-    ) -> Result<bool, anyhow::Error> {
-        // Extract content of the request
-        // The first 32 bytes are the File ID
-        // let file_id = &content[1..16];
-        // // The next part contains the file name
-        // let file_name = match String::from_utf16(&content[17..]) {
-        //     Ok(name) => name,
-        //     Err(_) => {
-        //         return Ok((UsbAuthorization::Block, false));
-        //     }
-        // };
-
-        // let file_path = Path::new(file_name.trim_matches(char::from(0)));
-        let file_path = Path::new(path);
+    pub fn authorize_file(&self, file: &FilteredFile, _write: bool) -> Result<bool, anyhow::Error> {
+        let file_path = match &file.path {
+            Some(p) => {
+                let mut pb = PathBuf::new();
+                pb.push(&p);
+                pb
+            },
+            None => {
+                return Err(anyhow!("Invalid file"));
+            }
+        };
 
         // Try to get the parent directory
-        let mut components = file_path.components();
+        let mut components = file_path.as_path().components();
 
         // First component is the Root Directory
         // If the second directory is "System Volume Information" then it is internal to windows, skip it
@@ -425,7 +418,7 @@ impl ServiceController {
         }
 
         // Try to validate the file from the station report
-        match self.validate_file(file_path) {
+        match self.validate_file(file_path.as_path()) {
             Ok(true) => {
                 return Ok(true);
             }
@@ -435,7 +428,7 @@ impl ServiceController {
         }
 
         // If the validation fails, ask the user authorization
-        self.user_authorize_file(file_path)
+        self.user_authorize_file(file_path.as_path())
     }
 
     /// Handle requests coming from the driver
@@ -475,13 +468,9 @@ impl ServiceController {
     // }
 
     /// Handle a request coming from the HMI
-    fn handle_tray_request(
-        &self,
-        req: &FileUpdateMessage,
-    ) -> Result<(), anyhow::Error> {
+    fn handle_tray_request(&self, req: &FileUpdateMessage) -> Result<(), anyhow::Error> {
         // Check that the request is conforme to the security policy
-        if (FileAuthorization::AllowRead == req.authorization)
-            && !self.policy.allow_user_file_read
+        if (FileAuthorization::AllowRead == req.authorization) && !self.policy.allow_user_file_read
         {
             return Err(anyhow!("Authorization change not allowed"));
         }
@@ -515,8 +504,11 @@ impl ServiceController {
         Ok(())
     }
 
-    fn validate_usb_signature(&self, device: &UsbDevice, sig_block: &str)
-            -> Result<bool, anyhow::Error> {
+    fn validate_usb_signature(
+        &self,
+        device: &UsbDevice,
+        sig_block: &str,
+    ) -> Result<bool, anyhow::Error> {
         let mut signatures = sig_block.split('|');
 
         // Extract ED25519 signature
@@ -529,7 +521,7 @@ impl ServiceController {
 
         let sig_cl_dec = match general_purpose::STANDARD.decode(sig_cl) {
             Ok(s) => s,
-            Err(e) => {
+            Err(_e) => {
                 return Err(anyhow!("Failed to parse ED25519 signature"));
             }
         };
@@ -543,7 +535,6 @@ impl ServiceController {
 
         let sig_dalek = SignatureDalek::from_bytes(&sig_cl_dec_casted);
 
-
         let sig_pq = match signatures.remainder() {
             Some(s) => s,
             None => {
@@ -553,7 +544,7 @@ impl ServiceController {
 
         let sig_pq_dec = match general_purpose::STANDARD.decode(sig_pq) {
             Ok(s) => s,
-            Err(e) => {
+            Err(_e) => {
                 return Err(anyhow!("Failed to parse Dilithium 5 signature"));
             }
         };
@@ -580,9 +571,12 @@ impl ServiceController {
         );
 
         match KeysasHybridPubKeys::verify_key_signatures(
-            data.as_bytes(), &hybrid_sig, &self.usb_ca_pub) {
+            data.as_bytes(),
+            &hybrid_sig,
+            &self.usb_ca_pub,
+        ) {
             Ok(_) => Ok(true),
-            Err(e) => Ok(false)
+            Err(_e) => Ok(false),
         }
     }
 
@@ -685,26 +679,6 @@ impl ServiceController {
     /// * 'path' - Path to the file
     fn user_authorize_file(&self, path: &Path) -> Result<bool, anyhow::Error> {
         // Find authorization status for the file
-        let auth_request = format!("Allow file: {:?}", path.as_os_str());
         todo!()
-        // let (auth_request_ptr, _, _) = auth_request.into_raw_parts();
-
-        // let authorization_status = unsafe {
-        //     MessageBoxA(
-        //         None,
-        //         PCSTR::from_raw(auth_request_ptr),
-        //         s!("Keysas USB Filter"),
-        //         MB_YESNO | MB_ICONWARNING | MB_SYSTEMMODAL,
-        //     )
-        // };
-
-        // match authorization_status {
-        //     IDYES => Ok(KeysasAuthorization::AuthAllowRead),
-        //     IDNO => Ok(KeysasAuthorization::AuthBlock),
-        //     _ => Err(anyhow!(format!(
-        //         "Unknown Authorization: {:?}",
-        //         authorization_status
-        //     ))),
-        // }
     }
 }

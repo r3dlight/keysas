@@ -52,11 +52,11 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use std::sync::{Arc, Mutex};
-use std::boxed::Box;
 use cfg_if::cfg_if;
+use std::boxed::Box;
+use std::sync::{Arc, Mutex};
 
-use crate::controller::{ServiceController, FilteredFile};
+use crate::controller::{FilteredFile, ServiceController};
 
 #[cfg(target_os = "windows")]
 use crate::windows::file_filter_if::WindowsFileFilterInterface;

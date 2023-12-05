@@ -1,0 +1,25 @@
+_version: 2
+
+keysas_title:
+  en: Keysas USB Filter
+  fr: Pare-feu Keysas
+
+messages.user_file_auth_read_req:
+  en: Grant read access to file %{path} on USB %{usb}
+  fr: Autoriser la lecture du fichier %{path} sur la clé %{usb}
+
+messages.user_file_auth_write_req:
+  en: Grant write access to file %{path} on USB %{usb}
+  fr: Autoriser l'écriture du fichier %{path} sur la clé %{usb}
+
+messages.user_usb_auth_read_req:
+  en: Grant read access to partition %{mount} on usb %{usb}
+  fr: Autoriser en lecture la partition %{mount} sur la clé %{usb}
+
+messages.user_usb_auth_write_req:
+  en: Grant write access to partition %{mount} on usb %{usb}
+  fr: Autoriser en écriture la partition %{mount} sur la clé %{usb}
+
+messages.user_usb_auth_all_req:
+  en: Grant all access to partition %{mount} on usb %{usb}
+  fr: Autoriser l'accés à la partition %{mount} sur la clé %{usb}
