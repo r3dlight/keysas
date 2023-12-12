@@ -11,8 +11,9 @@ Keysas-admin application
 .. warning:: 
 
  **Keysas-admin** only work on GNU/Linux based systems for now !
- Adding your current user to the **plugdev** group (Debian/Ubuntu) is
- also required to access USB raw devices without being privileged.
+ To be able to sign USB devices with your current user, 
+ create a new udev rule **/etc/udev/rules.d/71-keysas.rules** with the following:
+ **SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"**
 
 SSH configuration
 =================
