@@ -101,6 +101,9 @@ Make sure that your **clamav-daemon** and **clamav-freshclam** services are up a
   TCPSocket 3310
   TCPAddr 127.0.0.1
 
+.. warning::
+ Make sure that the **StreamMaxLength** (clamd.conf) parameter is consistent with **MAX_SIZE** and **YARA_MAXFILESIZE** (see keysas-transit).  
+
 We now need to allow the Clamav daemon to be able to read the /var/local/in
 directory with Apparmor.
 
