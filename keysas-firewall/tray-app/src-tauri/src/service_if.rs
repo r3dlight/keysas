@@ -5,7 +5,38 @@
  *
  */
 
-//! Connection to Keysas Windows service
+//! Generic interface to the Keysas daemon/Windows service. It must be specialized
+//!  for Linux and Windows
+//! 
+//! Communications between the daemon and the tray app are:
+//! 
+//! - Notification of Usb device or File authorization update
+//!
+//!  ```text
+//!           Daemon                        App
+//!           ──────                       ─────
+//!             │      FileUpdateMessage     │
+//!             │ ─────────────────────────► │
+//!             │                            │
+//!             │      UsbUpdateMessage      │
+//!             │ ─────────────────────────► │
+//!             │                            │
+//! ```
+//! 
+//! - Request by the user to update the authorization status for a Usb device or a File
+//!
+//! ```text
+//!            App                         Daemon
+//!           ─────                        ──────
+//!             │      FileUpdateMessage     │
+//!             │ ─────────────────────────► │
+//!             │                            │
+//!             │      UsbUpdateMessage      │
+//!             │ ─────────────────────────► │
+//!             │                            │
+//! ```
+//! 
+//! Both type of communications are done with UpdateMessage
 
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -22,45 +53,67 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use cfg_if::cfg_if;
 
 use crate::app_controller::AppController;
 
-/// Authorization states for files and USB devices
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
-pub enum KeysasAuthorization {
-    /// Default value
-    Unknown = 0,
+#[cfg(target_os = "windows")]
+use crate::windows::service_if::WindowsServiceInterface;
+
+#[cfg(target_os = "linux")]
+use crate::linux::service_if::LinuxServiceInterface;
+
+/// Authorization states for USB devices
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum UsbAuthorization {
     /// Authorization request pending
-    Pending,
+    Pending = 0,
     /// Access is blocked
     Block,
     /// Access is allowed in read mode only
     AllowRead,
     /// Access is allowed with a warning to the user
-    AllowWarning,
+    AllowRW,
     /// Access is allowed for all operations
     AllowAll,
 }
 
-impl KeysasAuthorization {
-    /// Convert the authorization enum to an unsigned char so that it can be send to javascript
-    pub fn to_u8_file(self) -> u8 {
-        match self {
-            Self::AllowRead => 1,
-            Self::AllowAll => 2,
-            _ => 0,
-        }
+impl UsbAuthorization {
+    pub fn as_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+/// Authorization states for files
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum FileAuthorization {
+    /// Authorization request pending
+    Pending = 0,
+    /// Access is blocked
+    Block,
+    /// Access is allowed in read mode only
+    AllowRead,
+    /// Access is allowed in read/write mode
+    AllowRW,
+}
+
+impl FileAuthorization {
+    pub fn as_u8(self) -> u8 {
+        self as u8
     }
 
-    /// Convert an unsigned char to the authorization enum for a file
-    pub fn from_u8_file(auth: u8) -> KeysasAuthorization {
+    /// Convert u8 to FileAuthorization, default value is Block
+    pub fn from_u8(auth: u8) -> FileAuthorization {
         match auth {
-            1 => Self::AllowRead,
-            2 => Self::AllowAll,
-            _ => Self::Block,
+            0 => FileAuthorization::Pending,
+            1 => FileAuthorization::Block,
+            2 => FileAuthorization::AllowRead,
+            3 => FileAuthorization::AllowRW,
+            _ => FileAuthorization::Block
         }
     }
 }
@@ -71,70 +124,41 @@ pub struct FileUpdateMessage {
     pub device: String,
     pub id: [u16; 16],
     pub path: String,
-    pub authorization: KeysasAuthorization,
+    pub authorization: FileAuthorization,
 }
 
-/// Handle to the service interface client and server
-pub struct ServiceIf {
-    server: Arc<RwLock<libmailslot::MailSlot>>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UsbUpdateMessage {
+    pub device: String,
+    pub path: String,
+    pub name: String,
+    pub authorization: UsbAuthorization
 }
 
-/// Name of the communication pipe
-const SERVICE_PIPE: &str = r"\\.\mailslot\keysas\service-to-app";
-const TRAY_PIPE: &str = r"\\.\mailslot\keysas\app-to-service";
+#[derive(Debug, Copy, Clone)]
+pub struct ServiceInterfaceBuilder {}
 
-impl ServiceIf {
-    /// Initialize the pipe with Keysas Service
-    pub fn init_service_if() -> Result<ServiceIf, anyhow::Error> {
-        // Initialize the mailslot handles
-        let server = match libmailslot::create_mailslot(SERVICE_PIPE) {
-            Ok(s) => s,
-            Err(e) => return Err(anyhow!("Failed to create server: {e}")),
-        };
-
-        Ok(ServiceIf {
-            server: RwLock::new(server).into(),
-        })
-    }
-
-    /// Start the server thread to listen for the Keysas service
-    pub fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error> {
-        // Start listening on the server side
-        let ctrl_hdl = ctrl.clone();
-        let server = self.server.clone();
-        std::thread::spawn(move || {
-            // Get a mutable lock on the server
-            let server = match server.write() {
-                Ok(s) => s,
-                Err(_) => {
-                    return;
-                }
-            };
-            println!("Start listening for daemon");
-            loop {
-                while let Ok(Some(msg)) = libmailslot::read_mailslot(&server) {
-                    if let Ok(update) = serde_json::from_slice::<FileUpdateMessage>(msg.as_bytes())
-                    {
-                        ctrl_hdl.notify_file_change(&update);
-                        println!("message from service {:?}", update);
-                    }
-                }
-                std::thread::sleep(std::time::Duration::from_secs(1));
+impl ServiceInterfaceBuilder {
+    pub fn build() -> Result<Box<dyn ServiceInterface + Send + Sync>, anyhow::Error> {
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+                return Ok(Box::new(LinuxServiceInterface::init()?)
+                            as Box<dyn ServiceInterface + Send + Sync>)
+            } else if #[cfg(target_os = "windows")] {
+                return Ok(Box::new(WindowsServiceInterface::init()?)
+                            as Box<dyn ServiceInterface + Send + Sync>)
+            } else {
+                return Err(anyhow!("OS not supported"))
             }
-        });
-        Ok(())
-    }
-
-    pub fn send_msg(&self, msg: &impl Serialize) -> Result<(), anyhow::Error> {
-        let msg_vec = match serde_json::to_string(msg) {
-            Ok(m) => m,
-            Err(e) => return Err(anyhow!("Failed to serialize message: {e}")),
-        };
-
-        if let Err(e) = libmailslot::write_mailslot(TRAY_PIPE, &msg_vec) {
-            return Err(anyhow!("Failed to post message to the mailslot: {e}"));
         }
-
-        Ok(())
     }
+}
+
+/// Generice Service Interface
+pub trait ServiceInterface {
+    fn start_server(&self, ctrl: &Arc<AppController>) -> Result<(), anyhow::Error>;
+
+    fn send_file_update(&self, update: &FileUpdateMessage) -> Result<(), anyhow::Error>;
+
+    fn send_usb_update(&self, update: &UsbUpdateMessage) -> Result<(), anyhow::Error>;
 }

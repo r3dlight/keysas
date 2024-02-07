@@ -22,7 +22,7 @@
 //!              │                                       │
 //! ```
 //! The filter calls the controller with [authorize_file](crate::controller::ServiceController) to validate the
-//!  new file. It must provide a [FilteredFile](crate::controller::FilteredFile) with all the information on the
+//!  new file. It must provide a [FilteredFile](crate::controller) with all the information on the
 //!  file. The controller responds with a boolean indicating if the file is authorized or not.
 //!
 //! - Request by the controller to update file authorization status
@@ -37,6 +37,20 @@
 //! ```
 //! The controller can send a request to the filter to update the authorization
 //!  status of a file.
+//!
+//! - Get the USB authorization status
+//!
+//! ```text
+//!           Filter                                 Controller
+//!           ──────                                 ──────────
+//!              │         get_usb_auth(mount_point)      │
+//!              │ ─────────────────────────────────────► │
+//!              │            Auth_status/error           │ Check USB auth
+//!              │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//! ```
+//! The filter can request the authorization status for a USB device so that it 
+//! can set the default policy for all files on the device. The request is done
+//! with the mount point of the filesystem.
 
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -56,7 +70,7 @@ use cfg_if::cfg_if;
 use std::boxed::Box;
 use std::sync::{Arc, Mutex};
 
-use crate::controller::{FilteredFile, ServiceController};
+use crate::controller::{ServiceController, FilePolicy, UsbDevicePolicy};
 
 #[cfg(target_os = "windows")]
 use crate::windows::file_filter_if::WindowsFileFilterInterface;
@@ -95,7 +109,14 @@ pub trait FileFilterInterface {
     /// # Arguments
     ///
     /// `update` - Information on the file and the new authorization status
-    fn update_file_auth(&self, update: &FilteredFile) -> Result<(), anyhow::Error>;
+    fn update_file_auth(&self, update: &FilePolicy) -> Result<(), anyhow::Error>;
+
+    /// Update the control policy on a partition
+    ///
+    /// # Arguments
+    ///
+    /// `update` - Information on the partition and the new authorization status, the mount point must be specified
+    fn update_usb_auth(&self, update: &UsbDevicePolicy) -> Result<(), anyhow::Error>;
 
     /// Stop the interface and free resources
     fn stop(self: Box<Self>);

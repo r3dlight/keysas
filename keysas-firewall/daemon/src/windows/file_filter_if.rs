@@ -5,9 +5,64 @@
  *
  */
 
-//! KeysasDriverInterface is a generic interface to send and receive messages
-//! to the firewall driver in kernel space.
-//! The interface must be specialized for Linux or Windows
+//! File filter interface for Windows
+//! It interfaces a minifilter that intercepts IRP_MJ_CREATE (file opent) and
+//!  IRP_MJ_WRITE (file modification) requests to the filesystem. The calls
+//!  between the minifilter and the interface are the following:
+//! 
+//! - When a new volume is detected and a new minifilter instance is created, the
+//!  minifilter requests the default authorization policiy for the volume
+//!
+//! ```text
+//!     Minifilter                      Filter IF                 Controller
+//!     ──────────                      ─────────                 ────────── 
+//!         │      scan_usb(mnt_point)      │                          │
+//!         │ ────────────────────────────► │  get_usb_auth(mnt_point) │
+//!         │                               │ ───────────────────────► │
+//!         │                               │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!         │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                          │
+//! ```
+//! The filter asks the controller for the default policy, if the Controller does
+//!  not have a policy for the volume it blocks it by default
+//! 
+//! - When a new file is detected on a volume in [AllowRead](crate::controller::UsbAuthorization)
+//!  and [AllowRW](crate::controller::UsbAuthorization), the minifilter asks the policy to apply for the file.
+//!
+//! ```text
+//!     Minifilter                      Filter IF                   Controller
+//!     ──────────                      ─────────                   ────────── 
+//!         │   scan_file(path, file_id)  │                             │
+//!         │ ──────────────────────────► │ authorize_file(file, write) │
+//!         │                             │ ──────────────────────────► │
+//!         │                             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│
+//!         │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                             │
+//! ```
+//! The filter asks the controller for the policy to apply, if an error occur the
+//!  default policy is set to [Block](crate::controller::FileAuthorization)
+//! 
+//! - When the policy for a file is updated
+//!
+//! ```text
+//!     Controller                      Filter IF                 Minifilter
+//!     ──────────                      ─────────                 ────────── 
+//!         │  update_file_auth(update)  │                            │
+//!         │ ─────────────────────────► │   update(file_id, auth)    │
+//!         │                            │ ─────────────────────────► │
+//!         │                            │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!         │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │                            │
+//! ```
+//! 
+//! - When the policy is updated for a volume
+//! 
+//! ```text
+//!     Controller                      Filter IF                 Minifilter
+//!     ──────────                      ─────────                 ────────── 
+//!         │  update_usb_auth(update)   │                            │
+//!         │ ─────────────────────────► │  update(mnt_point, auth)   │
+//!         │                            │ ─────────────────────────► │
+//!         │                            │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!         │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │                            │
+//! ```
 
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
@@ -26,17 +81,18 @@
 use anyhow::anyhow;
 use std::mem::size_of;
 use std::thread;
-use std::ffi::OsString;
+use std::ffi::{OsString, c_void};
 use std::sync::{Arc, Mutex};
 use widestring::U16CString;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Storage::InstallableFileSystems::{
-    FilterConnectCommunicationPort, FilterGetMessage, FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER, FilterReplyMessage
+    FilterConnectCommunicationPort, FilterGetMessage, FILTER_MESSAGE_HEADER, FILTER_REPLY_HEADER, FilterReplyMessage,
+    FilterSendMessage
 };
-use windows::Win32::Foundation::STATUS_SUCCESS;
+use windows::Win32::Foundation::{GetLastError, STATUS_SUCCESS};
 
-use crate::controller::{FileAuthorization, FilteredFile, ServiceController};
+use crate::controller::{FileAuthorization, FilteredFile, ServiceController, FilePolicy, UsbDevicePolicy};
 use crate::file_filter_if::FileFilterInterface;
 
 /// Operation code for the request from a driver to userland
@@ -185,27 +241,39 @@ impl FileFilterInterface for WindowsFileFilterInterface {
     /// # Arguments
     ///
     /// `update` - Information on the file and the new authorization status
-    fn update_file_auth(&self, _update: &FilteredFile) -> Result<(), anyhow::Error> {
+    fn update_file_auth(&self, update: &FilePolicy) -> Result<(), anyhow::Error> {
+        let mut msg: [u8; 33] = [0; 33];
+        msg[..32].copy_from_slice(&update.file.id);
+        msg[32] = update.auth.as_u8();
+        
+        let mut nb_bytes_ret: u32 = 0;
+        unsafe {
+            if let Err(_) = FilterSendMessage(
+                self.handle,
+                &msg as *const _ as *const c_void,
+                msg.len().try_into()?,
+                None,
+                0,
+                &mut nb_bytes_ret as *mut u32
+            ) {
+                let err = GetLastError();
+                println!("Error: {:?}", err);
+                return Err(anyhow!("Failed to send message to driver"));
+            }
+        }
+
+        // TODO - Handle response from driver
+
+        Ok(())
+    }
+    
+    /// Update the control policy on a partition
+    ///
+    /// # Arguments
+    ///
+    /// `update` - Information on the partition and the new authorization status, the mount point must be specified
+    fn update_usb_auth(&self, update: &UsbDevicePolicy) -> Result<(), anyhow::Error> {
         todo!()
-        // let mut nb_bytes_ret: u32 = 0;
-        // unsafe {
-        //     if let Err(_) = FilterSendMessage(
-        //         self.handle,
-        //         msg as *const _ as *const c_void,
-        //         msg.len().try_into()?,
-        //         None,
-        //         0,
-        //         &mut nb_bytes_ret as *mut u32
-        //     ) {
-        //         let err = GetLastError();
-        //         println!("Error: {:?}", err.to_hresult().message().to_string_lossy());
-        //         return Err(anyhow!("Failed to send message to driver"));
-        //     }
-        // }
-
-        // // TODO - Handle response from driver
-
-        // Ok(())
     }
 
     /// Close the communication with the driver

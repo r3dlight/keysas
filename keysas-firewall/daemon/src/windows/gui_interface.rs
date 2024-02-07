@@ -30,7 +30,9 @@ use windows::core::PCSTR;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::controller::{ServiceController, FileAuthorization, UsbAuthorization};
-use crate::gui_interface::{FileUpdateMessage, GuiInterface, UsbUpdateMessage};
+use crate::gui_interface::{
+    GuiInterface, UsbUpdateMessage, FileUpdateMessage, UsbFileListRequest
+};
 
 /// Name of the communication pipe
 const SERVICE_PIPE: &str = r"\\.\mailslot\keysas\service-to-app";
@@ -86,7 +88,15 @@ impl GuiInterface for WindowsGuiInterface {
                                 error!("Failed to handle usb update request: {e}");
                             }
                         }
-                    } else {
+                    } 
+                    // Try to read Usb and Files list request
+                    else if let Ok(req) = serde_json::from_slice::<UsbFileListRequest>(msg.as_bytes()) {
+                        let controller = ctrl_hdl.lock().unwrap();
+                        if let Err(e) = controller.send_usb_file_list() {
+                            error!("Failed to send usb and file listt: {e}");
+                        }
+                    }
+                    else {
                         warn!("Message from tray app not recognized");
                     }
                 }

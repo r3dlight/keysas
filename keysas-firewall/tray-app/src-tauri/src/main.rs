@@ -36,7 +36,13 @@ use tauri::{
 };
 
 use crate::app_controller::AppController;
-use crate::service_if::KeysasAuthorization;
+use crate::service_if::FileAuthorization;
+
+#[cfg(target_os = "windows")]
+pub mod windows;
+
+#[cfg(target_os = "linux")]
+pub mod linux;
 
 /// Payload for the init event sent to the usb_details window
 #[derive(Clone, serde::Serialize)]
@@ -201,8 +207,7 @@ async fn toggle_file_auth(
     new_auth: u8,
     app_ctrl: State<'_, Arc<AppController>>,
 ) -> Result<(), String> {
-    let auth = KeysasAuthorization::from_u8_file(new_auth);
-    println!("Test");
+    let auth = FileAuthorization::from_u8(new_auth);
     if let Err(e) = app_ctrl.request_file_auth_toggle(&device, &id, &path, auth) {
         println!("toggle_file_auth: File toggle failed: {e}");
         return Err(e.to_string());

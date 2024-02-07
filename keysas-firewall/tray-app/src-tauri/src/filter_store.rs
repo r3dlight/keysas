@@ -22,7 +22,7 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use crate::service_if::KeysasAuthorization;
+use crate::service_if::UsbAuthorization;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -34,15 +34,15 @@ pub struct FileAuth {
 }
 
 #[derive(Debug, Clone)]
-pub struct USBDevice {
+pub struct UsbDevice {
     pub name: String,
     pub path: String,
-    pub authorization: KeysasAuthorization,
+    pub authorization: UsbAuthorization,
 }
 
 #[derive(Debug, Clone)]
 pub struct FilterStore {
-    pub devices: Vec<USBDevice>,
+    pub devices: Vec<UsbDevice>,
     pub files: Vec<FileAuth>,
 }
 
@@ -54,7 +54,7 @@ impl FilterStore {
         }
     }
 
-    pub fn add_device(&mut self, device: &USBDevice) {
+    pub fn add_device(&mut self, device: &UsbDevice) {
         self.devices.push(device.clone());
     }
 
@@ -62,22 +62,22 @@ impl FilterStore {
         todo!()
     }
 
-    pub fn get_devices(&self) -> &[USBDevice] {
+    pub fn get_devices(&self) -> &[UsbDevice] {
         &self.devices
     }
 
-    pub fn get_device(&self, device_path: &str) -> Option<&USBDevice> {
+    pub fn get_device(&self, device_path: &str) -> Option<&UsbDevice> {
         self.devices.iter().find(|&d| d.path.eq(device_path))
     }
 
-    pub fn get_device_mut(&mut self, device_path: &str) -> Option<&mut USBDevice> {
+    pub fn get_device_mut(&mut self, device_path: &str) -> Option<&mut UsbDevice> {
         self.devices.iter_mut().find(|d| d.path.eq(device_path))
     }
 
     pub fn set_device_auth(
         &mut self,
         _device_name: &str,
-        _auth: KeysasAuthorization,
+        _auth: UsbAuthorization,
     ) -> Result<(), anyhow::Error> {
         todo!()
     }
@@ -111,7 +111,7 @@ impl FilterStore {
         &mut self,
         _device_name: &str,
         _file_name: &str,
-        _auth: KeysasAuthorization,
+        _auth: UsbAuthorization,
     ) -> Result<(), anyhow::Error> {
         todo!()
     }

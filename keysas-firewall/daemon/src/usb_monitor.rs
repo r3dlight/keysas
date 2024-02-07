@@ -37,12 +37,12 @@
 //!  └───────────┼───────────────────────────────────────┼─────────────┘
 //! ```
 //! The USB monitor calls the controller with [authorize_usb](crate::controller::ServiceController) to validate the
-//!  new USB key. It must provide a [UsbDevice](crate::controller::UsbDevice) with all the information on the
+//!  new USB key. It must provide a [UsbDevice] with all the information on the
 //!  key and if available the signature block found. If the mount point is knwown
 //!  at that point it can be provided. The controller responds with a boolean
 //!  indicating if the key is authorized or not.
 //! The monitor sends further update to the monitor once the partition on the USB
-//!  key is mounted with the same [UsbDevice:device_id](crate::controller::UsbDevice) and the updated fields
+//!  key is mounted with the same [device_id](crate::controller::UsbDevice) and the updated fields
 //!
 //! - Request by the controller to update usb key authorization status
 //!

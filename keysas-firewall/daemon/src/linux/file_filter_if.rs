@@ -35,7 +35,7 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
-use crate::controller::{FilteredFile, ServiceController};
+use crate::controller::{ServiceController, FilePolicy, UsbDevicePolicy};
 use crate::file_filter_if::FileFilterInterface;
 
 #[derive(Debug, Copy, Clone)]
@@ -118,7 +118,16 @@ impl FileFilterInterface for LinuxFileFilterInterface {
     /// # Arguments
     ///
     /// `update` - Information on the file and the new authorization status
-    fn update_file_auth(&self, update: &FilteredFile) -> Result<(), anyhow::Error> {
+    fn update_file_auth(&self, update: &FilePolicy) -> Result<(), anyhow::Error> {
+        todo!()
+    }
+    
+    /// Update the control policy on a partition
+    ///
+    /// # Arguments
+    ///
+    /// `update` - Information on the partition and the new authorization status, the mount point must be specified
+    fn update_usb_auth(&self, update: &UsbDevicePolicy) -> Result<(), anyhow::Error> {
         todo!()
     }
 

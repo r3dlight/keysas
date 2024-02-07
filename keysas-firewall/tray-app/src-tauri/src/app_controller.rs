@@ -22,8 +22,9 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use crate::filter_store::{FileAuth, FilterStore, USBDevice};
-use crate::service_if::{FileUpdateMessage, KeysasAuthorization, ServiceIf};
+use crate::filter_store::{FileAuth, FilterStore, UsbDevice};
+use crate::service_if::{FileUpdateMessage, FileAuthorization, ServiceInterface,
+    UsbAuthorization, ServiceInterfaceBuilder, UsbUpdateMessage};
 
 use anyhow::anyhow;
 use std::sync::{Arc, RwLock};
@@ -33,7 +34,7 @@ use tauri::{AppHandle, Manager};
 pub struct AppController {
     pub store: RwLock<FilterStore>,
     view: AppHandle,
-    comm: ServiceIf,
+    comm: Box<dyn ServiceInterface + Send + Sync>,
 }
 
 impl AppController {
@@ -47,7 +48,7 @@ impl AppController {
         let ctrl = Arc::new(AppController {
             store: RwLock::new(FilterStore::init_store()),
             view: app_handle,
-            comm: ServiceIf::init_service_if()?,
+            comm: ServiceInterfaceBuilder::build()?,
         });
 
         // Start the server thread
@@ -57,16 +58,16 @@ impl AppController {
         }
 
         // Create a default USB device for the tests
-        let usb = USBDevice {
-            name: String::from("Kingston USB"),
-            path: String::from("D:"),
-            authorization: KeysasAuthorization::AllowRead,
-        };
+        // let usb = USBDevice {
+        //     name: String::from("Kingston USB"),
+        //     path: String::from("D:"),
+        //     authorization: UsbAuthorization::AllowRead,
+        // };
 
-        match ctrl.store.write() {
-            Ok(mut store) => store.add_device(&usb),
-            Err(e) => log::error!("Failed to get store lock: {e}"),
-        }
+        // match ctrl.store.write() {
+        //     Ok(mut store) => store.add_device(&usb),
+        //     Err(e) => log::error!("Failed to get store lock: {e}"),
+        // }
 
         Ok(ctrl)
     }
@@ -82,7 +83,7 @@ impl AppController {
             device: String::from(&update.device),
             id,
             path: String::from(&update.path),
-            authorization: update.authorization.to_u8_file(),
+            authorization: update.authorization.as_u8(),
         };
 
         match self.store.write() {
@@ -104,6 +105,29 @@ impl AppController {
         }
     }
 
+    /// Called when a usb notification has been received from the driver
+    pub fn notify_usb_change(&self, update: &UsbUpdateMessage) {
+        // Store the new file
+        let device = UsbDevice {
+            name: String::from(&update.name),
+            path: String::from(&update.path) ,
+            authorization: update.authorization,
+        };
+
+        match self.store.write() {
+            Ok(mut store) => store.add_device(&device),
+            Err(e) => println!("Failed to get store lock: {e}"),
+        }
+
+        // Notify the GUI to update the view
+        // if let Err(e) = self
+        //     .view
+        //     .emit_all("file_update", String::from(&update.device))
+        // {
+        //     println!("Failed to notify view of file changed: {e}");
+        // }
+    }
+
     /// Return the list of files in the datastore
     pub fn get_file_list(&self, device_path: &str) -> Result<Vec<FileAuth>, anyhow::Error> {
         match self.store.read() {
@@ -119,12 +143,12 @@ impl AppController {
         device: &str,
         id: &[u16],
         path: &str,
-        new_auth: KeysasAuthorization,
+        new_auth: FileAuthorization,
     ) -> Result<(), anyhow::Error> {
         let mut file_id: [u16; 16] = Default::default();
         file_id.copy_from_slice(id);
 
-        if let Err(e) = self.comm.send_msg(&FileUpdateMessage {
+        if let Err(e) = self.comm.send_file_update(&FileUpdateMessage {
             device: device.to_string(),
             id: file_id,
             path: path.to_string(),

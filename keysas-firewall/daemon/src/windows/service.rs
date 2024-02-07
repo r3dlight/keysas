@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fs, thread, time::Duration};
+use std::{ffi::OsString, thread, time::Duration};
 use anyhow::anyhow;
 use log::*;
 use registry::{Data, Hive, Security};

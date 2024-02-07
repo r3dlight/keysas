@@ -44,7 +44,30 @@
 //! current authorization status set to Pending. Also the request contains the
 //! new authorization status requested from the user. The users' response is a
 //! boolean indicating the approval state of the request.
+//! 
+//! - Request list of files and usb devices from GUI to the controller
 //!
+//! ```text
+//!            GUI                                      Controller
+//!           ─────                                     ──────────
+//!             │          request_objects_list              │
+//!             │ ─────────────────────────────────────────► │
+//!             │    send_usb_update(UsbUpdateMessage)       │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!             │                    ...                     │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!             │    send_usb_update(UsbUpdateMessage)       │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!             │    send_file_update(FileUpdateMessage)     │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!             │                    ...                     │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//!             │    send_file_update(FileUpdateMessage)     │
+//!             │ ◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+//! ```
+//! On request for the list, the controller sends all the USB devices and files
+//!  in separate [UsbUpdateMessage] and [FileUpdateMessage].
+//! 
 //! - Authorization update from the user to the daemon
 //!
 //! ```text
@@ -89,9 +112,19 @@ use crate::windows::gui_interface::WindowsGuiInterface;
 #[cfg(target_os = "linux")]
 use crate::linux::gui_interface::LinuxGuiInterface;
 
+/// Message code used to differentiate requests between GUI and Controller
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum GuiMessageCode {
+    UsbUpdateMessage,
+    FileUpdateMessage,
+    UsbFileListRequest
+}
+
 /// Message for a USB status notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UsbUpdateMessage {
+    /// Message code for the request, should be UsbUpdateMessage
+    pub code: GuiMessageCode,
     /// Usb device system identifier
     pub device: String,
     /// Mount point for the partition on the device
@@ -105,6 +138,8 @@ pub struct UsbUpdateMessage {
 /// Message for a file notification
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FileUpdateMessage {
+    /// Message code for the request, should be FileUpdateMessage
+    pub code: GuiMessageCode,
     /// Usb device identifier
     pub device: String,
     /// File ID based on sha-256 hash of full path
@@ -113,6 +148,19 @@ pub struct FileUpdateMessage {
     pub path: String,
     /// Authorization status
     pub authorization: FileAuthorization,
+}
+
+/// Message for usb and files list request
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UsbFileListRequest {
+    /// Message code for the request, should be UsbFileListRequest
+    pub code: GuiMessageCode
+}
+
+impl Default for UsbFileListRequest {
+    fn default() -> UsbFileListRequest {
+        UsbFileListRequest{code: GuiMessageCode::UsbFileListRequest}
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -173,31 +221,4 @@ pub trait GuiInterface {
 
     /// Stop listening for user notifications and free the interface
     fn stop(self: Box<Self>);
-}
-
-pub fn send_file_auth_status(
-    _file_data: &[u16],
-    _authorization: UsbAuthorization,
-) -> Result<(), anyhow::Error> {
-    todo!()
-    // let file_path = match String::from_utf16(&file_data[17..]) {
-    //     Ok(path) => path,
-    //     Err(_) => {
-    //         println!("Failed to convert request to string");
-    //         return Err(anyhow!("Failed to convert request to string"));
-    //     }
-    // };
-    // let file_path = file_path.trim_matches(char::from(0));
-
-    // let mut id: [u16; 16] = Default::default();
-    // id.copy_from_slice(&file_data[1..17]);
-
-    // let msg = FileUpdateMessage {
-    //     device: String::from("D:"),
-    //     id,
-    //     path: String::from(file_path),
-    //     authorization,
-    // };
-
-    // send(&msg)
 }

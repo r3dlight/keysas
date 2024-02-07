@@ -108,6 +108,7 @@ use std::{
 use crate::file_filter_if::{FileFilterInterface, FileFilterInterfaceBuilder};
 use crate::gui_interface::{
     FileUpdateMessage, GuiInterface, GuiInterfaceBuilder, UsbUpdateMessage,
+    GuiMessageCode
 };
 use crate::usb_monitor::{UsbMonitor, UsbMonitorBuilder};
 use crate::Config;
@@ -203,12 +204,23 @@ pub struct UsbDevice {
     pub serial: OsString,
 }
 
+impl UsbDevice {
+    fn get_name(&self) -> String {
+        format!("{}-{}-{}-{}",
+            self.vendor.to_string_lossy(),
+            self.model.to_string_lossy(),
+            self.revision.to_string_lossy(),
+            self.serial.to_string_lossy()
+        )
+    }
+}
+
 /// Firewall policy for one USB device
 pub struct UsbDevicePolicy {
     /// Usb device information
-    device: UsbDevice,
+    pub device: UsbDevice,
     /// Authorization status
-    auth: UsbAuthorization,
+    pub auth: UsbAuthorization,
 }
 
 /// Representation of a file in the firewall
@@ -222,8 +234,8 @@ pub struct FilteredFile {
 
 /// Firewall policy for one file
 pub struct FilePolicy {
-    file: FilteredFile,
-    auth: FileAuthorization,
+    pub file: FilteredFile,
+    pub auth: FileAuthorization,
 }
 
 impl ServiceController {
@@ -431,79 +443,6 @@ impl ServiceController {
         self.user_authorize_file(file_path.as_path())
     }
 
-    /// Handle requests coming from the driver
-    /// Return the authorization state for the USB device or the file, or an error
-    ///
-    /// # Arguments
-    ///
-    /// * 'operation' - Operation code
-    /// * 'content' - Content of the request
-    // pub fn handle_driver_request(
-    //     &self,
-    //     operation: KeysasFilterOperation,
-    //     content: &[u16],
-    // ) -> Result<KeysasAuthorization, anyhow::Error> {
-    //     // Dispatch the request
-    //     let result = match operation {
-    //         KeysasFilterOperation::ScanFile => {
-    //             match self.authorize_file(operation, content) {
-    //                 Ok((result, true)) => {
-    //                     // Send the authorization result to the tray interface
-    //                     if let Err(e) = tray_interface::send_file_auth_status(content, result) {
-    //                         error!("Failed to send file status to tray app {e}");
-    //                     }
-    //                     result
-    //                 }
-    //                 Ok((result, false)) => result,
-    //                 Err(e) => {
-    //                     error!("Failed to validate the file: {e}");
-    //                     KeysasAuthorization::AuthBlock
-    //                 }
-    //             }
-    //         }
-    //         KeysasFilterOperation::ScanUsb => KeysasAuthorization::AuthAllowAll, // For now, allow all
-    //     };
-
-    //     Ok(result)
-    // }
-
-    /// Handle a request coming from the HMI
-    fn handle_tray_request(&self, req: &FileUpdateMessage) -> Result<(), anyhow::Error> {
-        // Check that the request is conforme to the security policy
-        if (FileAuthorization::AllowRead == req.authorization) && !self.policy.allow_user_file_read
-        {
-            return Err(anyhow!("Authorization change not allowed"));
-        }
-
-        if (FileAuthorization::AllowRW == req.authorization)
-            && (!self.policy.allow_user_file_read || !self.policy.allow_user_file_write)
-        {
-            return Err(anyhow!("Authorization change not allowed"));
-        }
-
-        // Create the request for the driver
-        // The format is :
-        //   - FileID: 32 bytes
-        //   - New authorization: 1 byte
-        let mut request: [u8; 33] = [0; 33];
-        let mut index = 0;
-
-        for db in req.id {
-            let bytes = db.to_ne_bytes();
-            request[index] = bytes[0];
-            request[index + 1] = bytes[1];
-            index += 2;
-        }
-        request[32] = req.authorization.as_u8();
-
-        // Send the request to the driver
-        // if let Err(e) = self.driver_if.send_msg(&request) {
-        //     return Err(anyhow!("Failed to pass tray request to driver {e}"));
-        // }
-
-        Ok(())
-    }
-
     fn validate_usb_signature(
         &self,
         device: &UsbDevice,
@@ -581,6 +520,8 @@ impl ServiceController {
     }
 
     /// Check a file
+    /// 
+    /// # Return value
     ///  - If it is a normal file, try to find the corresponding station report
     ///     - If there is none, return False
     ///     - If there is one, validate both
@@ -590,7 +531,7 @@ impl ServiceController {
     ///
     /// # Arguments
     ///
-    /// * 'path' - Path to the file
+    /// * `path` - Path to the file
     fn validate_file(&self, path: &Path) -> Result<bool, anyhow::Error> {
         // Test if the file is a station report
         if Path::new(path)
@@ -676,9 +617,75 @@ impl ServiceController {
     ///
     /// # Arguments
     ///
-    /// * 'path' - Path to the file
+    /// * `path` - Path to the file
     fn user_authorize_file(&self, path: &Path) -> Result<bool, anyhow::Error> {
-        // Find authorization status for the file
-        todo!()
+        let req = FileUpdateMessage {
+            code: GuiMessageCode::FileUpdateMessage,
+            device: String::default(),
+            id: [0; 16],
+            path: String::from(path.to_string_lossy()),
+            authorization: FileAuthorization::AllowRead
+        };
+
+        self.gui.request_file_auth(&req)
+    }
+
+    /// Get the authorization status for a filesystem on a USB device
+    /// 
+    /// # Arguments
+    /// 
+    /// * `mount` - Name of the filesystem partition
+    /// 
+    /// # Return value
+    /// 
+    /// *  if a device with a [mnt_point](UsbDevice) = `mount` => the [auth](UsbDevicePolicy) corresponding to its device policy
+    /// * else an error
+    pub fn get_usb_auth(&self, mount: &OsString) -> Result<UsbAuthorization, anyhow::Error> {
+        match self.mounted_usb.get(mount) {
+            Some(dev_policy) => {
+                // Return the authorization status for the device
+                Ok(dev_policy.auth)
+            },
+            None => {
+                // no mounted device exists, return an error
+                Err(anyhow!("No device found"))
+            }
+        }
+    }
+
+    /// Send the list of Usb devices and files currently registered in the firewall
+    /// 
+    /// For now, send the list of USB devices registered
+    /// Files are not currently stored in the controller: TO BE FIXED
+    /// 
+    /// # Return value
+    /// 
+    /// * error if needed
+    pub fn send_usb_file_list(&self) -> Result<(), anyhow::Error> {
+        for (_, usb) in self.unmounted_usb.iter() {
+            let update = UsbUpdateMessage {
+                code: GuiMessageCode::UsbUpdateMessage,
+                device: String::from(usb.device.device_id.to_string_lossy()),
+                path: String::default(),
+                name: usb.device.get_name(),
+                authorization: usb.auth
+            };
+
+            self.gui.send_usb_update(&update);
+        }
+
+        for (_, usb) in self.mounted_usb.iter() {
+            let update = UsbUpdateMessage {
+                code: GuiMessageCode::UsbUpdateMessage,
+                device: String::from(usb.device.device_id.to_string_lossy()),
+                path: String::default(),
+                name: usb.device.get_name(),
+                authorization: usb.auth
+            };
+
+            self.gui.send_usb_update(&update);
+        }
+
+        Ok(())
     }
 }
