@@ -122,7 +122,7 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
         .match_subsystem("block")?
         .listen()?;
 
-    let mut fds = vec![pollfd {
+    let mut fds = [pollfd {
         fd: socket.as_raw_fd(),
         events: POLLIN,
         revents: 0,

@@ -659,7 +659,7 @@ fn main() -> Result<()> {
                 .match_subsystem("block")?
                 .listen()?;
 
-            let mut fds = vec![pollfd {
+            let mut fds = [pollfd {
                 fd: socket.as_raw_fd(),
                 events: POLLIN,
                 revents: 0,
