@@ -22,7 +22,7 @@ crossbeam-utils = "0.8"
 nix = { version = "0.27", features = ["net"]}
 tempfile = "3.8"
 diacritics = "0.2"
-sys-mount = "2.1"
+sys-mount = "3"
 proc-mounts = "0.3"
 hex = "0.4"
 kv = "0.24"
