@@ -27,6 +27,7 @@ use std::time::Duration;
 
 #[repr(C)]
 #[cfg(target_os = "linux")]
+#[allow(non_camel_case_types)]
 struct pollfd {
     fd: c_int,
     events: c_short,
@@ -35,6 +36,7 @@ struct pollfd {
 
 #[repr(C)]
 #[cfg(target_os = "linux")]
+#[allow(non_camel_case_types)]
 struct sigset_t {
     __private: c_void,
 }
@@ -55,18 +57,6 @@ extern "C" {
     ) -> c_int;
 }
 
-trait StrExt {
-    fn remove_last(&self) -> &str;
-}
-
-impl StrExt for str {
-    fn remove_last(&self) -> &str {
-        match self.char_indices().next_back() {
-            Some((i, _)) => &self[..i],
-            None => self,
-        }
-    }
-}
 const USB_CA_SUB_DIR: &str = "/CA/usb";
 
 // Remove the partition number and return the device
