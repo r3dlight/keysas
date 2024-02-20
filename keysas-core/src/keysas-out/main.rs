@@ -223,6 +223,7 @@ fn output_files(
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&path)?;
         let json_report = serde_json::to_string_pretty(&new_report)?;
 
@@ -245,7 +246,11 @@ fn output_files(
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
 
-            let output = File::options().write(true).create(true).open(path)?;
+            let output = File::options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)?;
             // Position the cursor at the beginning of the file
             unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet)?;
             let mut writer = BufWriter::new(output);
