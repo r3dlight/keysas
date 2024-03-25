@@ -21,8 +21,7 @@ The code is entirely written in Rust, sandboxed, and follows the principle of le
 
 Download
 =========
-- `keysas-sd-v2.1 <https://keysas.fr/download/rasp/keysas-sd-v2.1.tar.gz>`_ (`sha256 <https://keysas.fr/download/rasp/keysas-sd-v2.1.tar.gz.sha256>`_)
-- `keysas-admin-v2.1 (GNU/Linux) <https://keysas.fr/download/keysas-admin/v2.1/keysas-admin_2.1_amd64.AppImage>`_ (`sha256 <https://keysas.fr/download/keysas-admin/v2.1/keysas-admin_2.1_amd64.AppImage.sha256>`_)
+- `Github/releases <https://github.com/r3dlight/keysas/releases>`_
 
 
 The downloaded image will automatically resize according to the size of your MicroSD card.
