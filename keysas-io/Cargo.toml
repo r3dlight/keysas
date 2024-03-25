@@ -19,7 +19,7 @@ libc = "0.2"
 nom = "7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 crossbeam-utils = "0.8"
-nix = "0.27"
+nix = "0.28"
 tempfile = "3.8"
 diacritics = "0.2"
 sys-mount = "3"
@@ -29,11 +29,11 @@ kv = "0.24"
 yubico_manager = { git = "https://github.com/r3dlight/yubico-manager"}
 walkdir = "2.4"
 landlock = "0.3" 
-flexi_logger = "0.27"
+flexi_logger = "0.28"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.9", default-features = false, features =["dilithium"] }
 ed25519-dalek = "2"
-base64 = "0.21"
+base64 = "0.22"
 
 [dev-dependencies]
 criterion = "0.5"
