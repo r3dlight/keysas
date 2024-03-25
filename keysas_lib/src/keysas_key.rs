@@ -2,7 +2,7 @@
 /*
  * The "keysas-lib".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas_lib.
@@ -120,7 +120,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
             return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
         }
 
-        let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
+        let pub_cl = VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
         oqs::init();
         let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
             Ok(pq_s) => pq_s,
@@ -241,7 +241,7 @@ pub trait KeysasKey<T> {
 impl KeysasKey<SigningKey> for SigningKey {
     fn generate_new() -> Result<SigningKey, anyhow::Error> {
         let mut csprng = OsRng;
-        let kp_ed: SigningKey = ed25519_dalek::SigningKey::generate(&mut csprng);
+        let kp_ed: SigningKey = SigningKey::generate(&mut csprng);
         Ok(kp_ed)
     }
 
@@ -273,7 +273,7 @@ impl KeysasKey<SigningKey> for SigningKey {
         if decoded_pk.private_key.len() == 32 {
             let mut private_key_casted: [u8; 32] = [0u8; 32];
             private_key_casted.copy_from_slice(decoded_pk.private_key);
-            let signing_key = ed25519_dalek::SigningKey::from_bytes(&private_key_casted);
+            let signing_key = SigningKey::from_bytes(&private_key_casted);
             Ok(signing_key)
         } else {
             Err(anyhow!("Key is not 32 bytes long"))
@@ -434,7 +434,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             }
         };
         oqs::init();
-        let scheme = match oqs::sig::Sig::new(oqs::sig::Algorithm::Dilithium5) {
+        let scheme = match Sig::new(Algorithm::Dilithium5) {
             Ok(scheme) => scheme,
             Err(e) => {
                 return Err(anyhow!(
@@ -442,8 +442,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
                 ))
             }
         };
-        let tmp_pq_sk = match oqs::sig::Sig::secret_key_from_bytes(&scheme, decoded_pk.private_key)
-        {
+        let tmp_pq_sk = match Sig::secret_key_from_bytes(&scheme, decoded_pk.private_key) {
             Some(tmp_sig_sk) => tmp_sig_sk,
             None => {
                 return Err(anyhow!(
@@ -454,8 +453,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         let secret_key = tmp_pq_sk.to_owned();
         match decoded_pk.public_key {
             Some(public_key_u8) => {
-                let public_key = match oqs::sig::Sig::public_key_from_bytes(&scheme, public_key_u8)
-                {
+                let public_key = match Sig::public_key_from_bytes(&scheme, public_key_u8) {
                     Some(p) => p,
                     None => {
                         return Err(anyhow!("Cannot parse PQC public key from pkcs#8"));

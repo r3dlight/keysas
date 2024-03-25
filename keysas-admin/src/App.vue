@@ -36,23 +36,10 @@ export default {
     chace: null,
     screenWidth: 0,
     Menu: [
-  {
-    header: 'Keysas-admin'
-  },
     {
     name: 'Home',
     icon: { text: 'home' , class: 'bi bi-house-door-fill' },
     href: '/'
-  },
-  {
-    name: 'Version',
-    icon: { text: 'about' , class: 'bi bi-sunglasses' },
-    href: '/about'
-  },
-  {
-    name: 'Admin configuration',
-    icon: { text: 'config' , class: 'bi bi-wrench-adjustable' },
-    href: '/config'
   },
   {
     header: 'Keysas stations'
@@ -66,6 +53,19 @@ export default {
     name: 'Manage registred stations',
     icon: { text: 'manage' , class: 'bi bi-diagram-3-fill' },
     href: '/manage'
+  },
+  {
+    header: 'Keysas-admin'
+  },
+  {
+    name: 'Configuration',
+    icon: { text: 'config' , class: 'bi bi-wrench-adjustable' },
+    href: '/config'
+  },
+  {
+    name: 'Version',
+    icon: { text: 'about' , class: 'bi bi-sunglasses' },
+    href: '/about'
   },
 ],
   })

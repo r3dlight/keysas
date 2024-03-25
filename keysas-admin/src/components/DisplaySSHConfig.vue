@@ -1,13 +1,14 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
+    <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
     <br>
-    <span class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
-      stations.</span>
-    <span class="tip-text">Only ED25519 in PEM format is supported.<br> To generate this new SSH keypair on your local
-      machine, open a terminal and enter to following command:</span>
-    <br>
-    <span class="tip-text"><b>ssh-keygen -m PEM -t ed25519 -f mykey</b></span>
+    <ul>
+    <li class="tip-text">You must provide the application a dedicated SSH keypair to connect your Keysas
+      stations.</li>
+    <li class="tip-text">Only ED25519 in PEM format is supported.<br> To generate this new SSH keypair on your local
+      machine, open a terminal and enter to following command:</li>
+    </ul>
+    <h4 class="text-center text-secondary"><b>ssh-keygen -m PEM -t ed25519 -f mykey</b></h4>
   </div>
   <br>
   <div v-if="!hide" class="custom-li tip">
@@ -121,16 +122,13 @@ button {
 }
 
 .tip {
-  max-width: 1000px;
-  text-align: left;
-  margin: 40px auto;
+  max-width: 1200px;
+  margin: 20px auto;
   background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 5px 5px 5px black;
+  text-align: left;
+  padding: 1em;
+  border-radius: 18px;
   color: white;
-  display: inline-block;
-  font-size: 1.0em;
 }
 
 .tip-text {

@@ -2,7 +2,7 @@
 /*
  * The "keysas-in".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-in binary.
@@ -10,7 +10,6 @@
 #![feature(unix_socket_ancillary_data)]
 #![feature(tcp_quickack)]
 #![forbid(unsafe_code)]
-#![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
 #![warn(missing_debug_implementations)]
@@ -165,7 +164,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 base_path
             })
             .filter_map(|f| {
-                // FD is opened in read-write mode
+                // FD is opened in read-only mode
                 let fh = match File::open(&f) {
                     Ok(f) => f,
                     Err(e) => {

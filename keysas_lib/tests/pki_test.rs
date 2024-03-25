@@ -27,6 +27,7 @@ use x509_cert::spki::ObjectIdentifier;
 const PASSWORD: &[u8] = b"hunter42";
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_pkcs8_decrypt_der() {
     let cipher: &[u8] = include_bytes!("./ed25519-encpriv-aes256-scrypt.der");
     let plain: &[u8] = include_bytes!("./ed25519-priv-pkcs8v1.der");
@@ -45,6 +46,7 @@ fn test_pkcs8_decrypt_der() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_pkcs8_create_and_decrypt_der() {
     // Create a random keypair
     let mut csprng = OsRng {};
@@ -110,6 +112,7 @@ fn test_pkcs8_create_and_decrypt_der() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_pkcs8_create_and_decrypt_with_public_der() {
     // Create a random keypair
     let mut csprng = OsRng {};
@@ -227,6 +230,7 @@ fn test_generate_csr_ed25519() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_generate_csr_dilithium5() {
     // Create the root CA Dilithium key pair
     oqs::init();
@@ -280,6 +284,7 @@ fn test_generate_csr_dilithium5() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_save_and_load_ed25519() {
     // Create a random keypair
     let mut csprng = OsRng {};
@@ -303,6 +308,7 @@ fn test_save_and_load_ed25519() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_save_and_load_dilithium5() {
     // Create the root CA Dilithium key pair
     oqs::init();
@@ -331,6 +337,7 @@ fn test_save_and_load_dilithium5() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_save_and_load_hybrid_signature() {
     use pkcs8::der::EncodePem;
     use std::path::Path;

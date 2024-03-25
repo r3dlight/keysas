@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -10,7 +10,6 @@
 use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
-use http::header::HeaderValue;
 use landlock::{
     path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
     RulesetStatus, ABI,
@@ -37,7 +36,6 @@ extern crate serde_derive;
 
 extern crate libc;
 extern crate regex;
-mod errors;
 
 const SAS_IN: &str = "/var/local/in";
 const SAS_OUT: &str = "/var/local/out";
@@ -73,7 +71,7 @@ pub struct GuichetState {
 
 fn landlock_sandbox() -> Result<(), RulesetError> {
     let abi = ABI::V1;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
         .create()?
         // Read-only access to /usr, /etc and /dev.
@@ -83,8 +81,6 @@ fn landlock_sandbox() -> Result<(), RulesetError> {
             ],
             AccessFs::from_read(abi),
         ))?
-        // Read-write access to /home and /tmp.
-        //.add_rules(path_beneath_rules(&["/home", "/tmp"], AccessFs::from_all(abi)))?
         .restrict_self()?;
     match status.ruleset {
         // The FullyEnforced case must be tested by the developer.
@@ -182,14 +178,10 @@ fn main() -> Result<()> {
             }
         };
         spawn(move || -> Result<()> {
-            let callback = |_req: &Request, mut response: Response| {
+            let callback = |_req: &Request, response: Response| {
                 log::info!("keysas-backend: Received a new websocket handshake.");
                 //let headers = response.headers_mut();
-                //headers.append("KeysasBackend", "true".parse().unwrap());
-                response.headers_mut().append(
-                    "Sec-WebSocket-Protocol",
-                    HeaderValue::from_static("websocket"),
-                );
+                //headers.append("Sec-WebSocket-Protocol", "websocket".parse().unwrap());
                 //println!("Response: {response:?}");
                 Ok(response)
             };

@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -11,8 +11,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
+    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
+    RulesetCreatedAttr, RulesetError, RulesetStatus, ABI,
 };
 
 #[cfg(target_os = "linux")]
@@ -71,8 +71,9 @@ pub fn init() -> Result<()> {
 /// Setup the landlock sandboxing
 pub fn landlock_sandbox(sas_out: &String) -> Result<(), RulesetError> {
     let abi = ABI::V2;
-    let status = Ruleset::new()
+    let status = Ruleset::default()
         .handle_access(AccessFs::from_all(abi))?
+        .set_compatibility(CompatLevel::HardRequirement)
         .create()?
         // Read-only access.
         .add_rules(path_beneath_rules(

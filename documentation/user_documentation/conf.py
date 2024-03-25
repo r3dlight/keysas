@@ -20,13 +20,13 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Keysas'
-copyright = '2020-2023, Stephane N'
+copyright = '2020-2024, Stephane N'
 author = 'Stephane N'
 
 # The short X.Y version
-version = '2.1'
+version = '2.3'
 # The full version, including alpha/beta/rc tags
-release = 'v2.1'
+release = 'v2.3'
 
 
 

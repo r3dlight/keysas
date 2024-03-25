@@ -92,6 +92,9 @@
       <AdditionalIncludeDirectories>$(KMDF_INC_PATH)$(KMDF_VER_PATH);C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\km;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_AMD64_</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(WindowsDDK_LibraryPath)\$(PlatformTarget)\usbdex.lib;$(WindowsDDK_LibraryPath)\$(PlatformTarget)\usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DriverSign>
@@ -101,6 +104,9 @@
       <AdditionalIncludeDirectories>$(KMDF_INC_PATH)$(KMDF_VER_PATH);C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\km;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_AMD64_</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(WindowsDDK_LibraryPath)\$(PlatformTarget)\usbdex.lib;$(WindowsDDK_LibraryPath)\$(PlatformTarget)\usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DriverSign>
@@ -113,13 +119,13 @@
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Inf Include="usbfilter.inf" />
-  </ItemGroup>
-  <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="USBFilterDriver.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="usbfilter.inf" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

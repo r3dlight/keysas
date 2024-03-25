@@ -7,6 +7,7 @@ use crate::generate_signing_keypair;
 use crate::Config;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_generate_signing_keypair() {
     // Generate temporay path to save the keys
 

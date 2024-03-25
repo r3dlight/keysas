@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /*
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions for building and validating file report
  */
@@ -402,6 +402,7 @@ mod tests_out {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_bind_and_sign() {
         // Generate temporary keys
         let infos =

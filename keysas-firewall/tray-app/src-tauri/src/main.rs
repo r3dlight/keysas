@@ -18,23 +18,22 @@
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
-#![forbid(private_in_public)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 #![warn(unused_imports)]
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod service_if;
 mod app_controller;
 mod filter_store;
+mod service_if;
 
-use tauri::{
-    AppHandle, Manager, SystemTray, SystemTrayEvent, State, PhysicalPosition,
-    LogicalPosition, LogicalSize, Window
-};
-use std::sync::Arc;
 use anyhow::anyhow;
+use std::sync::Arc;
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, SystemTray,
+    SystemTrayEvent, Window,
+};
 
 use crate::app_controller::AppController;
 use crate::service_if::KeysasAuthorization;
@@ -43,7 +42,7 @@ use crate::service_if::KeysasAuthorization;
 #[derive(Clone, serde::Serialize)]
 struct InitPayload {
     /// Name of the USB device
-    usb_name: String
+    usb_name: String,
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -64,36 +63,36 @@ fn init_tauri() -> Result<(), anyhow::Error> {
             Ok(())
         })
         .system_tray(SystemTray::new())
-        .on_system_tray_event(|app, event| 
-            if let SystemTrayEvent::LeftClick {position, .. } = event {
+        .on_system_tray_event(|app, event| {
+            if let SystemTrayEvent::LeftClick { position, .. } = event {
                 if let Err(e) = open_usb_view(app, &position) {
                     log::error!("Failed to open main view: {e}");
                     app.exit(1);
                 }
             }
-        )
+        })
         .invoke_handler(tauri::generate_handler![get_file_list, toggle_file_auth])
         .build(tauri::generate_context!())?;
 
-    app.run(|_app_handle, event| match event {
-        tauri::RunEvent::ExitRequested { api, .. } => {
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
             api.prevent_exit();
         }
-        _ => {}
     });
 
     Ok(())
 }
 
 /// Set the application on the bottom right corner over the desktop tray
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * 'w' - Reference to the window
 /// * 'click' - Position of the click event, it corresponds to the top of the icon in the tray
-fn set_window_over_tray(w: &Window, click: &PhysicalPosition<f64>)
-    -> Result<(), anyhow::Error> {
-    let screen = w.current_monitor()?.ok_or_else(|| anyhow!("Not screen detected"))?;
+fn set_window_over_tray(w: &Window, click: &PhysicalPosition<f64>) -> Result<(), anyhow::Error> {
+    let screen = w
+        .current_monitor()?
+        .ok_or_else(|| anyhow!("Not screen detected"))?;
     let scale_factor = screen.scale_factor();
 
     // Click position corresponds to the top left corner of the icon
@@ -109,27 +108,23 @@ fn set_window_over_tray(w: &Window, click: &PhysicalPosition<f64>)
     w.set_size(window_size)?;
 
     // Set the position of the window just above the click position and the farthest to the right
-    let x_log = if click_log.x+window_size.width <= screen_pos_log.x+screen_size_log.width {
+    let x_log = if click_log.x + window_size.width <= screen_pos_log.x + screen_size_log.width {
         click_log.x
     } else {
         screen_pos_log.x + screen_size_log.width - window_size.width
     };
-    let window_pos = LogicalPosition::<f64>::new(
-        x_log,
-        click_log.y-window_size.height
-    );
+    let window_pos = LogicalPosition::<f64>::new(x_log, click_log.y - window_size.height);
     w.set_position(window_pos)?;
 
     Ok(())
 }
 
 /// Toggle the USB view when the tray icon is clicked
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * 'app' - The tauri application
-fn open_usb_view(app: &AppHandle, click: &PhysicalPosition<f64>)
-    -> Result<(), anyhow::Error> {
+fn open_usb_view(app: &AppHandle, click: &PhysicalPosition<f64>) -> Result<(), anyhow::Error> {
     // Get the window
     match app.get_window("main") {
         Some(w) => {
@@ -144,21 +139,18 @@ fn open_usb_view(app: &AppHandle, click: &PhysicalPosition<f64>)
                     w.hide()?;
                 }
             }
-        },
+        }
         None => {
             // If the window does not exists, create a new one
-            let w = tauri::WindowBuilder::new(
-                app,
-                "main",
-                tauri::WindowUrl::App("index.html".into())
-            )
-            .decorations(false)
-            .focused(true)
-            .build()?;
+            let w =
+                tauri::WindowBuilder::new(app, "main", tauri::WindowUrl::App("index.html".into()))
+                    .decorations(false)
+                    .focused(true)
+                    .build()?;
             set_window_over_tray(&w, click)?;
         }
     };
-    
+
     Ok(())
 }
 
@@ -169,42 +161,46 @@ fn open_usb_view(app: &AppHandle, click: &PhysicalPosition<f64>)
 ///     path: string
 ///     authorization: boolean
 /// }, ..]
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * 'device_path' - Name of the path of the volume, e.g 'D:'
 /// * 'app_ctrl' - Handle to the application controler, it is supplied by tauri
 #[tauri::command]
-async fn get_file_list(device_path: String, app_ctrl: State<'_, Arc<AppController>>) -> Result<String, String> {
+async fn get_file_list(
+    device_path: String,
+    app_ctrl: State<'_, Arc<AppController>>,
+) -> Result<String, String> {
     match app_ctrl.get_file_list(&device_path) {
-        Ok(files) => {
-            match serde_json::to_string(&files) {
-                Ok(s) => {
-                    return Ok(s);
-                },
-                Err(e) =>  {
-                    log::error!("Failed to serialize result: {e}");
-                    return Err(String::from("Failed to get files"));
-                }
+        Ok(files) => match serde_json::to_string(&files) {
+            Ok(s) => Ok(s),
+            Err(e) => {
+                log::error!("Failed to serialize result: {e}");
+                Err(String::from("Failed to get files"))
             }
         },
         Err(e) => {
             log::error!("Device not found: {e}");
-            return Err(String::from("Failed to get files"));
+            Err(String::from("Failed to get files"))
         }
     }
 }
 
 /// Request to toggle the authorization for a file in a give device
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * 'device' - Name of the USB device volume, e.g. 'D:'
 /// * 'path' - Full path to the file on the device
 /// * 'current_auth' - Current authorization status for the file
 #[tauri::command]
-async fn toggle_file_auth(device: String, id: [u16; 16], path: String, new_auth: u8,
-                            app_ctrl: State<'_, Arc<AppController>>) -> Result<(), String> {
+async fn toggle_file_auth(
+    device: String,
+    id: [u16; 16],
+    path: String,
+    new_auth: u8,
+    app_ctrl: State<'_, Arc<AppController>>,
+) -> Result<(), String> {
     let auth = KeysasAuthorization::from_u8_file(new_auth);
     println!("Test");
     if let Err(e) = app_ctrl.request_file_auth_toggle(&device, &id, &path, auth) {

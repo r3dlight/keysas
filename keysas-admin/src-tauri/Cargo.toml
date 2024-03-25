@@ -1,6 +1,6 @@
 [package]
 name = "keysas-admin"
-version = "2.2.0"
+version = "2.3.0"
 description = "Keysas stations administration application"
 authors = ["Stephane N", "Luc Bonnafoux"]
 license = "GPL-3.0"
@@ -11,18 +11,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.4", features = [] }
+tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.4", features = ["api-all", "updater"] }
-ssh-rs = { version = "0.4", features = ["scp"] } 
+tauri = { version = "1.6", features = ["api-all", "updater"] }
+ssh-rs = { version = "0.5", features = ["scp"] } 
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 sha2 ="0.10"
-regex="1.9"
-sqlite = "0.31"
+regex="1"
+sqlite = "0.34"
 simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", features = ["encryption", "pem"] }
@@ -35,11 +35,11 @@ hex-literal = "0.4"
 libc = "0.2"
 udev = "0.8"
 mbrman = "0.5"
-base64 = "0.21"
+base64 = "0.22"
 keysas_lib = { path = "../../keysas_lib" }
 
 [dependencies.oqs]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["std", "dilithium"]
 

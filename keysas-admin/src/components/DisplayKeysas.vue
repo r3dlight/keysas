@@ -1,15 +1,18 @@
 <template>
   <div class="tip">
-    <h5 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h5>
+    <h4 class="text-info"><i class="bi bi-moon-stars-fill"> HELP</i></h4>
     <br>
-    <span class="tip-text">Add here the Keysas stations you want to manage with this application.</span><br>
-    <span class="tip-text">You can find the IP address in the Help menu of your Keysas station <i
-        class="bi bi-emoji-wink"></i><br>Do not not forget to enroll it when done !</span>
+    <ul>
+     <li class="tip-text">Add here the Keysas stations you want to manage with this application.</li><br>
+     <li class="tip-text">You can find the IP address in the Help menu of your Keysas station 
+       <i class="bi bi-emoji-wink"></i></li><br>
+     <li class="tip-text">Do not not forget to export your public SSH key and enroll it when done !</li>
+    </ul>
   </div>
   <br>
   <div v-if="!hide" class="custom-li tip">
     <div class="text-center">
-      <button class="send btn btn-light shadow" @click="hide = true; displayKeysasList()"><span
+      <button class="send btn btn-secondary shadow" @click="hide = true; displayKeysasList()"><span
           class="bi bi-caret-up-fill"> Hide registred Keysas stations</span></button>
       <br><br>
     </div>
@@ -126,5 +129,11 @@ button {
   color: white;
   display: inline-block;
   font-size: 1.0em;
+}
+
+.tip-text {
+  font-weight: normal;
+  color: rgb(101, 101, 101);
+  font-size: 1.1em;
 }
 </style>

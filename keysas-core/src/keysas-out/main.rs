@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2023 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-out binary.
@@ -50,7 +50,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
@@ -140,7 +139,7 @@ fn parse_args() -> Configuration {
             Arg::new("yara_clean")
                 .short('c')
                 .long("yara_clean")
-                .action(clap::ArgAction::SetTrue)
+                .action(ArgAction::SetTrue)
                 .help("Remove the file if a Yara rule matched"),
         )
         .arg(
@@ -198,7 +197,7 @@ fn output_files(
     for mut f in files {
         let file = unsafe { File::from_raw_fd(f.fd) };
         // Position the cursor at the beginning of the file
-        unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet)?;
+        unistd::lseek(f.fd, 0, unistd::Whence::SeekSet)?;
         // Check digest
         let digest = sha256_digest(&file)?;
 
@@ -223,9 +222,11 @@ fn output_files(
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&path)?;
         let json_report = serde_json::to_string_pretty(&new_report)?;
 
+        info!("{json_report}");
         writeln!(report, "{}", json_report)?;
 
         // Test if the check passed, if yes write the file to sas_out
@@ -244,9 +245,13 @@ fn output_files(
             path.push(&conf.sas_out);
             path.push(&f.md.filename);
 
-            let output = File::options().write(true).create(true).open(path)?;
+            let output = File::options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)?;
             // Position the cursor at the beginning of the file
-            unistd::lseek(f.fd, 0, nix::unistd::Whence::SeekSet)?;
+            unistd::lseek(f.fd, 0, unistd::Whence::SeekSet)?;
             let mut writer = BufWriter::new(output);
             io::copy(&mut reader, &mut writer)?;
         }

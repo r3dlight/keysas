@@ -1,39 +1,39 @@
 [package]
 name = "keysas-backend"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
 [dependencies]
-tungstenite = "0.20"
+tungstenite = "0.21"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 log = "0.4"
 anyhow = "1.0"
 udev = "0.8"
-regex = "1.9"
+regex = "1"
 libc = "0.2"
 nom = "7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 crossbeam-utils = "0.8"
-nix = { version = "0.27", features = ["net"]}
+nix = { version = "0.28", features = ["net"]}
 tempfile = "3.8"
 diacritics = "0.2"
-sys-mount = "2.1"
+sys-mount = "3"
 proc-mounts = "0.3"
 hex = "0.4"
 kv = "0.24"
 walkdir = "2.4"
-landlock = "0.2" 
-flexi_logger = "0.27"
-http = "0.2"
+landlock = "0.3" 
+flexi_logger = "0.28"
+http = "1"
 
 [dev-dependencies]
 criterion = "0.5"
-env_logger = "0.10"
+env_logger = "0.11"
 input_buffer = "0.5"
 socket2 = "0.5"
 rand = "0.8"

@@ -2,7 +2,7 @@
 /*
  * The "keysas-io".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * This file is the main file for udev management.
  */
@@ -71,6 +71,7 @@ use yubico_manager::Yubico;
 mod errors;
 //use std::process::exit;
 
+#[allow(non_camel_case_types)]
 #[repr(C)]
 struct pollfd {
     fd: c_int,
@@ -78,6 +79,7 @@ struct pollfd {
     revents: c_short,
 }
 
+#[allow(non_camel_case_types)]
 #[repr(C)]
 struct sigset_t {
     __private: c_void,
@@ -657,7 +659,7 @@ fn main() -> Result<()> {
                 .match_subsystem("block")?
                 .listen()?;
 
-            let mut fds = vec![pollfd {
+            let mut fds = [pollfd {
                 fd: socket.as_raw_fd(),
                 events: POLLIN,
                 revents: 0,

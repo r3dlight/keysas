@@ -39,7 +39,7 @@ Getting **Keysas**
 
 A pre-compiled **Keysas** binary is at your
 disposal. We recommend using the latest version here:
-https://github.com/r3dlight/keysas/tags
+https://github.com/r3dlight/keysas/releases
 
 
 Download the following files of lastest stable version.
@@ -100,6 +100,9 @@ Make sure that your **clamav-daemon** and **clamav-freshclam** services are up a
   #/etc/clamav/clamd.conf
   TCPSocket 3310
   TCPAddr 127.0.0.1
+
+.. warning::
+ Make sure that the **StreamMaxLength** (clamd.conf) parameter is consistent with **MAX_SIZE** and **YARA_MAXFILESIZE** (see keysas-transit).  
 
 We now need to allow the Clamav daemon to be able to read the /var/local/in
 directory with Apparmor.

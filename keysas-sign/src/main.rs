@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2024 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -23,7 +23,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
@@ -35,15 +34,14 @@
 
 pub use anyhow::{anyhow, Context, Result};
 use clap::{crate_version, Arg, ArgAction, Command};
+use ed25519_dalek::SigningKey;
 use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::keysas_key::KeysasKey;
+use keysas_lib::keysas_key::KeysasPQKey;
 use pkcs8::der::EncodePem;
 use std::fs::File;
 use std::io::prelude::*;
-mod errors;
-use ed25519_dalek::SigningKey;
-use keysas_lib::keysas_key::KeysasKey;
-use keysas_lib::keysas_key::KeysasPQKey;
 use std::path::Path;
 use std::str;
 
@@ -106,7 +104,7 @@ fn command_args() -> Config {
              .value_name("name")
              .help("Name for the station certificate")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .arg(
          Arg::new("certtype")
@@ -115,7 +113,7 @@ fn command_args() -> Config {
              .value_name("certtype")
              .help("[file-cl|file-pq|usb-cl|usb-pq]: file is the station file signature certificate, usb is the CA certificate")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .arg(
          Arg::new("cert")
@@ -124,7 +122,7 @@ fn command_args() -> Config {
              .value_name("cert")
              .help("Content of the certificate in PEM format")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .get_matches();
 

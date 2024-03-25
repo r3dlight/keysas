@@ -26,7 +26,7 @@ Environment:
 #include <suppress.h>
 #include <ntdef.h>
 
-#include "keysasDriver.h"
+#include "KeysasMinifilter.h"
 
 #define KEYSAS_REQUEST_BUFFER_SIZE 1024
 

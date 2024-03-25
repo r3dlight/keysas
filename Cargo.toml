@@ -14,10 +14,4 @@ exclude = [
     "keysas-firewall"
 ]
 
-[patch.crates-io.loopdev]
-git = "https://github.com/mulkieran/loopdev"
-branch = "bump-bindgen-reduce-version"
 
-[patch.crates-io.ed25519-dalek]
-git = "https://github.com/r3dlight/curve25519-dalek/"
-version = "=2.0.0"

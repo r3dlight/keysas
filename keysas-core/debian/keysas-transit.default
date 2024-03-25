@@ -12,7 +12,8 @@ SOCKET_IN=socket_in
 SOCKET_OUT=socket_out
 
 # Max file size to be transfered
-# You should not touch this parameter.
+# This parameter must be consistent
+# with StreamMaxLength (clamd.conf).
 MAX_SIZE=500000000
 
 # Path to Yara rules (don't forget to add index.yar)

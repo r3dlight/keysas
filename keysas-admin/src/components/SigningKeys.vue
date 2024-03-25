@@ -1,11 +1,11 @@
 <template>
   <div class="row align-items-start box">
     <div class="col">
-      <button class="send btn btn-outline-info btn-lg shadow"
+      <button class="send btn btn-primary btn-lg shadow"
               @click="showLoadPKIForm = !showLoadPKIForm;
                       showRootKeyForm = false;
                       showPkiDirForm = false;">
-        Load from local IKPQPKI
+        Load a local IKPQPKI
       </button>
     </div>
     <!-- No pkcs11 for now-->
@@ -18,7 +18,7 @@
       </button>      
     </div>-->
     <div class="col">
-      <button class="send btn btn-outline-info btn-lg shadow" 
+      <button class="send btn btn-primary btn-lg shadow" 
               @click="showLoadPKIForm = false;
                       showRootKeyForm = false;
                       showPkiDirForm = !showPkiDirForm;">
@@ -31,7 +31,7 @@
       <label type="text"> Path to your IKPQPKI folder:</label>
       <input type="text" required v-model="pkiFolder" id="pkiFolder"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="PKIFolder">Browse</button>
       </div>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
@@ -39,7 +39,7 @@
       <input type="password" required v-model="p8Password" id="p8Password"/>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
+        <button class="send btn btn-success btn-lg shadow"
                 @click="submitPKIFolderForm">
           <i class="bi bi-check-square"> Ok</i>
         </button>
@@ -65,13 +65,13 @@
       <label type="text"> Path to your Root CA key file (PKCS#8):</label>
       <input type="text" required v-model="rootKeyPath" id="rootKey"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="RootKeyPath">Browse</button>
       </div>
       <div v-if="keysError" class="error"> {{ keysError }}
       </div>
       <br><br>
       <div class="submit">
-        <button class="send btn btn-outline-success btn-lg shadow"
+        <button class="send btn btn-success btn-lg shadow"
                 @click="submitRootCAForm">
           <i class="bi bi-check-square"> Ok</i>
         </button>
@@ -94,7 +94,7 @@
       <label type="text"> Select directory:</label>
       <input type="text" required v-model="pkiDir" id="pkiDir"/>
       <div class="text-center">
-        <button class="btn btn-outline-secondary btn-sm shadow" @click="PKIDir">Browse</button>
+        <button class="btn btn-secondary btn-sm shadow" @click="PKIDir">Browse</button>
       </div>
       <label type="text"> Password:</label>
       <input type="password" required v-model="adminPwd" id="adminPwd"/>
@@ -102,7 +102,7 @@
       </div>
       <br><br>
       <div class="submit">
-        <button v-if="!waiting" class="send btn btn-outline-success btn-lg shadow"
+        <button v-if="!waiting" class="send btn btn-success btn-lg shadow"
                 @click="submit();">
           <i class="bi bi-check-square"> Ok</i>
         </button>
