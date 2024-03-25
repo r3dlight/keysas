@@ -23,7 +23,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
@@ -105,7 +104,7 @@ fn command_args() -> Config {
              .value_name("name")
              .help("Name for the station certificate")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .arg(
          Arg::new("certtype")
@@ -114,7 +113,7 @@ fn command_args() -> Config {
              .value_name("certtype")
              .help("[file-cl|file-pq|usb-cl|usb-pq]: file is the station file signature certificate, usb is the CA certificate")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .arg(
          Arg::new("cert")
@@ -123,7 +122,7 @@ fn command_args() -> Config {
              .value_name("cert")
              .help("Content of the certificate in PEM format")
              .default_value("")
-             .action(clap::ArgAction::Set)
+             .action(ArgAction::Set)
      )
      .get_matches();
 

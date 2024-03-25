@@ -10,7 +10,6 @@
 #![feature(unix_socket_ancillary_data)]
 #![feature(tcp_quickack)]
 #![forbid(unsafe_code)]
-#![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
 #![warn(missing_debug_implementations)]

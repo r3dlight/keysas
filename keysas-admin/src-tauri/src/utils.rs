@@ -85,7 +85,7 @@ pub fn send_cert_to_station(
     cert: &Certificate,
     kind: &str,
 ) -> Result<(), anyhow::Error> {
-    let output = String::from_utf8(cert.to_pem(pkcs8::LineEnding::LF)?.into())?;
+    let output = String::from_utf8(cert.to_pem(LineEnding::LF)?.into())?;
 
     let command = format!(
         "{}{}{}{}",
@@ -118,7 +118,7 @@ pub fn send_cert_to_station(
 }
 
 pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::Error> {
-    let output = String::from_utf8(cert.to_pem(pkcs8::LineEnding::LF)?.into())?;
+    let output = String::from_utf8(cert.to_pem(LineEnding::LF)?.into())?;
     let mut file = File::create(path)?;
     write!(file, "{}", output)?;
     Ok(())

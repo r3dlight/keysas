@@ -17,7 +17,6 @@
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts)]
 #![warn(trivial_numeric_casts)]
-#![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_qualifications)]
 #![warn(variant_size_differences)]
@@ -190,7 +189,7 @@ fn parse_args() -> Configuration {
             Arg::new("type_off")
                 .short('m')
                 .long("type_off")
-                .action(clap::ArgAction::SetTrue)
+                .action(ArgAction::SetTrue)
                 .help("Disable the magic number check"),
         )
          .arg(
@@ -304,13 +303,13 @@ fn get_extension(buf: Vec<u8>) -> String {
 /// This function does not modify the files.
 fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: String) {
     for f in files {
-        match nix::unistd::dup2(f.fd, 500) {
+        match unistd::dup2(f.fd, 500) {
             Ok(nfd) => {
                 let mut file = unsafe { File::from_raw_fd(nfd) };
                 // Synchronize the file before calculating the SHA256 hash
                 file.sync_all().unwrap();
                 // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
@@ -330,7 +329,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                     }
                 }
                 // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
@@ -350,7 +349,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 }
 
                 // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
@@ -370,7 +369,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 }
 
                 // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
@@ -402,7 +401,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                     }
                 }
                 // Position the cursor at the beginning of the file
-                match unistd::lseek(nfd, 0, nix::unistd::Whence::SeekSet) {
+                match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Unable to lseek on file descriptor: {e:?}, killing myself.");
