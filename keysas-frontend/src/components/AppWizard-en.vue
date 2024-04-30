@@ -3,54 +3,60 @@
     <div class="row">
       <div class="col-sm-12">
       <section id="no-signed-key">
-<h1>Congratulations and welcome to Keysas !</h1>
+<h1>Congrats and welcome to <b>Keysas</b></h1>
+<p> My IP is {{ ip[0] }}.</p>
+<p><b>KEYSAS</b> is 100% opesource and written in Rust :-) <br> The provided SD card image for Raspberry Pi 4 is based a hardened GNU/Linux Debian 12 (Bookworm). DHCP is activated by default: your IP should available above in this page.</p>
+<p> If your are using the SD image, we already have configured protections against BadUSB, only USB mass storages will be recognized. USB keyboards and mouse should <b>not</b> work.</p>
+To administrate your <b>Keysas</b> stations, you should install the <b>Keysas-admin</b> application on a dedicated administration laptop (Debian 12). This app is available at github.com/r3dlight/keysas/ then click on <b>Releases</b> section.
+<div class="callout callout-warning">
+If it's your first time using <b>Keysas-admin</b>, you should start by generating a <b>IKPQPKI</b> (<b>I</b>ncredible <b>K</b>eysas <b>P</b>ost-<b>Q</b>uantum <b>P</b>rivate <b>K</b>ey <b>I</b>nfrastrcture) using <b>Keysas-admin</b>, enroll your new <b>Keysas</b> station and sign at least one output USB device. <br>
+</div>
+<p>Unsigned USB devices will be automatically considered as untrusted whereas signed USB devices using <b>Keysas-admin</b> will be considered trusted to retrieve your documents.
+This following HOW-TO shows you how to sign a new USB device.</p>
+<h2>Keysas-admin</h2>
+<section id="creation-pki">
+<h3>1 - PKI creation</h3>
+This procedure will show you how to generate a new hybrid (Ed25519/Ditithium5) PKI to sign both trusted USB devices and your documents in the <b>Keysas</b> reports (.krp).
 <div class="callout callout-info">
-If this is your first time using the Keysas station you should first sign a USB key in order before going further.<br>
-This tutorial will show you how to process. You will be able to display it anytime in the future using the menu.
-</div>
-<h2>How to create a USB device for output ?</h2>
-<section id="connexion-a-la-station-blanche">
-<h3>1 - Connect to your Keysas station</h3>
-<p>The operating system is based on a hardened GNU/Linux Debian 11 (codename: Bullseye). DHCP on on by default so you may want to check your network router to get back the IP address assigned to your Keysas at boot.</address>
-<p>To protected the <b>Keysas</b> against various attacks like BadUSB, only mass storage device like USB keys or disks are discovered by your <b>Keysas</b> station.
-To sign a new output device, you will have to connect using <b>SSH</b> to you <b>Keysas</b> station:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh keysas-sign@192.168.XX.YY (IP retrived via DHCP)</span>
-</code></pre></div>
-<div class="callout callout-warning">
-Ths default password is Changeme. You will have to change it right after connecting with a strong and personnal password.
-</div>
-</section>
-<section id="generation-des-cles-de-signature">
-<h3>2 - Generating a keypair for signatures</h3>
-<p>We are now going to create an asymetric keypair allowing us to sign and verify devices for output:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">sudo /usr/bin/keysas-sign --generate=true --password=Toto007</span>
-<span class="go">sudo chmod 600 /etc/keysas/keysas.priv</span>
-<span class="go">sudo chattr +i /etc/keysas/keysas.priv</span>
-</code></pre></div>
-<div class="callout callout-warning">
-Do not forget to change the password used in the above commandline with yours :) 
-</div>
+  If no PKI were previously created, go to <b>Keysas-admin</b>, then go to <b>Admin configuration</b> and click on <b>IKPQPKI configuration</b>. <br>
+  Click on <b>Create a new IKPQPKI</b> and provide the parameters you want to customize your PKI. 
+</div> 
+<p>The key generation might take a while, so be patient :o)</p>
 <div class="callout callout-danger">
-This keypair must be generated once while initializing your <b>Keysas</b> station. Changing this keypair 
-may lead to verification failures on any devices previously signed. By default, the private and the public keys are stored under /etc/keysas.
-It might be important to save your keypai in a safe place to be able to restore it if needed.
-</div>
+  The chosen password strengh must be as strong as you can and the password must be saved securely.<br>
+Do not loose or forget your password or the PKI will be unrecoverable. 
+  </div>
+  <div class="callout callout-info">
+    By default, private keys are stored using the <b>PKCS#8</b> format and the public key using the <p>PEM</p> format. <br>
+    On the <b>Keysas</b>, they are all stored under /etc/keysas/ path.
+    </div>
+</section>
+
+<section id="generation-des-cles-de-signature">
+<h3>2 - Add a new Keysas station</h3>
+  <p>Add now a new <b>Keysas</b> station using <b>Keysas-admin</b> by clicking on <b>"Add a Keysas"</b>. Provide a name and an IP address.</p>
+  <div class="callout callout-info">
+  The remove administration is done using <b>SSH</b>. It is necessary to create an SSH keypair using <b>Ed25519</b> format only on the <b>admin</b> computer to allow <b>Keysas-admin</b> application to securely connect your remote <b>Keysas</b> stations.
+  </div>
+<p>To do so, open a terminal and type:<b></b></p>
+<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh-keygen -m PEM -t ed25519 -f mykey</span>
+</code></pre></div>
+<p>Then go to <b>Admin configuration/SSH configuration</b> and provide the path to your public and private keys. Go to <b>Manage your Keysas</b> and click on <b>Export SSH pubkey</b>. Note that the path /home/keysas/.ssh must be present (for custom installations). Then wait until the status become <b class="text-success">Online</b>. Click on <b>More...</b> and <b>Enroll</b> to generate the remote keys on the <b>Keysas</b> station.</p>
+
+
 </section>
 <section id="signature-d-un-peripherique-usb">
-<h3>3 - Sign you USB device</h3>
-<p>Once the keypair is generated, execute the following commandline:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">sudo /usr/bin/keysas-sign --watch=true</span>
-</code></pre></div>
-<p>Now plug the device you want to sign into you <b>Keysas</b> station. This device must be empty in order to avoid transfering unwanted files.</p>
-<p>Press Crtl+c and copy/paste the commandline printed in your terminal and change the password with yours.
-For example:</p>
-<div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">sudo /usr/bin/keysas-sign -device=/dev/sda --sign=true --password=Toto007 --vendorid=0951 --modelid=160b --revision=1.00 --serial=Kingston_DataTraveler_2.0_0019E000B4625C8B0A070016-0:0</span>
-</code></pre></div>
-<p>The new USB device should be now successfully signed and formated using fat32 filesystem. You can of course reformat the device using any other filesystem supported by your <b>Keysas</b> station (ext2, ext3, ext4, fat32, exfat, ntfs).</p>
+<h3>3 - Sign a USB key</h3>
+<p> To sign a new trusted key, go to administration menu and choose <b>"Sign a key"</b>. Provide your <b>IKPQPKI</b> password and click on <b class="text-success">Sign</b>.<br>
+Plug your USB key in a USB port and wait for the confirmation message. That's all !</p>
+
 <div class="callout callout-info">
-Please repeat this procedure with any devices when want to use for output.
+  Every signed device will recognized on any <b>Keysas</b> station enrolled with you <b>IKPQPKI</b>. 
 </div>
-<p>Once done, plug out and plug in your device to verify it is is know by the station as a output device.</p>
+
+<p>You must now format your newly signed device (ext2, ext3, ext4, fat32, exfat, ntfs) using mkfs.* for example.</p>
+
+<p>For more documentation, visit <b>keysas.fr</b>.</p>
 </section>
 </section>
       </div>
@@ -61,19 +67,24 @@ Please repeat this procedure with any devices when want to use for output.
 <script>
 export default {
   name: "AppWizard-en",
-  props: [],
+  props: {
+    ip: [],
+  },
 };
 </script>
 
-<style lang="sass">
+<style lang="scss">
 @import "../assets/style/app.scss";
+
 pre {
   background: $navy;
   color: $grey-light;
   padding: 5px;
   border-radius: 2px;
 }
+
 #no-signed-key {
   padding: 40px;
 }
+
 </style>
