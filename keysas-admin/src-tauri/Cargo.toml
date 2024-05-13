@@ -22,7 +22,7 @@ anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
 sha2 ="0.10"
 regex="1"
-sqlite = "0.34"
+sqlite = "0.36"
 simple_logger = "4"
 log = "0.4"
 pkcs8 = {version = "0.10", features = ["encryption", "pem"] }

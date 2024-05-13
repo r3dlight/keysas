@@ -25,7 +25,7 @@ serde_derive = "1.0"
 serde = "1.0"
 serde_json = "1.0"
 time = "0.3"
-base64 = "0.21"
+base64 = "0.22"
 
 [dependencies.oqs]
 version = "0.9"
