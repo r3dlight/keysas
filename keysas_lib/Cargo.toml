@@ -11,7 +11,7 @@ anyhow = "1.0"
 clap = "4.4"
 walkdir = "2.4"
 regex ="1"
-simple_logger = "4"
+simple_logger = "5"
 log = "0.4"
 pkcs8 = {version = "0.10", default-features = false, features = ["encryption", "pem"] }
 x509-cert = "0.2"
@@ -25,7 +25,7 @@ serde_derive = "1.0"
 serde = "1.0"
 serde_json = "1.0"
 time = "0.3"
-base64 = "0.21"
+base64 = "0.22"
 
 [dependencies.oqs]
 version = "0.9"
