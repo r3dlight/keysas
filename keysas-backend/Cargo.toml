@@ -7,7 +7,7 @@ edition = "2021"
 
 
 [dependencies]
-tungstenite = "0.21"
+tungstenite = "0.23"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -19,7 +19,7 @@ libc = "0.2"
 nom = "7"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
 crossbeam-utils = "0.8"
-nix = { version = "0.28", features = ["net"]}
+nix = { version = "0.29", features = ["net"]}
 tempfile = "3.8"
 diacritics = "0.2"
 sys-mount = "3"
