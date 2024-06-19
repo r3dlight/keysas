@@ -18,7 +18,6 @@ use landlock::{
 #[cfg(target_os = "linux")]
 use syscallz::{Context, Syscall};
 
-#[cfg(not(tarpaulin_include))]
 #[cfg(target_os = "linux")]
 pub fn init() -> Result<()> {
     let mut ctx = Context::init()?;

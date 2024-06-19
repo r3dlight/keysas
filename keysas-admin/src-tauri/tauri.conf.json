@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "keysas-admin",
-    "version": "2.2.0"
+    "version": "2.4.0"
   },
   "tauri": {
     "allowlist": {
@@ -55,7 +55,7 @@
           "https://keysas.fr/download/keysas-admin/update.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCREY4RkREMzhGNzNFRDgKUldUWVB2YzQzWS9mKys1Y1IvWGNJTzdPbnpOaURyNFBOME14N0pEUityeTNVaWlaanRTUlNvcmEK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFMjg4NzZFOTJBRDdGOEUKUldTT2Y2MlNib2NvanN5MXN0WHgvV08wNGg1T2N2ZGZEZmJ1N2ZneXhwL3Y3RXdPYTdKOHp2VWMK"
     },
     "windows": [
       {
