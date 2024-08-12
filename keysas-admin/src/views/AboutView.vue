@@ -19,7 +19,7 @@ export default {
 
 <template>
   <NavBar />
-  <h2>Keysas-admin. Version 2.3</h2>
+  <h2>Keysas-admin. Version 2.4</h2>
   <h2>Please visit <a href="#https://keysas.fr" class="website text-info">keysas.fr</a> to learn more </h2>
   <h3>Copyright. Keysas 2022-2024.</h3>
 </template>

@@ -37,7 +37,7 @@ Toute perte de ce mot de passe rendra la PKI définitivement inutilisable.
 <h3>2 - Ajouter une station blanche</h3>
   <p>Ajouter ensuite votre nouvelle station <b>Keysas</b> dans <b>Keysas-admin</b> en cliquant sur <b>"Add a Keysas"</b>. Nommez votre station et renseignez son adresse IP.</p>
   <div class="callout callout-info">
-  L'administration des différentes stations blanches à distance se fait pas <b>SSH</b>. Il est donc nécessaire de créer une paire de clés <b>SSH</b> au format <b>Ed25519</b> sur la station d'administration pour que l'application puisse contrôler les stations à distance et de manière chiffrée.
+  L'administration des différentes stations blanches à distance se fait par <b>SSH</b>. Il est donc nécessaire de créer une paire de clés <b>SSH</b> au format <b>Ed25519</b> sur la station d'administration pour que l'application puisse contrôler les stations à distance et de manière chiffrée.
   </div>
 <p>Pour ce faire, ouvrez un terminal et entrez la ligne de commande suivante:<b></b></p>
 <div class="highlight"><pre><code class="language-html" data-lang="html"><span></span><span class="go">ssh-keygen -m PEM -t ed25519 -f mykey</span>
