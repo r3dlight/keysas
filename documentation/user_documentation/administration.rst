@@ -37,7 +37,7 @@ Here are some recommendations and best practices to use **Keysas** in good condi
 
  The GNU/Linux system used should be hardened according to the best practices such as *ANSSI*, *CIS*, *STIG* etc.
 
- You can take a look at the following: https://www.ssi.gouv.fr/en/guide/configuration-recommendations-of-a-gnulinux-system/ 
+ You can take a look at the following: https://cyber.gouv.fr/en/publications/configuration-recommendations-gnulinux-system 
 
 .. admonition:: Network Cards (Only for network gateway)
  :class: tip
