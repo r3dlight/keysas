@@ -13,7 +13,7 @@ serde_json = "1.0"
 serde_derive = "1.0"
 log = "0.4"
 anyhow = "1.0"
-udev = "0.8"
+udev = "0.9"
 regex = "1"
 libc = "0.2"
 nom = "7"
@@ -28,7 +28,7 @@ hex = "0.4"
 kv = "0.24"
 yubico_manager = { git = "https://github.com/r3dlight/yubico-manager"}
 walkdir = "2.4"
-landlock = "0.3" 
+landlock = "0.4" 
 flexi_logger = "0.28"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.9", default-features = false, features =["dilithium"] }

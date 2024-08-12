@@ -33,7 +33,7 @@ rand_dl = {package = "rand", version = "0.8"}
 rand_core = "0.6"
 hex-literal = "0.4"
 libc = "0.2"
-udev = "0.8"
+udev = "0.9"
 mbrman = "0.5"
 base64 = "0.22"
 keysas_lib = { path = "../../keysas_lib" }
