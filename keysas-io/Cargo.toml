@@ -7,7 +7,7 @@ edition = "2021"
 
 
 [dependencies]
-tungstenite = "0.23"
+tungstenite = "0.24"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -29,7 +29,7 @@ kv = "0.24"
 yubico_manager = { git = "https://github.com/r3dlight/yubico-manager"}
 walkdir = "2.4"
 landlock = "0.4" 
-flexi_logger = "0.28"
+flexi_logger = "0.29"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.9", default-features = false, features =["dilithium"] }
 ed25519-dalek = "2"

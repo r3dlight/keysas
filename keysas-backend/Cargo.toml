@@ -7,7 +7,7 @@ edition = "2021"
 
 
 [dependencies]
-tungstenite = "0.23"
+tungstenite = "0.24"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -28,7 +28,7 @@ hex = "0.4"
 kv = "0.24"
 walkdir = "2.4"
 landlock = "0.4" 
-flexi_logger = "0.28"
+flexi_logger = "0.29"
 http = "1"
 
 [dev-dependencies]
