@@ -16,7 +16,7 @@ tauri-build = { version = "1.5", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.6", features = ["api-all", "updater"] }
+tauri = { version = "1.8", features = ["api-all", "updater"] }
 ssh-rs = { version = "0.5", features = ["scp"] } 
 anyhow = { version = "1.0", features = ["backtrace"] }
 async-std = "1.12"
@@ -39,7 +39,7 @@ base64 = "0.22"
 keysas_lib = { path = "../../keysas_lib" }
 
 [dependencies.oqs]
-version = "0.9"
+version = "0.10"
 default-features = false
 features = ["std", "dilithium"]
 

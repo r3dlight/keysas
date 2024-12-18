@@ -29,7 +29,7 @@ syscallz = "0.17"
 yara = "0.29"
 
 [dependencies.oqs]
-version = "0.9"
+version = "0.10"
 default-features = false
 features = ["dilithium"]
 
