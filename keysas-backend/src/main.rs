@@ -233,7 +233,7 @@ fn main() -> Result<()> {
                 };
 
                 let serialized = serde_json::to_string(&orders)?;
-                websocket.send(Message::Text(serialized))?;
+                websocket.send(Message::Text(serialized.into()))?;
                 thread::sleep(Duration::from_millis(300));
             }
         });

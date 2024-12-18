@@ -678,7 +678,7 @@ fn main() -> Result<()> {
                 yubikeys: yubi,
             };
             let serialized = serde_json::to_string(&keys)?;
-            websocket.send(Message::Text(serialized))?;
+            websocket.send(Message::Text(serialized.into()))?;
 
             loop {
                 let result = unsafe {
@@ -721,7 +721,7 @@ fn main() -> Result<()> {
                         yubikeys: yubi,
                     };
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.send(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized.into()))?;
 
                     let id_vendor_id = event
                         .property_value(
@@ -819,7 +819,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket.send(Message::Text(serialized))?;
+                                    websocket.send(Message::Text(serialized.into()))?;
                                     if yubikey {
                                         match hmac_challenge() {
                                             Some(name) => {
@@ -860,7 +860,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    match websocket.send(Message::Text(serialized)) {
+                                    match websocket.send(Message::Text(serialized.into())) {
                                         Ok(_) => log::debug!("Data wrote into the websocket"),
                                         Err(e) => {
                                             log::error!("Cannot write data into the websocket: {e}")
@@ -887,7 +887,7 @@ fn main() -> Result<()> {
                                         yubikeys: yubi,
                                     };
                                     let serialized = serde_json::to_string(&keys)?;
-                                    websocket.send(Message::Text(serialized))?;
+                                    websocket.send(Message::Text(serialized.into()))?;
                                 }
                             }
                         }
@@ -909,7 +909,7 @@ fn main() -> Result<()> {
                                     yubikeys: yubi,
                                 };
                                 let serialized = serde_json::to_string(&keys)?;
-                                websocket.send(Message::Text(serialized))?;
+                                websocket.send(Message::Text(serialized.into()))?;
                                 if yubikey {
                                     match hmac_challenge() {
                                         Some(name) => {
@@ -954,7 +954,7 @@ fn main() -> Result<()> {
                     };
 
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.send(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized.into()))?;
                 }
 
                 sthread::sleep(Duration::from_millis(60));
