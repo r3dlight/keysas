@@ -69,7 +69,6 @@ use yubico_manager::config::{Mode, Slot};
 use yubico_manager::Yubico;
 
 mod errors;
-//use std::process::exit;
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -125,7 +124,7 @@ impl StrExt for str {
     }
 }
 
-// Const because we do not want them to be modifyied
+// Const as we do not want them to be user modifyied
 const TMP_DIR: &str = "/var/local/tmp/";
 const SAS_IN: &str = "/var/local/in/";
 const SAS_OUT: &str = "/var/local/out/";
@@ -140,16 +139,15 @@ fn list_yubikey() -> Vec<String> {
     let mut yubikey_vector = Vec::new();
 
     if let Ok(device) = yubi.find_yubikey() {
-        //info!(
-        //    "Vendor ID: {:?} Product ID {:?}",
-        //    device.vendor_id, device.product_id
-        //);
+        debug!(
+            "Vendor ID: {:?}, Product ID {:?}.",
+            device.vendor_id, device.product_id
+        );
         let concat = format!("{:?}/{:?}", device.vendor_id, device.product_id);
         yubikey_vector.push(concat);
     } else {
         debug!("Fido2: Yubikey not present.");
     }
-
     yubikey_vector
 }
 
@@ -295,7 +293,7 @@ fn is_signed(
     let opt_pubkeys = match KeysasHybridPubKeys::get_pubkeys_from_certs(ca_cert_cl, ca_cert_pq) {
         Ok(o) => o,
         Err(e) => {
-            error!("Cannot get pubkeys from certs: {e}");
+            warn!("Cannot get pubkeys from certs: {e}");
             return Ok(false);
         }
     };
@@ -702,13 +700,27 @@ fn main() -> Result<()> {
                     }
                 };
 
-                debug!("Event type is: {:?}", event.event_type());
+                info!("New USB event type detected: {:?}", event.event_type());
+                info!("action: {:?}", event.action());
+                info!(
+                    "property_value: {:?}",
+                    event.property_value(
+                        OsStr::new("DEVTYPE")
+                            .to_str()
+                            .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?
+                    )
+                );
                 if event.action() == Some(OsStr::new("add"))
-                    && event.property_value(
+                    && ((event.property_value(
                         OsStr::new("DEVTYPE")
                             .to_str()
                             .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?,
-                    ) == Some(OsStr::new("partition"))
+                    ) == Some(OsStr::new("partition")))
+                        || (event.property_value(
+                            OsStr::new("DEVTYPE")
+                                .to_str()
+                                .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?,
+                        ) == Some(OsStr::new("disk"))))
                 {
                     let yubi: Yubistruct = Yubistruct {
                         active: yubikey,
@@ -758,7 +770,14 @@ fn main() -> Result<()> {
                                 .ok_or_else(|| anyhow!("Cannot convert ID_SERIAL to str."))?,
                         )
                         .ok_or_else(|| anyhow!("Cannot get ID_SERIAL from event."))?;
-                    //println!("device: {:?}", event.device().parent().unwrap().property_value(OsStr::new("system_name")));
+                    error!(
+                        "device: {:?}",
+                        event
+                            .device()
+                            .parent()
+                            .unwrap()
+                            .property_value(OsStr::new("system_name"))
+                    );
                     //for property in event.device().parent() {
                     //    for attr in property.attributes() {
                     //        println!("{:?}:{:?}", attr.name(),attr.value());
@@ -805,6 +824,7 @@ fn main() -> Result<()> {
                                 info!("Device signature is not valid !");
                                 let keys_in_iter: Vec<String> =
                                     keys_in.clone().into_iter().collect();
+                                warn!("keys_in_iter: {:?}", keys_in_iter);
                                 if !keys_in_iter.contains(&product) {
                                     busy_in()?;
                                     keys_in.push(product);
@@ -818,6 +838,7 @@ fn main() -> Result<()> {
                                         usb_undef: keys_undef.clone(),
                                         yubikeys: yubi,
                                     };
+                                    info!("DEVICE NOT VALID1: {}", &device);
                                     let serialized = serde_json::to_string(&keys)?;
                                     websocket.send(Message::Text(serialized.into()))?;
                                     if yubikey {
@@ -836,10 +857,36 @@ fn main() -> Result<()> {
                                             }
                                         };
                                     } else {
+                                        info!("DEVICE NOT VALID2: {}", &device);
                                         copy_device_in(Path::new(&device))?;
                                         info!("Unsigned USB device done.");
                                         ready_in()?;
                                     }
+                                } else if keys_in_iter.contains(&product)
+                                    && (event.property_value(
+                                        OsStr::new("DEVTYPE").to_str().ok_or_else(|| {
+                                            anyhow!("Cannot convert DEVTYPE to str.")
+                                        })?,
+                                    ) == Some(OsStr::new("partition")))
+                                {
+                                    busy_in()?;
+                                    //keys_in.push(product);
+                                    let yubi: Yubistruct = Yubistruct {
+                                        active: yubikey,
+                                        yubikeys: list_yubikey(),
+                                    };
+                                    let keys: Usbkeys = Usbkeys {
+                                        usb_in: keys_in.clone(),
+                                        usb_out: keys_out.clone(),
+                                        usb_undef: keys_undef.clone(),
+                                        yubikeys: yubi,
+                                    };
+                                    info!("DEVICE NOT VALID3: {}", &device);
+                                    let serialized = serde_json::to_string(&keys)?;
+                                    websocket.send(Message::Text(serialized.into()))?;
+                                    copy_device_in(Path::new(&device))?;
+                                    ready_in()?;
+                                    info!("Unsigned USB device done.");
                                 }
                             //Signature ok so this is a out device
                             } else if value {
@@ -895,7 +942,6 @@ fn main() -> Result<()> {
                             info!("USB device never signed: {e:?}");
                             let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
                             if !keys_in_iter.contains(&product) {
-                                // busy_in ?
                                 busy_in()?;
                                 keys_in.push(product);
                                 let yubi: Yubistruct = Yubistruct {
