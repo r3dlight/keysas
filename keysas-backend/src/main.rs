@@ -152,11 +152,11 @@ fn parse_ip(s: &str) -> IResult<&str, &str> {
 fn get_ip() -> Result<Vec<String>> {
     let mut ips = Vec::new();
     let addrs = nix::ifaddrs::getifaddrs()?;
+    let re = Regex::new(r"eth|enp")?;
     for ifaddr in addrs {
         if let Some(address) = ifaddr.address {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
-            let re = Regex::new(r"eth|enp")?;
             if re.is_match(&ifaddr.interface_name) && ip.parse::<Ipv4Addr>().is_ok() {
                 ips.push(ip.to_string());
             }
