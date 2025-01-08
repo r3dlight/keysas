@@ -260,7 +260,7 @@ pub fn parse_report(
     let report: Report = serde_json::from_str(report_content.as_str())?;
 
     // If the report is linked to a file, test that there is a path to it supplied
-    if report.metadata.name.ne("") && file_path.is_none() {
+    if !report.metadata.name.is_empty() && file_path.is_none() {
         return Err(anyhow!("No file supplied with the report"));
     }
 
