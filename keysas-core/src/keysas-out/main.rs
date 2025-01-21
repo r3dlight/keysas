@@ -6,7 +6,7 @@
  *
  * This file contains various funtions
  * for building the keysas-out binary.
- */
+ */ 
 
 //! Output daemon
 //!
@@ -97,6 +97,7 @@ pub struct FileData {
 /// Directory containing the station signing keys
 const KEY_FILE_DIR: &str = "/etc/keysas";
 /// Password for the private signing keys PKCS#8 files
+/// TODO: Remove this hardcoded pass and add a config file
 const KEY_PASSWD: &str = "Keysas007";
 /// Directory containing the station configuration
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -270,7 +271,6 @@ fn output_files(
 /// 2. Parse them
 /// 3. Create reports for each file and outputs them with the file to the output directory
 fn main() -> Result<()> {
-    // TODO activate seccomp
 
     // Parse command arguments
     let config = parse_args();
