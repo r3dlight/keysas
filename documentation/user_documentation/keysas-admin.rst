@@ -45,6 +45,9 @@ Enroll you Keysas stations
 You can now start adding new **Keysas** stations in the **"Add a new Keysas"** menu providing a name and an IP address
 When done, export the **public SSH** key by clicking the **"Export SSH pubkey"** button for each station added.
 
+.. warning:: 
+ Exporting the SSH public key requires that directory **/home/keysas/.ssh/** is already existing on the remote host. 
+
 In the menu, go to **"Manage your registered stations"**, click on more, provide your **IKPQPKI** **password** then click on **"Enroll"**
 Be patient, this may take some time !
 

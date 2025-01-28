@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Keysas'
-copyright = '2020-2024, Stephane N'
+copyright = '2020-2025, Stephane N'
 author = 'Stephane N'
 
 # The short X.Y version
