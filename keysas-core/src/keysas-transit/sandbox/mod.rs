@@ -2,7 +2,7 @@
 /*
  * The "keysas-transit".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.

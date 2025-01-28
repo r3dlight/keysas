@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */

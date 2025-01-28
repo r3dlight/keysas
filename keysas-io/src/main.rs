@@ -2,7 +2,7 @@
 /*
  * The "keysas-io".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file is the main file for udev management.
  */

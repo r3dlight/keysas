@@ -7,7 +7,6 @@
 # ###COPYRIGHT###
 # Keysas
 
-
 /usr/bin/keysas-in {
   #include <abstractions/base>
   /var/local/in/ r,

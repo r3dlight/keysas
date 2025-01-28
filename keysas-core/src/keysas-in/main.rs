@@ -2,7 +2,7 @@
 /*
  * The "keysas-in".
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-in binary.
