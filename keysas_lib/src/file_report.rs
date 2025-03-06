@@ -41,7 +41,7 @@ use crate::{
     certificate_field::validate_signing_certificate, keysas_hybrid_keypair::HybridKeyPair,
 };
 use anyhow::anyhow;
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use oqs::sig::{Algorithm, Sig};
 use sha2::Sha256;
 use std::fs::File;
@@ -266,6 +266,9 @@ pub fn parse_report(
 
     // Extracts the certificate within the report and validate them
     let mut certs = report.binding.station_certificate.split('|');
+    if certs.clone().count() != 2 {
+        return Err(anyhow!("Invalid number of certificates"));
+    }
     let cert_cl = validate_signing_certificate(
         certs.next().ok_or(anyhow!("No ED25519 certificate"))?,
         ca_cert_cl,
@@ -311,6 +314,9 @@ pub fn parse_report(
     // Signature validation
     let signature = general_purpose::STANDARD.decode(&report.binding.report_signature)?;
 
+    if signature.len() <= ed25519_dalek::SIGNATURE_LENGTH {
+        return Err(anyhow!("Signature is too short"));
+    }
     // Validate the signature with ED25519
     let cert_cl_bytes = cert_cl
         .tbs_certificate
@@ -324,7 +330,7 @@ pub fn parse_report(
         return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
     }
     let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
-
+    // Should not panic as len is checked previously as <= 64
     let sign_cl_bytes = &signature[0..ed25519_dalek::SIGNATURE_LENGTH];
     let mut sign_cl_bytes_casted: [u8; 64] = [0u8; 64];
     if sign_cl_bytes.len() == 64 {
@@ -366,12 +372,12 @@ pub fn parse_report(
 #[cfg(test)]
 mod tests_out {
     use crate::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
-    use base64::{engine::general_purpose, Engine};
+    use base64::{Engine, engine::general_purpose};
     use oqs::sig::{Algorithm, Sig};
     use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
 
-    use crate::file_report::{bind_and_sign, generate_report_metadata, FileMetadata};
+    use crate::file_report::{FileMetadata, bind_and_sign, generate_report_metadata};
 
     #[test]
     fn test_metadata_valid_file() {
