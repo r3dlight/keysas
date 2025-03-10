@@ -23,23 +23,23 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::anyhow;
 use anyhow::Context;
+use anyhow::anyhow;
 use ed25519_dalek::Signer;
 use ed25519_dalek::SigningKey;
 use oqs::sig::Algorithm;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
+use pkcs8::LineEnding;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
-use pkcs8::LineEnding;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use x509_cert::certificate::*;
-use x509_cert::der::asn1::BitString;
 use x509_cert::der::EncodePem;
+use x509_cert::der::asn1::BitString;
 use x509_cert::name::RdnSequence;
 use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
@@ -47,9 +47,9 @@ use x509_cert::spki::ObjectIdentifier;
 use crate::certificate_field::CertificateFields;
 use crate::keysas_key::KeysasKey;
 use crate::keysas_key::KeysasPQKey;
-use crate::pki::generate_cert_from_csr;
 use crate::pki::DILITHIUM5_OID;
 use crate::pki::ED25519_OID;
+use crate::pki::generate_cert_from_csr;
 
 /// Keysas `HybridKeyPair`
 ///

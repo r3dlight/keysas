@@ -6,7 +6,7 @@
  *
  * This file contains various funtions
  * for building the keysas-out binary.
- */ 
+ */
 
 //! Output daemon
 //!
@@ -271,7 +271,6 @@ fn output_files(
 /// 2. Parse them
 /// 3. Create reports for each file and outputs them with the file to the output directory
 fn main() -> Result<()> {
-
     // Parse command arguments
     let config = parse_args();
 

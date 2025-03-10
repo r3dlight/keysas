@@ -23,16 +23,16 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::{anyhow, Context};
-use der::asn1::SetOfVec;
-use der::oid::db::rfc4519;
+use anyhow::{Context, anyhow};
 use der::Any;
 use der::Tag;
+use der::asn1::SetOfVec;
+use der::oid::db::rfc4519;
 use oqs::sig::{Algorithm, Sig};
-use pkcs8::der::asn1::OctetString;
-use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
+use pkcs8::der::asn1::OctetString;
+use pkcs8::der::oid::db::rfc5280;
 use std::time::Duration;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
