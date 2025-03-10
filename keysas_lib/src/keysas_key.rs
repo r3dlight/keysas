@@ -23,7 +23,7 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use der::DecodePem;
 use ed25519_dalek::Signature as SignatureDalek;
 use ed25519_dalek::Signer;
@@ -34,19 +34,19 @@ use oqs::sig::PublicKey as PqPublicKey;
 use oqs::sig::SecretKey;
 use oqs::sig::Sig;
 use oqs::sig::Signature as SignatureOqs;
-use pkcs8::der::asn1::SetOfVec;
-use pkcs8::pkcs5::pbes2;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::PrivateKeyInfo;
-use rand_dl::rngs::OsRng;
+use pkcs8::der::asn1::SetOfVec;
+use pkcs8::pkcs5::pbes2;
 use rand_dl::RngCore;
+use rand_dl::rngs::OsRng;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use x509_cert::certificate::*;
-use x509_cert::der::asn1::BitString;
 use x509_cert::der::Encode;
+use x509_cert::der::asn1::BitString;
 use x509_cert::name::RdnSequence;
 use x509_cert::request::CertReq;
 use x509_cert::request::CertReqInfo;
@@ -175,6 +175,7 @@ fn store_keypair(
     //Initialize key wrap function parameters
     let mut salt = [0u8; 16];
     OsRng.fill_bytes(&mut salt);
+
     let mut iv = [0u8; 16];
     OsRng.fill_bytes(&mut iv);
     // Use default parameters for scrypt
@@ -438,7 +439,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             Err(e) => {
                 return Err(anyhow!(
                     "OQS error: cannot initialize Dililthium5 scheme: {e}"
-                ))
+                ));
             }
         };
         let tmp_pq_sk = match Sig::secret_key_from_bytes(&scheme, decoded_pk.private_key) {
@@ -468,12 +469,12 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
     }
 
     fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
-        let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
+        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
 
         store_keypair(
             &self.private_key.clone().into_vec(),
             &self.public_key.clone().into_vec(),
-            ed25519_oid,
+            dilithium5_oid,
             pwd,
             path,
         )
