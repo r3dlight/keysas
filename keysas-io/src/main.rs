@@ -89,7 +89,7 @@ type nfds_t = c_ulong;
 
 const POLLIN: c_short = 0x0001;
 
-extern "C" {
+unsafe extern "C" {
     fn ppoll(
         fds: *mut pollfd,
         nfds: nfds_t,
