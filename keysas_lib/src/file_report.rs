@@ -330,7 +330,7 @@ pub fn parse_report(
         return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
     }
     let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
-    // Should not panic as len is checked previously as <= 64
+    // SAFETY: Should not panic as len is checked previously as > 64
     let sign_cl_bytes = &signature[0..ed25519_dalek::SIGNATURE_LENGTH];
     let mut sign_cl_bytes_casted: [u8; 64] = [0u8; 64];
     if sign_cl_bytes.len() == 64 {
@@ -358,6 +358,8 @@ pub fn parse_report(
                 .raw_bytes(),
         )
         .ok_or_else(|| anyhow!("Failed to extract Dilithium public key"))?;
+
+    // SAFETY: should not panic as len has been verified as > 64
     let sig_pq = pq_scheme
         .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
         .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
