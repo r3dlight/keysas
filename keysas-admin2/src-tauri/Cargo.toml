@@ -1,12 +1,12 @@
 [package]
-name = "app"
+name = "keysas-admin"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
-edition = "2021"
-rust-version = "1.77.2"
+description = "Keysas stations administration application"
+authors = ["Stephane N", "Luc Bonnafoux"]
+license = "GPLv3"
+repository = "https://github.com/r3dlight/keysas"
+edition = "2024"
+#rust-version = "1.77.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,14 +15,14 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.4", features = [] }
+tauri-build = { version = "2.0.6", features = [] }
 
 [dependencies]
-serde_json = "1.0"
+serde_json = "1"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.2.3", features = [] }
-tauri-plugin-log = "2.0.0-rc"
+tauri = { version = "2.3.1", features = [] }
+tauri-plugin-log = "2.2.3"
 # App dependencies
 ssh-rs = { version = "0.5", features = ["scp"] }
 anyhow = { version = "1.0", features = ["backtrace"] }
