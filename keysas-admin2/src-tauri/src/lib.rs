@@ -163,7 +163,6 @@ fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
 /// This command saves the path to the public and private SSH keys
 /// If a path already exists it is replaced
 /// The returned value is a boolean indicating if an error occured during
