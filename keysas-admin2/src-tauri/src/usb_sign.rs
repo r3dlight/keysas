@@ -8,16 +8,16 @@
  */
 
 use crate::get_pki_dir;
-use anyhow::{anyhow, Context, Result};
-use base64::{engine::general_purpose, Engine as _};
+use anyhow::{Context, Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use ed25519_dalek::SigningKey;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use libc::{c_int, c_short, c_ulong, c_void};
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::ptr;

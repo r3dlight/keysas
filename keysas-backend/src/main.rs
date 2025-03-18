@@ -11,11 +11,11 @@ use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
+    ABI, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError, RulesetStatus,
+    path_beneath_rules,
 };
-use nom::bytes::complete::take_until;
 use nom::IResult;
+use nom::bytes::complete::take_until;
 use regex::Regex;
 use std::fs;
 use std::net::Ipv4Addr;
@@ -24,9 +24,8 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use tungstenite::{
-    accept_hdr,
+    Message, accept_hdr,
     handshake::server::{Request, Response},
-    Message,
 };
 
 extern crate serde;

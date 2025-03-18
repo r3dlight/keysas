@@ -32,11 +32,11 @@
 #![warn(unused_imports)]
 #![feature(str_split_remainder)]
 
-pub use anyhow::{anyhow, Context, Result};
-use clap::{crate_version, Arg, ArgAction, Command};
+pub use anyhow::{Context, Result, anyhow};
+use clap::{Arg, ArgAction, Command, crate_version};
 use ed25519_dalek::SigningKey;
-use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use pkcs8::der::EncodePem;

@@ -495,7 +495,6 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-
 fn move_files_out(mount_point: &PathBuf) -> Result<()> {
     let dir = fs::read_dir(SAS_OUT)?;
     for entry in dir {

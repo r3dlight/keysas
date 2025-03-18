@@ -3,8 +3,8 @@ use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use tempfile::NamedTempFile;
 
-use crate::generate_signing_keypair;
 use crate::Config;
+use crate::generate_signing_keypair;
 
 #[test]
 #[cfg_attr(miri, ignore)]

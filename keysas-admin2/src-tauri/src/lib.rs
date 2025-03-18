@@ -450,10 +450,15 @@ async fn update(ip: String) -> bool {
         }
     };
 
-    match session_exec(&mut session, &String::from("sudo /usr/bin/apt update && sudo /usr/bin/apt -y dist-upgrade && sudo /bin/systemctl reboot ")) {
+    match session_exec(
+        &mut session,
+        &String::from(
+            "sudo /usr/bin/apt update && sudo /usr/bin/apt -y dist-upgrade && sudo /bin/systemctl reboot ",
+        ),
+    ) {
         Ok(_) => {
             log::info!("Trying to update and rebooting...");
-        },
+        }
         Err(why) => {
             log::error!("Error while updating: {:?}", why);
             return false;
@@ -567,13 +572,18 @@ async fn export_sshpubkey(ip: String) -> bool {
     }
 
     // Once the SSH has been copied, disable password authentication
-    match session_exec(&mut session, &String::from("sudo /usr/bin/sed -i \'s/.*PasswordAuthentication.*/PasswordAuthentication no/\' /etc/ssh/sshd_config && sudo /bin/systemctl restart sshd")) {
+    match session_exec(
+        &mut session,
+        &String::from(
+            "sudo /usr/bin/sed -i \'s/.*PasswordAuthentication.*/PasswordAuthentication no/\' /etc/ssh/sshd_config && sudo /bin/systemctl restart sshd",
+        ),
+    ) {
         Ok(res) => {
             log::debug!("Command output: {}", String::from_utf8(res).unwrap());
             log::info!("Password authentication has been disabled.");
             session.close();
             true
-        },
+        }
         Err(e) => {
             log::error!("Rust error on open_exec: {:?}", e);
             session.close();
