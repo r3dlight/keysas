@@ -19,7 +19,6 @@ use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
 use clap::{Arg, Command as Clap_Command, crate_version};
 use log::{debug, error, info, warn};
-use rand::random;
 use regex::Regex;
 use std::fs::{self, create_dir_all};
 use std::path::PathBuf;
@@ -42,6 +41,7 @@ extern crate sys_mount;
 extern crate serde_derive;
 
 use crate::errors::*;
+use bytemuck::cast_slice;
 use crossbeam_utils::thread;
 use ed25519_dalek::Signature as SignatureDalek;
 use keysas_lib::init_logger;
@@ -172,12 +172,13 @@ fn hmac_challenge() -> Option<String> {
                 .set_slot(Slot::Slot2);
 
             // Challenge can not be greater than 64 bytes
-            let challenge: [u128; 4] = [0; 4];
+            let mut challenge: [u128; 4] = [0; 4];
             for i in 0..4 {
                 challenge[i] = random();
             }
+            let casted_challenge = cast_slice(&challenge);
             // In HMAC Mode, the result will always be the SAME for the SAME provided challenge
-            match yubi.challenge_response_hmac(challenge.as_bytes(), config) {
+            match yubi.challenge_response_hmac(casted_challenge, config) {
                 Ok(hmac_result) => {
                     let v: &[u8] = hmac_result.deref();
                     let hex_string = hex::encode(v);
@@ -403,13 +404,10 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
 
 fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
     File::create(LOCK)?;
-    match thread::scope(|s| {
-        for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
-            if e.metadata()
-                .expect("Cannot get metadata for file.")
-                .is_file()
-            {
-                s.spawn(move |_| {
+    thread::scope(|s| {
+             for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
+                 if e.metadata().expect("Cannot get metadata for file.").is_file() {
+             s.spawn(move |_| {
                          debug!("New entry path found: {}.", e.path().display());
                          let path_to_read = e.path().to_str().unwrap();
                          let entry = e.file_name().to_string_lossy();
@@ -446,17 +444,14 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                              );
                                              let mut report =
                                                  format!("{}{}", path_to_write, ".ioerror");
-                                             let report = match File::create(&report) {
-                                                 Ok(r) => {
-                                                    warn!("io-error report file created.");
-                                                    r
-                                                },
+                                             match File::create(&report) {
+                                                 Ok(_) => warn!("io-error report file created."),
                                                  Err(why) => {
                                                      error!(
                                                          "Failed to create io-error report {report:?}: {why}"
                                                      );
                                                  }
-                                             };
+                                             }
                                              match writeln!(
                                                  report,
                                                  "Error while copying file: {e:?}"
@@ -489,20 +484,17 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                              ),
                          };
              });
-            }
-        }
-    }) {
-        Err(why) => {
-            error!("Failed to create thread: {why:?}");
-        }
-        _ => (),
-    };
+         }
+         }
+     })
+     .expect("Cannot scope threads !");
     info!("Incoming files copied sucessfully, unlocking.");
     if Path::new(LOCK).exists() {
         fs::remove_file(LOCK)?;
     }
     Ok(())
 }
+
 
 fn move_files_out(mount_point: &PathBuf) -> Result<()> {
     let dir = fs::read_dir(SAS_OUT)?;
@@ -841,7 +833,7 @@ fn main() -> Result<()> {
                         id_revision,
                         id_serial,
                     );
-                    if !value {
+                    if !signed {
                         info!("Device signature is not valid !");
                         let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
                         warn!("keys_in_iter: {:?}", keys_in_iter);
