@@ -10,8 +10,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, RulesetError, RulesetStatus, ABI,
+    ABI, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr, RulesetCreatedAttr,
+    RulesetError, RulesetStatus, path_beneath_rules,
 };
 use std::path::Path;
 use std::process;

@@ -1,10 +1,10 @@
 use std::error::Error;
 use std::net::TcpStream;
 
-use ssh::algorithm;
-use ssh::create_session_without_default;
 use ssh::LocalSession;
 use ssh::SshResult;
+use ssh::algorithm;
+use ssh::create_session_without_default;
 
 const TIMEOUT: u64 = 60 * 1000;
 const USER: &str = "keysas";

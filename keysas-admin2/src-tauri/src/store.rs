@@ -54,7 +54,7 @@ pub fn init_store(path: &str) -> Result<(), anyhow::Error> {
                                     *hdl = Some(c);
                                 }
                                 Err(e) => {
-                                    return Err(anyhow!("Failed to initialize database: {e}"))
+                                    return Err(anyhow!("Failed to initialize database: {e}"));
                                 }
                             }
                         }
@@ -121,8 +121,10 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
-                        public, private);
+                let query = format!(
+                    "REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
+                    public, private
+                );
                 connection.execute(query)?;
                 Ok(())
             }
@@ -266,7 +268,7 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
                 let query = format!(
                     "REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
                                         VALUES ('{}','{}', '{}','{}','{}','{}');",
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),             
+                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
                     pki_dir,
                     infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
                     infos.org_unit.as_ref().unwrap_or(&String::from("")),

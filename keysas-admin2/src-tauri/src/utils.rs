@@ -1,18 +1,18 @@
 use crate::ssh_wrapper::session_exec;
 use crate::store::{drop_pki, init_store, set_pki_config};
 use anyhow::anyhow;
-use keysas_lib::certificate_field::{validate_signing_certificate, CertificateFields};
+use keysas_lib::certificate_field::{CertificateFields, validate_signing_certificate};
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
-use pkcs8::der::EncodePem;
 use pkcs8::LineEnding;
+use pkcs8::der::EncodePem;
 use ssh::LocalSession;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
 use std::path::Path;
+use x509_cert::Certificate;
 use x509_cert::der::DecodePem;
 use x509_cert::request::CertReq;
-use x509_cert::Certificate;
 
 // Key names won't change
 const ST_CA_KEY_NAME: &str = "st-ca";
@@ -193,7 +193,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating root 25519 certificate: {:?}",
                 why,
-            ))
+            ));
         }
     };
     log::debug!("Root Ed25519 certificate validated.");
@@ -207,7 +207,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating root Dilithium5 certificate: {:?}",
                 why
-            ))
+            ));
         }
     };
     log::debug!("Root Dilithium5 certificate validated.");
@@ -235,7 +235,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating station Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -249,7 +249,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating station Dilithium5 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Dilithium5 certificate validated.");
@@ -277,7 +277,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating USB Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -291,7 +291,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating USB Dilithium5 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("USB Dilithium5 certificate validated.");

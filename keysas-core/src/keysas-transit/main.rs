@@ -29,7 +29,7 @@ use anyhow::Result;
 use bincode::Options;
 use clamav_tcp::scan;
 use clamav_tcp::version;
-use clap::{crate_version, Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, crate_version};
 use infer::get;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
@@ -424,7 +424,9 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                         }
                     }
                     Err(e) => {
-                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                        error!(
+                            "Cannot read limited buffer: {e:?}, file will be marked as not allowed !"
+                        );
                         f.md.is_type_allowed = false;
                         f.md.file_type = "Unknow".into();
                     }
@@ -511,7 +513,9 @@ fn main() -> Result<()> {
                 }
             },
             None => {
-                error!("Cannot parse any valid SocketAddr for connecting to clamav server, killing my self.");
+                error!(
+                    "Cannot parse any valid SocketAddr for connecting to clamav server, killing my self."
+                );
                 process::exit(1);
             }
         },
