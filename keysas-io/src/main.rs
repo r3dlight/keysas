@@ -424,7 +424,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                          );
                          // Create a tmp dir to be able to rename files later
                          let tmp = Path::new(TMP_DIR);
-                         if !tmp.exists() &&  !tmp.is_dir() {
+                         if !tmp.exists() ||  !tmp.is_dir() {
                              match fs::create_dir(tmp) {
                                  Ok(_)=> info!("Creating tmp directory for writing incoming files !"),
                                  Err(e) => error!("Cannot create tmp directory: {e:?}"),
