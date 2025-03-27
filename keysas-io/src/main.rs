@@ -42,7 +42,6 @@ extern crate serde_derive;
 
 use crate::errors::*;
 use bytemuck::cast_slice;
-use crossbeam_utils::thread;
 use ed25519_dalek::Signature as SignatureDalek;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_key::PublicKeys;
@@ -404,12 +403,19 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
 
 fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
     File::create(LOCK)?;
-    thread::scope(|s| {
+    std::thread::scope(|s| {
              for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
                  if e.metadata().expect("Cannot get metadata for file.").is_file() {
-             s.spawn(move |_| {
+                    // SAFETY: Thread should not panic as we test everything using match{}
+             s.spawn(move || {
                          debug!("New entry path found: {}.", e.path().display());
-                         let path_to_read = e.path().to_str().unwrap();
+                         let path_to_read = match e.path().to_str() {
+                             Some(p) => p,
+                             None => {
+                                 error!("Cannot convert path to string.");
+                                 return;
+                             }
+                         };
                          let entry = e.file_name().to_string_lossy();
                          let entry_cleaned = str::replace(&entry, "?", "-");
                          let path_to_write = format!(
@@ -486,8 +492,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
              });
          }
          }
-     })
-     .expect("Cannot scope threads !");
+     });
     info!("Incoming files copied sucessfully, unlocking.");
     if Path::new(LOCK).exists() {
         fs::remove_file(LOCK)?;
