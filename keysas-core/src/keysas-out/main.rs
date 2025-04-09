@@ -179,7 +179,9 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match bincode::deserialize_from::<&[u8], FileMetadata>(buffer) {
                 Ok(meta) => Some(FileData { fd, md: meta }),
                 Err(e) => {
-                    warn!("Failed to deserialize message from keysas-transit: {e}, killing myself.");
+                    warn!(
+                        "Failed to deserialize message from keysas-transit: {e}, killing myself."
+                    );
                     process::exit(1);
                 }
             }
