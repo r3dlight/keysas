@@ -133,7 +133,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
                 .raw_bytes(),
         ) {
             Some(pk) => pk,
-            None => return Ok(None),
+            None => return Err(anyhow!("Cannot parse Dilithium public key from certificate")),
         };
 
         Ok(Some(KeysasHybridPubKeys {
