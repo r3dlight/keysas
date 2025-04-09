@@ -404,10 +404,13 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
 fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
     File::create(LOCK)?;
     std::thread::scope(|s| {
-             for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
-                 if e.metadata().expect("Cannot get metadata for file.").is_file() {
-                    // SAFETY: Thread should not panic as we test everything using match{}
-             s.spawn(move || {
+        for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
+            if e.metadata()
+                .expect("Cannot get metadata for file.")
+                .is_file()
+            {
+                // SAFETY: Thread should not panic as we test everything using match{}
+                s.spawn(move || {
                          debug!("New entry path found: {}.", e.path().display());
                          let path_to_read = match e.path().to_str() {
                              Some(p) => p,
@@ -490,9 +493,9 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                              ),
                          };
              });
-         }
-         }
-     });
+            }
+        }
+    });
     info!("Incoming files copied sucessfully, unlocking.");
     if Path::new(LOCK).exists() {
         fs::remove_file(LOCK)?;
