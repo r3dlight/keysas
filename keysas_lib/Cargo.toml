@@ -15,8 +15,6 @@ pkcs8 = {version = "0.10", default-features = false, features = ["encryption", "
 x509-cert = "0.2"
 ed25519-dalek = {version = "2", features = ["digest", "rand_core"] }
 rand_dl = {package = "rand", version = "0.8"}
-hex-literal = "1"
-tempfile = "3"
 der = "0.7"
 serde_derive = "1.0"
 serde = "1.0"
@@ -28,3 +26,7 @@ base64 = "0.22"
 version = "0.10"
 default-features = false
 features = ["dilithium"]
+
+[dev-dependencies]
+hex-literal = "1"
+tempfile = "3"
