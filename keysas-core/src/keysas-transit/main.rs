@@ -428,7 +428,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                             "Cannot read limited buffer: {e:?}, file will be marked as not allowed !"
                         );
                         f.md.is_type_allowed = false;
-                        f.md.file_type = "Unknow".into();
+                        f.md.file_type = "Unknown".into();
                     }
                 }
             }
