@@ -305,9 +305,15 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
     for f in files {
         match unistd::dup2(f.fd, 500) {
             Ok(nfd) => {
+                // Safety: We are using a file descriptor that we know is valid
                 let mut file = unsafe { File::from_raw_fd(nfd) };
                 // Synchronize the file before calculating the SHA256 hash
-                file.sync_all().unwrap();
+                match file.sync_all() {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Failed to synchronize file: {e}");
+                    }
+                }
                 // Position the cursor at the beginning of the file
                 match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
