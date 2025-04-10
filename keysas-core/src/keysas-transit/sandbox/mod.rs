@@ -44,6 +44,7 @@ pub fn init() -> Result<()> {
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::dup3)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
+    ctx.allow_syscall(Syscall::fstat)?;
     ctx.allow_syscall(Syscall::madvise)?;
     ctx.allow_syscall(Syscall::accept4)?;
     ctx.allow_syscall(Syscall::bind)?;
