@@ -23,7 +23,6 @@
 #![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#![allow(forgetting_references)]
 
 use anyhow::Result;
 use bincode::Options;
@@ -38,7 +37,6 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
-use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -416,7 +414,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 }
                 // Check the magic number
                 // Read only 1Mo of the file to be faster and do not read large files
-                let reader = BufReader::new(file);
+                let reader = BufReader::new(&file);
                 let limited_reader = &mut reader.take(1024 * 1024);
                 let mut buffer = Vec::new();
                 match limited_reader.read_to_end(&mut buffer) {
@@ -452,8 +450,6 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             f.md.av_pass,
             f.md.is_toobig
         );
-        #[allow(forgetting_references)]
-        mem::forget(f);
     }
 }
 
