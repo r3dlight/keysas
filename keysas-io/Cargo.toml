@@ -16,9 +16,7 @@ anyhow = "1.0"
 udev = "0.9"
 regex = "1"
 libc = "0.2"
-nom = "8"
 clap = { version = "4", default-features = false, features = ["std", "cargo"] }
-nix = "0.29"
 tempfile = "3.8"
 diacritics = "0.2"
 sys-mount = "3"
@@ -28,7 +26,6 @@ kv = "0.24"
 yubico_manager = { git = "https://github.com/r3dlight/yubico-manager"}
 walkdir = "2.4"
 landlock = "0.4" 
-flexi_logger = "0.29"
 keysas_lib = { path = "../keysas_lib" }
 oqs = { version = "0.10", default-features = false, features =["dilithium"] }
 ed25519-dalek = "2"
