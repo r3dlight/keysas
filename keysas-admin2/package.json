@@ -1,7 +1,7 @@
 {
   "name": "keysas-admin",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-store": "^2.2.0",
     "animate.css": "^4.1.1",
@@ -20,7 +21,8 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.4.1",
     "@vitejs/plugin-vue": "^5.2.1",
-    "vite": "^6.0.5"
+    "vite": "^6.2.6"
   }
 }
