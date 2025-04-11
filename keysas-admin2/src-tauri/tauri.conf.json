@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0-rc",
   "productName": "keysas-admin",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "version": "2.5.0",
+  "identifier": "fr.keysas.dev",
   "build": {
     "frontendDist": "..",
     "devUrl": "http://localhost:5173",
