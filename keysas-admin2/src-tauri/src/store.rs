@@ -119,17 +119,19 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
 
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
-        Ok(hdl) => match hdl.as_ref() {
-            Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
-                    public, private
-                );
-                connection.execute(query)?;
-                Ok(())
+        Ok(hdl) => {
+            match hdl.as_ref() {
+                Some(connection) => {
+                    let mut query = connection.prepare("REPLACE INTO ssh_table (name, path) VALUES ('public', '?'), ('private', '?');")?;
+
+                    query.bind((1, public.as_str()))?;
+                    query.bind((2, private.as_str()))?;
+                    query.next()?;
+                    Ok(())
+                }
+                None => Err(anyhow!("Store is not initialized")),
             }
-            None => Err(anyhow!("Store is not initialized")),
-        },
+        }
     }
 }
 
@@ -140,12 +142,12 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO station_table (name, ip) VALUES ('{}', '{}');",
-                    name, ip
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query =
+                    connection.prepare("REPLACE INTO station_table (name, ip) VALUES ('?', '?');")?;
+                query.bind((1, name.as_str()))?;
+                query.bind((2, ip.as_str()))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -159,9 +161,10 @@ pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("DELETE FROM station_table WHERE name = '{}';", name);
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = connection.prepare("DELETE FROM station_table WHERE name = '?';")?;
+                query.bind((1, name.as_str()))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -265,18 +268,17 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
-                                        VALUES ('{}','{}', '{}','{}','{}','{}');",
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
-                    pki_dir,
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
-                    infos.org_unit.as_ref().unwrap_or(&String::from("")),
-                    infos.country.as_ref().unwrap_or(&String::from("")),
-                    &infos.validity.unwrap_or(0)
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = 
+                    connection.prepare("REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
+                                        VALUES ('?','?', '?','?','?','?');")?;
+                query.bind((1, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((2, pki_dir.as_str()))?;
+                query.bind((3, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((4, infos.org_unit.as_deref().unwrap_or("")))?;
+                query.bind((5, infos.country.as_deref().unwrap_or("")))?;
+                query.bind((6, infos.validity.unwrap_or(0) as i64))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
