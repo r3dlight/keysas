@@ -4,7 +4,7 @@
   "version": "2.5.0",
   "identifier": "fr.keysas.dev",
   "build": {
-    "frontendDist": "..",
+    "frontendDist": "../dist/",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
