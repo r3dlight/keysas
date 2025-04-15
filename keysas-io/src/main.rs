@@ -16,8 +16,8 @@ extern crate regex;
 extern crate udev;
 
 use anyhow::anyhow;
-use base64::{engine::general_purpose, Engine as _};
-use clap::{crate_version, Arg, Command as Clap_Command};
+use base64::{Engine as _, engine::general_purpose};
+use clap::{Arg, Command as Clap_Command, crate_version};
 use log::{debug, error, info, warn};
 use regex::Regex;
 use std::fs::{self, create_dir_all};
@@ -26,9 +26,8 @@ use std::random::random;
 use std::thread as sthread;
 use std::{ffi::OsStr, net::TcpListener, thread::spawn};
 use tungstenite::{
-    accept_hdr,
+    Message, accept_hdr,
     handshake::server::{Request, Response},
-    Message,
 };
 use udev::Event;
 use walkdir::WalkDir;
@@ -66,9 +65,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use sys_mount::unmount;
 use sys_mount::{FilesystemType, Mount, MountFlags, SupportedFilesystems, Unmount, UnmountFlags};
+use yubico_manager::Yubico;
 use yubico_manager::config::Config;
 use yubico_manager::config::{Mode, Slot};
-use yubico_manager::Yubico;
 
 mod errors;
 
