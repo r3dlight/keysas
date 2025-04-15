@@ -51,7 +51,7 @@ pub fn init_store(path: &str) -> Result<(), anyhow::Error> {
                             // Initialize the store and return the connection
                             match c.execute(CREATE_QUERY) {
                                 Ok(_) => {
-                                    log::info!("Store initialized");
+                                    log::debug!("Store initialized");
                                     *hdl = Some(c);
                                 }
                                 Err(e) => {
@@ -148,13 +148,10 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
                 let mut query =
                     connection.prepare("REPLACE INTO station_table (name, ip) VALUES (?, ?);")?;
                 query.bind((1, name.as_str()))?;
-                log::debug!("name: {}", name.as_str());
                 query.bind((2, ip.as_str()))?;
-                log::debug!("ip: {}", ip.as_str());
-                log::debug!("prep ok");
                 //log::debug!("Query: {}", query);
                 while let sqlite::State::Done = query.next()? {
-                    log::error!("Done");
+                    log::debug!("Station added");
                     break;
                 }
                 Ok(())
