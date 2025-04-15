@@ -25,15 +25,15 @@
 #![warn(deprecated)]
 
 use anyhow::{Context, Result};
-use clap::{crate_version, Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, crate_version};
 use itertools::MultiUnzip;
 use keysas_lib::append_ext;
 use log::{debug, error, info, warn};
-use nix::unistd::unlinkat;
 use nix::unistd::UnlinkatFlags;
+use nix::unistd::unlinkat;
 use regex::Regex;
-use std::fs::remove_file;
 use std::fs::File;
+use std::fs::remove_file;
 use std::os::linux::net::SocketAddrExt;
 use std::os::unix::net::{SocketAddr, SocketAncillary, UnixListener, UnixStream};
 use std::path::Path;
