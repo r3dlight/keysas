@@ -201,12 +201,25 @@ Open now a web browser like firefox and visit the http://127.0.0.1
 Building **Keysas-admin**
 --------------------------
 
-**Keysas-admin** needs to be signed by our personal private key.
+**Keysas-admin** requires nvm to be installed to install node and npm.
+Please refer to the nvm documentation for installation instructions.
+
+For keysas-admin, you need npm version 18:
+
+.. code-block:: shell-session
+
+ $ nvm install 18
+ $ nvm use 18
+
+Then, you can build the application using the following command:
 Nevertheless, if you want to build it yourself for testing purposes:
 
 .. code-block:: shell-session
 
- $ cd keysas-admin && npm i vite@latest && cargo install cargo-cli && cargo tauri build
+ $ cd keysas-admin
+ $ npm i vite@latest
+ $ cargo install tauri-cli --version "^2.0.0" --locked
+ $ cargo tauri build
 
 .. warning:: 
 
