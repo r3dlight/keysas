@@ -11,6 +11,7 @@
   "dependencies": {
     "@popperjs/core": "^2.11.8",
     "@tauri-apps/plugin-dialog": "^2.2.0",
+    "@tauri-apps/plugin-log": "^2.3.1",
     "@tauri-apps/plugin-store": "^2.2.0",
     "animate.css": "^4.1.1",
     "bootstrap": "^5.3.3",
