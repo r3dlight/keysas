@@ -3,7 +3,7 @@
 /*
  * The "keysas-admin".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains the main function.
  */
@@ -37,6 +37,13 @@ pub fn run() {
 
     // Tauri init
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -134,6 +141,7 @@ fn create_dir_if_not_exist(path: &String) -> Result<(), anyhow::Error> {
 #[cfg(target_os = "linux")]
 fn create_pki_dir(pki_dir: &String) -> Result<(), anyhow::Error> {
     // Test if the directory path is valid
+    log::info!("Creating pki directories");
     if !Path::new(&pki_dir.trim()).is_dir() {
         return Err(anyhow!("Invalid PKI directory path"));
     }
@@ -212,8 +220,12 @@ async fn del_pki() -> Result<(), String> {
 /// the execution (true: result is ok, false: error)
 #[command]
 async fn save_station(name: String, ip: String) -> bool {
+    log::info!("Saved station");
     match set_station(&name, &ip) {
-        Ok(_) => true,
+        Ok(_) => {
+            log::info!("Saved station");
+            true
+        }
         Err(e) => {
             log::error!("Failed to save station: {e}");
             false
