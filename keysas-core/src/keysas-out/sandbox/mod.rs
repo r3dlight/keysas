@@ -64,6 +64,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::copy_file_range)?;
     ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.allow_syscall(Syscall::futex)?;
+    ctx.allow_syscall(Syscall::exit_group)?;
     ctx.load()?;
     Ok(())
 }
