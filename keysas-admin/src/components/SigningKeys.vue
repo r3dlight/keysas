@@ -123,7 +123,7 @@
 
 import {getRootKeyPath, getPKIFolder, getPKIDir} from "../utils/utils";
 
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 
 export default {
   name: 'SigningKeys',

@@ -1,18 +1,19 @@
 use crate::ssh_wrapper::session_exec;
 use crate::store::{drop_pki, init_store, set_pki_config};
 use anyhow::anyhow;
-use keysas_lib::certificate_field::{validate_signing_certificate, CertificateFields};
+use keysas_lib::certificate_field::{CertificateFields, validate_signing_certificate};
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
-use pkcs8::der::EncodePem;
 use pkcs8::LineEnding;
+use pkcs8::der::EncodePem;
+use shlex::try_quote;
 use ssh::LocalSession;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
 use std::path::Path;
+use x509_cert::Certificate;
 use x509_cert::der::DecodePem;
 use x509_cert::request::CertReq;
-use x509_cert::Certificate;
 
 // Key names won't change
 const ST_CA_KEY_NAME: &str = "st-ca";
@@ -25,10 +26,14 @@ pub fn cmd_generate_key_and_get_csr(
     session: &mut LocalSession<TcpStream>,
     name: &str,
 ) -> Result<(CertReq, CertReq), anyhow::Error> {
+    let name_escaped = try_quote(name)?;
     let command = format!(
         "{}{}{}",
-        "sudo /usr/bin/keysas-sign --generate", " --name ", name
+        "sudo /usr/bin/keysas-sign --generate",
+        " --name ",
+        name_escaped.to_string()
     );
+    log::error!("Command: {command:?}");
     let cmd_res = match session_exec(session, &command) {
         Ok(res) => res,
         Err(why) => {
@@ -184,33 +189,19 @@ pub async fn check_restore_pki(
         }
     };
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.classic_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.classic_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root 25519 certificate: {:?}",
-                why,
-            ))
-        }
-    };
+    )
+    .map_err(|why| anyhow!("Error validating root ed25519 certificate: {:?}", why))?;
     log::debug!("Root Ed25519 certificate validated.");
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root Dilithium5 certificate: {:?}",
-                why
-            ))
-        }
-    };
-    log::debug!("Root Dilithium5 certificate validated.");
+    )
+    .map_err(|why| anyhow!("Error validating root PQC certificate: {:?}", why))?;
+    log::debug!("Root PQC certificate validated.");
 
     let st_keys = match HybridKeyPair::load(
         ST_CA_KEY_NAME,
@@ -235,7 +226,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating station Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -249,7 +240,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating station Dilithium5 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Dilithium5 certificate validated.");
@@ -277,7 +268,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating USB Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -291,7 +282,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating USB Dilithium5 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("USB Dilithium5 certificate validated.");

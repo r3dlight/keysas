@@ -51,10 +51,11 @@ pub fn init_store(path: &str) -> Result<(), anyhow::Error> {
                             // Initialize the store and return the connection
                             match c.execute(CREATE_QUERY) {
                                 Ok(_) => {
+                                    log::debug!("Store initialized");
                                     *hdl = Some(c);
                                 }
                                 Err(e) => {
-                                    return Err(anyhow!("Failed to initialize database: {e}"))
+                                    return Err(anyhow!("Failed to initialize database: {e}"));
                                 }
                             }
                         }
@@ -102,7 +103,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
                     log::debug!("Found: {}, {}", public, private);
                     Ok((public, private))
                 } else {
-                    Err(anyhow!("Failed to find station in database"))
+                    Err(anyhow!("get_ssh: Failed to find station in database"))
                 }
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -121,9 +122,15 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
-                        public, private);
-                connection.execute(query)?;
+                let mut query = connection.prepare(
+                    "REPLACE INTO ssh_table (name, path) VALUES ('public', ?), ('private', ?);",
+                )?;
+
+                query.bind((1, public.as_str()))?;
+                query.bind((2, private.as_str()))?;
+                while let sqlite::State::Done = query.next()? {
+                    break;
+                }
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -138,12 +145,15 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO station_table (name, ip) VALUES ('{}', '{}');",
-                    name, ip
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query =
+                    connection.prepare("REPLACE INTO station_table (name, ip) VALUES (?, ?);")?;
+                query.bind((1, name.as_str()))?;
+                query.bind((2, ip.as_str()))?;
+                //log::debug!("Query: {}", query);
+                while let sqlite::State::Done = query.next()? {
+                    log::debug!("Station added");
+                    break;
+                }
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -157,9 +167,12 @@ pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("DELETE FROM station_table WHERE name = '{}';", name);
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = connection.prepare("DELETE FROM station_table WHERE name = ?;")?;
+                query.bind((1, name.as_str()))?;
+                //log::debug!("Query: {}", query);
+                while let sqlite::State::Done = query.next()? {
+                    break;
+                }
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -191,19 +204,12 @@ pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("SELECT * FROM station_table WHERE name = '{}';", name);
+                let query = connection.prepare("SELECT * FROM station_table WHERE name = ?;")?;
                 let mut result = String::new();
-                log::debug!("Query: {}", query);
-                connection.iterate(query, |pairs| {
-                    for &(key, value) in pairs.iter() {
-                        if key == "ip" {
-                            if let Some(ip) = value {
-                                result.push_str(ip)
-                            }
-                        }
-                    }
-                    true
-                })?;
+                for row in query.into_iter().bind((1, name.as_str()))? {
+                    let row = row?;
+                    result = row.read::<&str, _>("ip").to_string();
+                }
                 if result.chars().count() > 0 {
                     log::debug!("Found: {}", result);
                     Ok(result)
@@ -263,18 +269,18 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
-                                        VALUES ('{}','{}', '{}','{}','{}','{}');",
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),             
-                    pki_dir,
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
-                    infos.org_unit.as_ref().unwrap_or(&String::from("")),
-                    infos.country.as_ref().unwrap_or(&String::from("")),
-                    &infos.validity.unwrap_or(0)
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = connection.prepare("REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
+                                        VALUES (?,?,?,?,?,?);")?;
+                query.bind((1, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((2, pki_dir.as_str()))?;
+                query.bind((3, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((4, infos.org_unit.as_deref().unwrap_or("")))?;
+                query.bind((5, infos.country.as_deref().unwrap_or("")))?;
+                query.bind((6, infos.validity.unwrap_or(0) as i64))?;
+                //log::debug!("Query: {}", query);
+                while let sqlite::State::Done = query.next()? {
+                    break;
+                }
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
