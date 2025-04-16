@@ -29,7 +29,9 @@ pub fn cmd_generate_key_and_get_csr(
     let name_escaped = try_quote(name)?;
     let command = format!(
         "{}{}{}",
-        "sudo /usr/bin/keysas-sign --generate", " --name ", name_escaped.to_string()
+        "sudo /usr/bin/keysas-sign --generate",
+        " --name ",
+        name_escaped.to_string()
     );
     log::error!("Command: {command:?}");
     let cmd_res = match session_exec(session, &command) {
@@ -187,33 +189,19 @@ pub async fn check_restore_pki(
         }
     };
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.classic_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.classic_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root 25519 certificate: {:?}",
-                why,
-            ));
-        }
-    };
+    )
+    .map_err(|why| anyhow!("Error validating root ed25519 certificate: {:?}", why))?;
     log::debug!("Root Ed25519 certificate validated.");
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root Dilithium5 certificate: {:?}",
-                why
-            ));
-        }
-    };
-    log::debug!("Root Dilithium5 certificate validated.");
+    )
+    .map_err(|why| anyhow!("Error validating root PQC certificate: {:?}", why))?;
+    log::debug!("Root PQC certificate validated.");
 
     let st_keys = match HybridKeyPair::load(
         ST_CA_KEY_NAME,
