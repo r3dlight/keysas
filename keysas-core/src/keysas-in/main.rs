@@ -219,9 +219,9 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         let (ios, fds) = convert_ioslice(&fhs, &bufs);
 
         let mut ancillary_buffer = [0; 4128];
-        let mut ancillary = SocketAncillary::new(&mut ancillary_buffer[..]);
-        ancillary.add_fds(&fds[..]);
-        match stream.send_vectored_with_ancillary(&ios[..], &mut ancillary) {
+        let mut ancillary = SocketAncillary::new(&mut ancillary_buffer);
+        ancillary.add_fds(&fds);
+        match stream.send_vectored_with_ancillary(&ios, &mut ancillary) {
             Ok(_) => {
                 info!("Chunk of file descriptors has been sent");
             }
