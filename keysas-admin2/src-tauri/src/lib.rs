@@ -588,7 +588,11 @@ async fn export_sshpubkey(ip: String) -> bool {
     match session_exec(
         &mut session,
         &String::from(
-            "sudo /usr/bin/sed -i \'s/.*PasswordAuthentication.*/PasswordAuthentication no/\' /etc/ssh/sshd_config && sudo /bin/systemctl restart sshd",
+            "if grep -q '^[[:space:]]*PasswordAuthentication' /etc/ssh/sshd_config && grep -v '^[[:space:]]*#' /etc/ssh/sshd_config | grep -q 'PasswordAuthentication'; then \
+                sudo sed -i '/^[[:space:]]*PasswordAuthentication/s/.*/PasswordAuthentication no/' /etc/ssh/sshd_config; \
+             else \
+                echo 'PasswordAuthentication no' | sudo tee -a /etc/ssh/sshd_config > /dev/null; \
+             fi && sudo systemctl restart sshd",
         ),
     ) {
         Ok(res) => {

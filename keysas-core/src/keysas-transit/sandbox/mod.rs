@@ -80,7 +80,6 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
     ctx.allow_syscall(Syscall::clock_gettime)?;
     ctx.allow_syscall(Syscall::exit_group)?;
-
     ctx.load()?;
     Ok(())
 }
