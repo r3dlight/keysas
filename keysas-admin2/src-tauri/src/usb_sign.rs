@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -92,9 +92,9 @@ fn sign_device(
     let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
     // Test the private keys by loading them
     let classic_struct = SigningKey::load_keys(path_cl, password)?;
-    let pq_pub_struct = KeysasPQKey::load_keys(path_pq, password)?;
+    let pq_struct = KeysasPQKey::load_keys(path_pq, password)?;
     let classic_sig = classic_struct.message_sign(data.as_bytes())?;
-    let pq_sig = pq_pub_struct.message_sign(data.as_bytes())?;
+    let pq_sig = pq_struct.message_sign(data.as_bytes())?;
     let hybrid_sig = format!(
         "{}|{}",
         general_purpose::STANDARD.encode(classic_sig.as_slice()),
