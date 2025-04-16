@@ -5,6 +5,7 @@ use keysas_lib::certificate_field::{CertificateFields, validate_signing_certific
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use pkcs8::LineEnding;
 use pkcs8::der::EncodePem;
+use shlex::try_quote;
 use ssh::LocalSession;
 use std::fs::File;
 use std::io::Write;
@@ -25,10 +26,12 @@ pub fn cmd_generate_key_and_get_csr(
     session: &mut LocalSession<TcpStream>,
     name: &str,
 ) -> Result<(CertReq, CertReq), anyhow::Error> {
+    let name_escaped = try_quote(name)?;
     let command = format!(
         "{}{}{}",
-        "sudo /usr/bin/keysas-sign --generate", " --name ", name
+        "sudo /usr/bin/keysas-sign --generate", " --name ", name_escaped.to_string()
     );
+    log::error!("Command: {command:?}");
     let cmd_res = match session_exec(session, &command) {
         Ok(res) => res,
         Err(why) => {
