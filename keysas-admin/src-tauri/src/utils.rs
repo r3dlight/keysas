@@ -29,9 +29,7 @@ pub fn cmd_generate_key_and_get_csr(
     let name_escaped = try_quote(name)?;
     let command = format!(
         "{}{}{}",
-        "sudo /usr/bin/keysas-sign --generate",
-        " --name ",
-        name_escaped
+        "sudo /usr/bin/keysas-sign --generate", " --name ", name_escaped
     );
     log::error!("Command: {command:?}");
     let cmd_res = match session_exec(session, &command) {
