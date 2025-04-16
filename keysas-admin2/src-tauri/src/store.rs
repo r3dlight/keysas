@@ -103,7 +103,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
                     log::debug!("Found: {}, {}", public, private);
                     Ok((public, private))
                 } else {
-                    Err(anyhow!("Failed to find station in database"))
+                    Err(anyhow!("get_ssh: Failed to find station in database"))
                 }
             }
             None => Err(anyhow!("Store is not initialized")),
