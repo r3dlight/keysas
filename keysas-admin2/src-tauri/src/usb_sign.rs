@@ -153,7 +153,7 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
                     Some(dev) => dev,
                     None => {
                         log::error!("Cannot get device name.");
-                        return Err(anyhow!("Cannot get device name."));
+                        return anyhow!("Cannot get device name.");
                     }
                 };
                 let dev = &device.to_string_lossy();
@@ -283,7 +283,7 @@ pub fn revoke_device(device: &str) -> Result<()> {
 
     //Let's write behind the magic number now
     let offset = 512;
-    let blank: String = String::from("000000000000000000");
+    let blank = "0".repeat(500);
     let size_u32 = blank.len() as u32;
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
