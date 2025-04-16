@@ -10,12 +10,12 @@
 //! Keysas-sign is a utility on the station that manage its private keys
 //! It can be called on the command line and it offers the two functions
 //!  - generate_signing_keypair
-//!     This command is used to generate a new signing keypair on the station that
-//!     will be used to signed outgoing files and reports
+//!    This command is used to generate a new signing keypair on the station that
+//!    will be used to signed outgoing files and reports
 //!  - save_certificate
-//!     This command is used to load certificate on the station, it can be either:
-//!         - file: the certificate corresponds to the private signing key of the station
-//!         - usb: the certificate corresponds to the USB signing authority
+//!    This command is used to load certificate on the station, it can be either:
+//!      - file: the certificate corresponds to the private signing key of the station
+//!      - usb: the certificate corresponds to the USB signing authority
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
