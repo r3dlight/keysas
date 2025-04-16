@@ -299,10 +299,7 @@ impl HybridKeyPair {
         Ok(HybridKeyPair {
             classic: kp_ed,
             classic_cert: cert_ed,
-            pq: KeysasPQKey {
-                private_key: kp_pq.private_key,
-                public_key: kp_pq.public_key,
-            },
+            pq: kp_pq,
             pq_cert: cert_dl,
         })
     }
