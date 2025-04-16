@@ -20,8 +20,7 @@
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap"
 import 'bootstrap-icons/font/bootstrap-icons.css'
-import { dataDir } from "@tauri-apps/api/path"
-
+//import { dataDir } from "@tauri-apps/api/path"
 
 
 export default {
@@ -93,7 +92,7 @@ h1 {
 }
 
 nav {
-  //padding: 10px;
+
 a {
     //font-weight: bold;
     font-style: normal;
@@ -105,10 +104,6 @@ a {
       margin-left: 1%;
     }
   }
-//h2 {
-//  font-weight: bold;
-//  color: #fff;
-//  font-size: 24px;
-//  }
+
 }
 </style>

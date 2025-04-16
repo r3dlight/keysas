@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 
 export default {
   name: 'DisplaySigningConfig',

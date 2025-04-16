@@ -45,7 +45,7 @@
 <script>
 "use strict";
 
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import 'animate.css';
 
 export default {

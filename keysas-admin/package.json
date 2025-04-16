@@ -1,31 +1,29 @@
 {
   "name": "keysas-admin",
+  "private": true,
   "version": "2.5.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@tauri-apps/api": "^1.2.0",
-    "@tauri-apps/cli": "^1.2.2",
+    "@popperjs/core": "^2.11.8",
+    "@tauri-apps/plugin-dialog": "^2.2.0",
+    "@tauri-apps/plugin-log": "^2.3.1",
+    "@tauri-apps/plugin-store": "^2.2.0",
     "animate.css": "^4.1.1",
-    "bootstrap": "^5.2.2",
-    "bootstrap-icons": "^1.9.1",
-    "sass": "^1.56.0",
-    "tauri-plugin-store-api": "github:r3dlight/tauri-plugin-store#dev",
-    "vue": "^3.2.45",
-    "vue-awesome-sidebar": "^1.2.1",
-    "vue-router": "^4.1.6"
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
+    "sass-embedded": "^1.83.4",
+    "vue": "^3.5.13",
+    "vue-awesome-sidebar": "^1.2.4",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@rushstack/eslint-patch": "^1.1.4",
-    "@vitejs/plugin-vue": "^4.0.0",
-    "@vue/eslint-config-prettier": "^7.0.0",
-    "eslint": "^8.22.0",
-    "eslint-plugin-vue": "^9.3.0",
-    "prettier": "^2.7.1",
-    "vite": "^4.5.0"
+    "@tauri-apps/cli": "^2.4.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.2.6"
   }
 }

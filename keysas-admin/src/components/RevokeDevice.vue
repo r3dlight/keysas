@@ -34,7 +34,7 @@
 "use strict";
 
 import 'animate.css';
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 
 export default {
   name: 'RevokeDevice',

@@ -169,8 +169,8 @@ import ShutdownKeysas from '../components/ShutdownKeysas.vue'
 import ExportSSH from '../components/ExportSSH.vue'
 
 import { reboot, shutdown, addsshpukey, update, init, generate_keypair, sign_USB, revoke_USB } from '../utils/utils.js'
-import { confirm } from '@tauri-apps/api/dialog';
-import { invoke } from "@tauri-apps/api";
+import { confirm } from '@tauri-apps/plugin-dialog';
+import { invoke } from "@tauri-apps/api/core";
 
 export default {
   name: 'ManageView',
@@ -423,13 +423,14 @@ p {
 }
 
 .box {
-  max-width: 1200px;
-  margin: 20px auto;
-  background: white;
-  /*text-align: center;*/
-  padding: 40px;
-  border-radius: 15px;
-  box-shadow: 10px 5px 5px black;
+  max-width: 1000px;
+  /*margin: 15px 50px;*/
+  margin: 15px 0 15px 12%; /* Ajoute 20px de marge uniquement à gauche */
+  background-color: #fff;
+  text-align: center;
+  padding: 1em;
+  border-radius: 18px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Ombre légère pour moderniser */
 }
 
 .password {
