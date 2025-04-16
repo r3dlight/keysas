@@ -7,10 +7,9 @@ members = [
     "keysas-sign/",
     "keysas-fido/",
     "keysas_lib/",
-    "keysas-admin2/src-tauri",
+    "keysas-admin/src-tauri",
 ]
 
 exclude = [
-    "keysas-admin/src-tauri",
     "keysas-firewall"
 ]
