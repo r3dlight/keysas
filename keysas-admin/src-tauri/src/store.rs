@@ -113,7 +113,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
 
 /// Save the paths to the public and private SSH keys
 /// The function first checks that the path are valid files
-pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
+pub fn set_ssh(public: &str, private: &str) -> Result<(), anyhow::Error> {
     if !Path::new(public.trim()).is_file() || !Path::new(private.trim()).is_file() {
         return Err(anyhow!("Invalid paths"));
     }
@@ -126,11 +126,9 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
                     "REPLACE INTO ssh_table (name, path) VALUES ('public', ?), ('private', ?);",
                 )?;
 
-                query.bind((1, public.as_str()))?;
-                query.bind((2, private.as_str()))?;
-                while let sqlite::State::Done = query.next()? {
-                    break;
-                }
+                query.bind((1, public))?;
+                query.bind((2, private))?;
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -140,20 +138,17 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
 
 /// Save the paths to the public and private SSH keys
 /// The function first checks that the path are valid files
-pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
+pub fn set_station(name: &str, ip: &str) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let mut query =
                     connection.prepare("REPLACE INTO station_table (name, ip) VALUES (?, ?);")?;
-                query.bind((1, name.as_str()))?;
-                query.bind((2, ip.as_str()))?;
+                query.bind((1, name))?;
+                query.bind((2, ip))?;
                 //log::debug!("Query: {}", query);
-                while let sqlite::State::Done = query.next()? {
-                    log::debug!("Station added");
-                    break;
-                }
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -162,17 +157,15 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
 }
 
 /// Delete a Keysas station
-pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
+pub fn delete_station(name: &str) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let mut query = connection.prepare("DELETE FROM station_table WHERE name = ?;")?;
-                query.bind((1, name.as_str()))?;
+                query.bind((1, name))?;
                 //log::debug!("Query: {}", query);
-                while let sqlite::State::Done = query.next()? {
-                    break;
-                }
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -199,14 +192,14 @@ pub async fn drop_pki() -> Result<(), anyhow::Error> {
 /// Get the station IP address by name
 /// Returns an error if the station does not exist or in case of trouble accessing
 /// the database
-pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
+pub fn get_station_ip_by_name(name: &str) -> Result<String, anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = connection.prepare("SELECT * FROM station_table WHERE name = ?;")?;
                 let mut result = String::new();
-                for row in query.into_iter().bind((1, name.as_str()))? {
+                for row in query.into_iter().bind((1, name))? {
                     let row = row?;
                     result = row.read::<&str, _>("ip").to_string();
                 }
@@ -264,7 +257,7 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
 
 /// Save the PKI configuration infos
 /// Returns Ok or an Error
-pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(), anyhow::Error> {
+pub fn set_pki_config(pki_dir: &str, infos: &CertificateFields) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
@@ -272,15 +265,13 @@ pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(),
                 let mut query = connection.prepare("REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
                                         VALUES (?,?,?,?,?,?);")?;
                 query.bind((1, infos.org_name.as_deref().unwrap_or("")))?;
-                query.bind((2, pki_dir.as_str()))?;
+                query.bind((2, pki_dir))?;
                 query.bind((3, infos.org_name.as_deref().unwrap_or("")))?;
                 query.bind((4, infos.org_unit.as_deref().unwrap_or("")))?;
                 query.bind((5, infos.country.as_deref().unwrap_or("")))?;
                 query.bind((6, infos.validity.unwrap_or(0) as i64))?;
                 //log::debug!("Query: {}", query);
-                while let sqlite::State::Done = query.next()? {
-                    break;
-                }
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),

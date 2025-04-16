@@ -68,9 +68,9 @@ fn rm_last(value: &str) -> &str {
         Some(last) => {
             if last.is_numeric() {
                 tmp.next_back();
-                return tmp.as_str();
+                tmp.as_str()
             } else {
-                return tmp.as_str();
+                tmp.as_str()
             }
         }
         None => value,
