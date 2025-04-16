@@ -17,7 +17,6 @@ use keysas_lib::pki::generate_cert_from_csr;
 use std::fs;
 use std::path::Path;
 use tauri::command;
-//use tauri::{CustomMenuItem, Menu, MenuItem, Submenu};
 
 mod ssh_wrapper;
 use crate::ssh_wrapper::*;
@@ -473,6 +472,7 @@ async fn update(ip: String) -> bool {
         }
         Err(why) => {
             log::error!("Error while updating: {:?}", why);
+            session.close();
             return false;
         }
     }
@@ -507,6 +507,7 @@ async fn reboot(ip: String) -> bool {
         }
         Err(why) => {
             log::error!("Rust error on open_exec: {:?}", why);
+            session.close();
             return false;
         }
     }
