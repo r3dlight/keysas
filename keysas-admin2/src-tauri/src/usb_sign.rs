@@ -153,7 +153,7 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
                     Some(dev) => dev,
                     None => {
                         log::error!("Cannot get device name.");
-                        return anyhow!("Cannot get device name.");
+                        return Err(anyhow!("Cannot get device name."));
                     }
                 };
                 let dev = &device.to_string_lossy();
