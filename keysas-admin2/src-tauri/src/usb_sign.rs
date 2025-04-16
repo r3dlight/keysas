@@ -149,7 +149,13 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
                 ) == Some(OsStr::new("partition"))
             {
                 let dev = event.device();
-                let device = dev.devnode().unwrap();
+                let device = match dev.devnode() {
+                    Some(dev) => dev,
+                    None => {
+                        log::error!("Cannot get device name.");
+                        return Err(anyhow!("Cannot get device name."));
+                    }
+                };
                 let dev = &device.to_string_lossy();
                 let device = rm_last(dev);
 
