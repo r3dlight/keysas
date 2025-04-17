@@ -34,7 +34,7 @@
 //!         "file_digest",         // String: base64 encoded SHA256 digest of the file
 //!         "metadata_digest",     // String: base64 encoded SHA256 digest of the metadata
 //!         "station_certificate", // String: concatenation of the station signing certificates PEM
-//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and Dilithium5 signatures
+//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and ML-DSA87 signatures
 //!     }
 //! }
 //! ```

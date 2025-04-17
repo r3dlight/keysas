@@ -278,9 +278,9 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
 
     let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded_casted);
     oqs::init();
-    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+    let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
         Ok(pq_s) => pq_s,
-        Err(e) => return Err(anyhow!("Cannot construct new Dilithium5 algorithm: {e}")),
+        Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
     };
 
     let sig_pq = match pq_scheme.signature_from_bytes(&s_pq_decoded) {

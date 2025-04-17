@@ -165,7 +165,7 @@ fn generate_signing_keypair(
     hybrid_csr.push_str(&ec_csr.to_pem(pkcs8::LineEnding::LF)?);
     // Add a delimiter between the two CSR
     hybrid_csr.push('|');
-    // Add the Dilithium5 CSR
+    // Add the ML-DSA87 CSR
     hybrid_csr.push_str(&pq_csr.to_pem(pkcs8::LineEnding::LF)?);
 
     Ok(hybrid_csr)

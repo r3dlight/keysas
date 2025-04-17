@@ -51,7 +51,7 @@ pub struct Config {
     config: String,
     /// Path to the CA ED25519 certificate
     ca_cert_cl: String,
-    /// Path to the CA Dilithium 5 certificate
+    /// Path to the CA Ml-Dsa certificate
     ca_cert_pq: String,
     // TODO - Add revocation mecanism configuration (OCSP IP or CRL IP)
 }
@@ -93,10 +93,10 @@ fn command_args(config: &mut Config) {
             Arg::new("ca_pq")
                 .short('q')
                 .long("ca_pq")
-                .value_name("Path to CA Dilithium 5 certificate")
+                .value_name("Path to CA Ml-Dsa certificate")
                 .default_value("./st-ca-pq.pem")
                 .action(ArgAction::Set)
-                .help("Path to CA Dilithium 5 certificate"),
+                .help("Path to CA Ml-Dsa certificate"),
         )
         .get_matches();
 

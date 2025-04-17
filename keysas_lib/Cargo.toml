@@ -25,7 +25,7 @@ base64 = "0.22"
 [dependencies.oqs]
 version = "0.10"
 default-features = false
-features = ["dilithium"]
+features = ["ml_dsa"]
 
 [dev-dependencies]
 hex-literal = "1"

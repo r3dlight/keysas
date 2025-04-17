@@ -42,4 +42,4 @@ shlex = "1.3.0"
 [dependencies.oqs]
 version = "0.10"
 default-features = false
-features = ["std", "dilithium"]
+features = ["std", "ml_dsa"]
