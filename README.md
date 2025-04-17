@@ -14,7 +14,7 @@
 - Signatures (for scanned files and USB keys)
     - Trusted (Outgoing) USB devices must be signed with Keysas-admin application
     - Each verified file signature is stored in the corresponding file report (.krp) 
-    - Signatures are post-quantum proof (hybrid Ed25519/Diltithium5 scheme)
+    - Signatures are post-quantum proof (hybrid Ed25519/Ml-Dsa-87 scheme)
     - Private keys are stored using PKCS#8 format
     - x509 certificates are signed by the internal PKI (using Keysas-admin)
 - Authentication

@@ -48,7 +48,7 @@ english.AllowUserFileWrite=Authorize user to modify or create file
 english.CertifConfigInfo=Select USB CA certificates
 english.EnterCertif=Enter path to USB CA certificates
 english.CertifCLLocation=Path to ED25519 certificate
-english.CertifPQLocation=Path to Dilithium 5 certificate
+english.CertifPQLocation=Path to Ml-Dsa certificate
 french.SecurityConfigInfo=Configuration du pare-feu Keysas
 french.EnterConfig=D�finissez la politique de s�curit� du pare-feu
 french.DisableUnsignedUsb=Autorisez toutes les cl�s USB non sign�es
@@ -58,7 +58,7 @@ french.AllowUserFileWrite=Autorisez l'utilisateur �modifier ou cr�er des fic
 french.CertifConfigInfo=S�lectionner les certificats de la CA USB
 french.EnterCertif=Entrer le chemin vers les certificats
 french.CertifCLLocation=Chemin vers le certificat ED25519
-french.CertifPQLocation=Chemin vers le certificat Dilithium 5
+french.CertifPQLocation=Chemin vers le certificat Ml-Dsa
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

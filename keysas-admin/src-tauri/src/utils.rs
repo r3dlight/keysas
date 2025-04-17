@@ -80,9 +80,9 @@ pub fn cmd_generate_key_and_get_csr(
 /// Utility function to load a certificate on the station
 /// Kind:
 ///     - file-cl: certificate for ED25519 station files signing
-///     - file-pq: certificate for Dilithium5 station files signing
+///     - file-pq: certificate for ML-DSA87 station files signing
 ///     - usb-cl: certificate for ED25519 USB signing
-///     - usb-pq: certificate for Dilithium5 USB signing
+///     - usb-pq: certificate for ML-DSA87 USB signing
 pub fn send_cert_to_station(
     session: &mut LocalSession<TcpStream>,
     cert: &Certificate,
@@ -233,15 +233,15 @@ pub async fn check_restore_pki(
         &st_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
     ) {
-        Ok(_) => log::debug!("Dilithium5 station certificate signature is valid."),
+        Ok(_) => log::debug!("ML-DSA87 station certificate signature is valid."),
         Err(why) => {
             return Err(anyhow!(
-                "Error validating station Dilithium5 certificate signature: {:?}",
+                "Error validating station ML-DSA87 certificate signature: {:?}",
                 why
             ));
         }
     }
-    log::debug!("Station Dilithium5 certificate validated.");
+    log::debug!("Station ML-DSA87 certificate validated.");
 
     let usb_keys = match HybridKeyPair::load(
         USB_CA_KEY_NAME,
@@ -275,15 +275,15 @@ pub async fn check_restore_pki(
         &usb_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
     ) {
-        Ok(_) => log::debug!("Dilithium5 USB certificate signature is valid."),
+        Ok(_) => log::debug!("ML-DSA87 USB certificate signature is valid."),
         Err(why) => {
             return Err(anyhow!(
-                "Error validating USB Dilithium5 certificate signature: {:?}",
+                "Error validating USB ML-DSA87 certificate signature: {:?}",
                 why
             ));
         }
     }
-    log::debug!("USB Dilithium5 certificate validated.");
+    log::debug!("USB ML-DSA87 certificate validated.");
     log::info!("PKI provided is valid.");
     log::info!("Writing loaded configuration to database...");
     drop_pki().await?;

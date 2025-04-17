@@ -103,7 +103,7 @@ use crate::keysas_key::KeysasKey;
 //      - Key usage                 => Critical, digitalSignature
 //      - Certificate policies      => Not critical
 
-pub const DILITHIUM5_OID: &str = "1.3.6.1.4.1.2.267.7.8.7";
+pub const ML_DSA87_OID: &str = "2.16.840.1.101.3.4.3.19";
 pub const ED25519_OID: &str = "1.3.101.112";
 
 /// Generate a X509 certificate from a CSR and a CA keypair
@@ -126,7 +126,7 @@ pub fn generate_cert_from_csr(
         .as_bytes()
         .ok_or(anyhow!("Subject public key missing"))?;
 
-    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+    let mldsa_oid = ObjectIdentifier::new(ML_DSA87_OID)?;
     let ed25519_oid = ObjectIdentifier::new(ED25519_OID)?;
 
     // Build the certificate
@@ -182,14 +182,14 @@ pub fn generate_cert_from_csr(
         .info
         .public_key
         .algorithm
-        .assert_algorithm_oid(dilithium5_oid)
+        .assert_algorithm_oid(mldsa_oid)
         .is_ok()
     {
         // Validate CSR authenticity
         oqs::init();
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         if pq_scheme
             .verify(

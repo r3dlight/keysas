@@ -47,13 +47,13 @@ use x509_cert::spki::ObjectIdentifier;
 use crate::certificate_field::CertificateFields;
 use crate::keysas_key::KeysasKey;
 use crate::keysas_key::KeysasPQKey;
-use crate::pki::DILITHIUM5_OID;
+use crate::pki::ML_DSA87_OID;
 use crate::pki::ED25519_OID;
 use crate::pki::generate_cert_from_csr;
 
 /// Keysas `HybridKeyPair`
 ///
-/// Structure containing both a ED25519 and a Dilithium5 keypair
+/// Structure containing both a ED25519 and a ML-DSA87 keypair
 /// The structure also contains the associated certificates
 #[derive(Debug)]
 pub struct HybridKeyPair {
@@ -106,23 +106,23 @@ fn generate_root_ed25519(
     Ok((keypair, cert))
 }
 
-fn generate_root_dilithium(
+fn generate_root_mldsa(
     infos: &CertificateFields,
 ) -> Result<(SecretKey, oqs::sig::PublicKey, Certificate), anyhow::Error> {
-    // Create the root CA Dilithium key pair
-    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+    // Create the root CA ML-DSA87 key pair
+    let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
         Ok(pq_s) => pq_s,
-        Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
     };
     let (pk, sk) = match pq_scheme.keypair() {
         Ok((public, secret)) => (public, secret),
-        Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+        Err(e) => return Err(anyhow!("Cannot generate new ML-DSA87 keypair: {e}")),
     };
 
-    // OID value for dilithium-sha512 from IBM's networking OID range
-    let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+    // OID value for ml-dsa-sha512 from IBM's networking OID range
+    let mldsa_oid = ObjectIdentifier::new(ML_DSA87_OID)?;
 
-    // Root Dilithium5 certificate will have this serial number
+    // Root ML-DSA87 certificate will have this serial number
     let serial: [u8; 20] = [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
     // Build subject DN
@@ -132,7 +132,7 @@ fn generate_root_dilithium(
         &subject,
         &pk.clone().into_vec(),
         &serial,
-        &dilithium5_oid,
+        &mldsa_oid,
         true,
     )?;
 
@@ -146,7 +146,7 @@ fn generate_root_dilithium(
     let cert = Certificate {
         tbs_certificate: tbs,
         signature_algorithm: AlgorithmIdentifier {
-            oid: dilithium5_oid,
+            oid: mldsa_oid,
             parameters: None,
         },
         signature: BitString::from_bytes(&signature.into_vec())?,
@@ -246,9 +246,9 @@ impl HybridKeyPair {
         let (kp_ed, cert_ed) =
             generate_root_ed25519(infos).with_context(|| "ED25519 generation failed")?;
 
-        // Generate root Dilithium key and certificate
+        // Generate root ML-DSA87 key and certificate
         let (sk_dl, pk_dl, cert_dl) =
-            generate_root_dilithium(infos).context("Dilithium generation failed")?;
+            generate_root_mldsa(infos).context("ML-DSA87 generation failed")?;
 
         Ok(HybridKeyPair {
             classic: kp_ed,
@@ -261,7 +261,7 @@ impl HybridKeyPair {
         })
     }
 
-    /// Generate a signed hybrid keypair (ED25519 and Dilithium5)
+    /// Generate a signed hybrid keypair (ED25519 and ML-DSA87)
     pub fn generate_signed_keypair(
         ca_keys: &HybridKeyPair,
         subject_name: &RdnSequence,
@@ -276,21 +276,21 @@ impl HybridKeyPair {
         // Generate a certificate from the CSR
         let cert_ed = generate_cert_from_csr(ca_keys, &csr_ed, pki_infos, is_app_key)?;
 
-        // Generate Dilithium key and certificate
-        // Create the Dilithium key pair
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        // Generate ML-DSA87 key and certificate
+        // Create the ML-DSA87 key pair
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let (pk_dl, sk_dl) = match pq_scheme.keypair() {
             Ok((public, secret)) => (public, secret),
-            Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+            Err(e) => return Err(anyhow!("Cannot generate new ML-DSA87 keypair: {e}")),
         };
         let kp_pq = KeysasPQKey {
             private_key: sk_dl,
             public_key: pk_dl,
         };
-        // Construct a CSR for the Dilithium key
+        // Construct a CSR for the ML-DSA87 key
         let csr_dl = kp_pq.generate_csr(subject_name)?;
         // Generate a certificate from the CSR
         let cert_dl = generate_cert_from_csr(ca_keys, &csr_dl, pki_infos, is_app_key)?;

@@ -36,7 +36,7 @@ CA certificates must be provided to the daemon. The path to the pem files is giv
 The comple command line is
 
 ```bash
-./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Dilithium5 certificate>
+./keysas-usbfilter-daemon.exe -config <path to security policy file> -ca_cl <path to CA ED25519 certificate> -ca_pq <path to CA Ml-Dsa certificate>
 ```
 
 On Windows, path to the CA certificates is configured in the registry at HKLM\SYSTEM\CurrentControlSet\Services\Keysas Service\config in the values UsbCaClCert and UsbCaPqCert.

@@ -55,8 +55,8 @@ use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 
 use crate::certificate_field::CertificateFields;
-use crate::pki::DILITHIUM5_OID;
 use crate::pki::ED25519_OID;
+use crate::pki::ML_DSA87_OID;
 
 #[derive(Debug)]
 pub struct KeysasPQKey {
@@ -99,11 +99,11 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
             .read_to_end(&mut cert_cl_bytes)
             .context("Cannot read Classic certificate file.")?;
         let mut cert_pq = File::open(cert_pq)
-            .context("Cannot open Dilithium PEM certificate to get the public key")?;
+            .context("Cannot open ML-DSA87 PEM certificate to get the public key")?;
         let mut cert_pq_bytes = Vec::new();
         cert_pq
             .read_to_end(&mut cert_pq_bytes)
-            .context("Cannot read Dilithium certificate file")?;
+            .context("Cannot read ML-DSA87 certificate file")?;
         let cert_cl = Certificate::from_pem(cert_cl_bytes)?;
         let cert_pq = Certificate::from_pem(cert_pq_bytes)?;
 
@@ -121,9 +121,9 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
 
         let pub_cl = VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
         oqs::init();
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct ML-DSA algorithm: {e}")),
         };
         let pub_pq = match pq_scheme.public_key_from_bytes(
             cert_pq
@@ -135,7 +135,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
             Some(pk) => pk,
             None => {
                 return Err(anyhow!(
-                    "Cannot parse Dilithium public key from certificate"
+                    "Cannot parse ML-DSA public key from certificate"
                 ));
             }
         };
@@ -155,13 +155,13 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
             .verify_strict(message, &signatures.classic)
             .context("Invalid Ed25519 signature")?;
         oqs::init();
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         match pq_scheme.verify(message, &signatures.pq, &pubkeys.pq) {
-            Ok(_) => log::info!("Dilithium scheme is verified"),
-            Err(e) => return Err(anyhow!("Dilithium scheme is not verified: {e}")),
+            Ok(_) => log::info!("ML-DSA87 scheme is verified"),
+            Err(e) => return Err(anyhow!("ML-DSA87 scheme is not verified: {e}")),
         };
         // If no error has been returned then the signature is valid
         Ok(())
@@ -394,13 +394,13 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         // Important load oqs:
         oqs::init();
 
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let (pk_dl, sk_dl) = match pq_scheme.keypair() {
             Ok((public, secret)) => (public, secret),
-            Err(e) => return Err(anyhow!("Cannot generate new Dilithium keypair: {e}")),
+            Err(e) => return Err(anyhow!("Cannot generate new ML-DSA87 keypair: {e}")),
         };
         let kp_pq = KeysasPQKey {
             private_key: sk_dl,
@@ -438,11 +438,11 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             }
         };
         oqs::init();
-        let scheme = match Sig::new(Algorithm::Dilithium5) {
+        let scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(scheme) => scheme,
             Err(e) => {
                 return Err(anyhow!(
-                    "OQS error: cannot initialize Dililthium5 scheme: {e}"
+                    "OQS error: cannot initialize ML-DSA87 scheme: {e}"
                 ));
             }
         };
@@ -473,12 +473,12 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
     }
 
     fn save_keys(&self, path: &Path, pwd: &str) -> Result<(), anyhow::Error> {
-        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+        let mldsa_oid = ObjectIdentifier::new(ML_DSA87_OID)?;
 
         store_keypair(
             &self.private_key.clone().into_vec(),
             &self.public_key.clone().into_vec(),
-            dilithium5_oid,
+            mldsa_oid,
             pwd,
             path,
         )
@@ -488,7 +488,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         // Important load oqs:
         oqs::init();
 
-        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+        let mldsa_oid = ObjectIdentifier::new(ML_DSA87_OID)?;
 
         let pub_key = BitString::from_bytes(&self.public_key.clone().into_vec())
             .with_context(|| "Failed get public key raw value")?;
@@ -498,7 +498,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             subject: subject.to_owned(),
             public_key: SubjectPublicKeyInfo {
                 algorithm: AlgorithmIdentifier {
-                    oid: dilithium5_oid,
+                    oid: mldsa_oid,
                     parameters: None,
                 },
                 subject_public_key: pub_key,
@@ -507,9 +507,9 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         };
 
         let content = info.to_der().with_context(|| "Failed to convert to DER")?;
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let signature = match pq_scheme.sign(&content, &self.private_key) {
             Ok(sig) => sig,
@@ -519,7 +519,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         let csr = CertReq {
             info,
             algorithm: AlgorithmIdentifier {
-                oid: dilithium5_oid,
+                oid: mldsa_oid,
                 parameters: None,
             },
             signature: BitString::from_bytes(&signature.into_vec())?,
@@ -530,9 +530,9 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
     fn message_sign(&self, message: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
         oqs::init();
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let signature = match pq_scheme.sign(message, &self.private_key) {
             Ok(sig) => sig,
@@ -543,9 +543,9 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
 
     fn message_verify(&self, message: &[u8], signature: &[u8]) -> Result<bool, anyhow::Error> {
         oqs::init();
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let sig = match pq_scheme.signature_from_bytes(signature) {
             Some(s) => s,
@@ -554,8 +554,8 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
             }
         };
         match pq_scheme.verify(message, sig, &self.public_key) {
-            Ok(_) => log::info!("Dilithium scheme verified"),
-            Err(e) => return Err(anyhow!("Dilithium scheme not verified: {e}")),
+            Ok(_) => log::info!("ML-DSA87 scheme verified"),
+            Err(e) => return Err(anyhow!("ML-DSA87 scheme not verified: {e}")),
         }
         // If no error then the signature is valid
         Ok(true)
@@ -572,22 +572,22 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         // Important load oqs:
         oqs::init();
 
-        let dilithium5_oid = ObjectIdentifier::new(DILITHIUM5_OID)?;
+        let mldsa_oid = ObjectIdentifier::new(ML_DSA87_OID)?;
 
         // Build the certificate
         let tbs = ca_infos.construct_tbs_certificate(
             subject_infos,
             subject_key,
             serial,
-            &dilithium5_oid,
+            &mldsa_oid,
             is_app_cert,
         )?;
 
         let content = tbs.to_der().with_context(|| "Failed to convert to DER")?;
 
-        let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+        let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(pq_s) => pq_s,
-            Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+            Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
         };
         let signature = match pq_scheme.sign(&content, &self.private_key) {
             Ok(sig) => sig,
@@ -597,7 +597,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         let cert = Certificate {
             tbs_certificate: tbs,
             signature_algorithm: AlgorithmIdentifier {
-                oid: dilithium5_oid,
+                oid: mldsa_oid,
                 parameters: None,
             },
             signature: BitString::from_bytes(&signature.into_vec())?,

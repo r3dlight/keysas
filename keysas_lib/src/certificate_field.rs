@@ -46,7 +46,7 @@ use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 
-use crate::pki::DILITHIUM5_OID;
+use crate::pki::ML_DSA87_OID;
 use crate::pki::ED25519_OID;
 
 /// Structure containing informations to build the certificate
@@ -68,7 +68,7 @@ pub struct CertificateFields {
 /// # Arguments
 ///
 /// * `pem` - Certificate in PEM format
-/// * `ca_cert` - CA certificate either ED25519 or Dilithium
+/// * `ca_cert` - CA certificate either ED25519 or ML-DSA87
 pub fn validate_signing_certificate(
     pem: &str,
     ca_cert: Option<&Certificate>,
@@ -120,15 +120,15 @@ pub fn validate_signing_certificate(
                 ca_key.verify_strict(&cert.tbs_certificate.to_der()?, &sig)?;
                 // If the signature is invalid an error is thrown
             }
-            DILITHIUM5_OID => {
+            ML_DSA87_OID => {
                 // Initialize liboqs
-                log::info!("Found Dilithium5 OID");
+                log::info!("Found ML-DSA87 OID");
                 oqs::init();
 
                 // Extract the CA public key
-                let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+                let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
                     Ok(pq_s) => pq_s,
-                    Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+                    Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
                 };
                 let ca_key = pq_scheme
                     .public_key_from_bytes(
@@ -137,7 +137,7 @@ pub fn validate_signing_certificate(
                             .subject_public_key
                             .raw_bytes(),
                     )
-                    .ok_or_else(|| anyhow!("Invalid Dilithium key"))?;
+                    .ok_or_else(|| anyhow!("Invalid ML-DSA87 key"))?;
 
                 // Verify the certificate signature
                 let sig = pq_scheme

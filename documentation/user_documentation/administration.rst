@@ -23,7 +23,7 @@ Each test and verification is added to metadata and sent to **Keysas-out**.
 **Keysas-out** receives the raw file descriptors and metadata through a dedicated abstract socket.
 It immediately verifies the sha256 digest. If a file is considered unhealthy (reading metadata), the file descriptor is definitly closed. 
 If not the file descriptor is copied into the outgoing SAS with a report containing the metadata associated.
-If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Dilithium5 on each file and linked report containing the file metadata and the station analysis.
+If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Ml-Dsa-87 on each file and linked report containing the file metadata and the station analysis.
 
 System configuration
 ====================

@@ -27,7 +27,7 @@
 //!         "file_digest",         // String: base64 encoded SHA256 digest of the file
 //!         "metadata_digest",     // String: base64 encoded SHA256 digest of the metadata
 //!         "station_certificate", // String: concatenation of the station signing certificates PEM
-//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and Dilithium5 signatures
+//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and ML-DSA87 signatures
 //!     }
 //! }
 //! ```
@@ -73,9 +73,9 @@ pub struct Bd {
     pub file_digest: String,
     /// SHA256 digest of the [MetaData] associated to the file
     pub metadata_digest: String,
-    /// Station certificates: concatenation of its ED25519 and Dilithium5 signing certificates with a '|' delimiter
+    /// Station certificates: concatenation of its ED25519 and ML-DSA87 signing certificates with a '|' delimiter
     pub station_certificate: String,
-    /// Report signature: concatenation of the ED25519 and Dilithium5 signatures in base64
+    /// Report signature: concatenation of the ED25519 and ML-DSA87 signatures in base64
     pub report_signature: String,
 }
 
@@ -177,7 +177,7 @@ pub fn generate_report_metadata(f: &FileMetadata) -> MetaData {
     }
 }
 
-/// Bind the report to the file by signing with ED25519 and Dilithium5 the concatenation
+/// Bind the report to the file by signing with ED25519 and ML-DSA87 the concatenation
 /// of the file digest and the report metadata digest.
 /// The two signatures are concatenated (ED25519 first).
 /// All the fields of the binding are encoded in base64
@@ -216,7 +216,7 @@ pub fn bind_and_sign(
     if let Some(keys) = sign_keys {
         // Sign with ED25519
         signature.append(&mut keys.classic.message_sign(concat.as_bytes())?);
-        // Sign with Dilithium5
+        // Sign with ML-DSA87
         signature.append(&mut keys.pq.message_sign(concat.as_bytes())?);
     }
 
@@ -241,7 +241,7 @@ pub fn bind_and_sign(
 /// * `report_path` - Path to the file containing the report
 /// * `file_path`   - Path to the file linked to the report
 /// * `ca_cert_cl`  - ED25519 certificate of the authority, used to validate the certificate in the report
-/// * `ca_cert_pq`  - Dilithium certificate of the authority
+/// * `ca_cert_pq`  - ML-DSA87 certificate of the authority
 pub fn parse_report(
     report_path: &Path,
     file_path: Option<&Path>,
@@ -276,7 +276,7 @@ pub fn parse_report(
     let cert_pq = validate_signing_certificate(
         certs
             .remainder()
-            .ok_or(anyhow!("No Dilithium certificate"))?,
+            .ok_or(anyhow!("No ML-DSA87 certificate"))?,
         ca_cert_pq,
     )?;
 
@@ -343,11 +343,11 @@ pub fn parse_report(
     pub_cl.verify_strict(message.as_bytes(), &sig_cl)?;
     // If the signature is invalid, an error is thrown
 
-    // Validate the signature with Dilithium
+    // Validate the signature with ML-DSA87
     oqs::init();
-    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+    let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
         Ok(pq_s) => pq_s,
-        Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
     };
     let pub_pq = pq_scheme
         .public_key_from_bytes(
@@ -357,15 +357,15 @@ pub fn parse_report(
                 .subject_public_key
                 .raw_bytes(),
         )
-        .ok_or_else(|| anyhow!("Failed to extract Dilithium public key"))?;
+        .ok_or_else(|| anyhow!("Failed to extract ML-DSA87 public key"))?;
 
     // SAFETY: should not panic as len has been verified as > 64
     let sig_pq = pq_scheme
         .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
         .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
     match pq_scheme.verify(message.as_bytes(), sig_pq, pub_pq) {
-        Ok(_) => log::info!("Dilithium scheme is now verified"),
-        Err(e) => return Err(anyhow!("Dilithium scheme is not verified: {e}")),
+        Ok(_) => log::info!("ML-DSA87 scheme is now verified"),
+        Err(e) => return Err(anyhow!("ML-DSA87 scheme is not verified: {e}")),
     }
     // If the signature is invalid an error is thrown
     Ok(report)
@@ -468,7 +468,7 @@ mod tests_out {
         }
         let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&pub_cl_casted).unwrap();
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+        let pq_scheme = Sig::new(Algorithm::MlDsa87).unwrap();
         let pub_pq = pq_scheme
             .public_key_from_bytes(
                 cert_pq
