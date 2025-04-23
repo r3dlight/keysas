@@ -47,8 +47,8 @@ use x509_cert::spki::ObjectIdentifier;
 use crate::certificate_field::CertificateFields;
 use crate::keysas_key::KeysasKey;
 use crate::keysas_key::KeysasPQKey;
-use crate::pki::ML_DSA87_OID;
 use crate::pki::ED25519_OID;
+use crate::pki::ML_DSA87_OID;
 use crate::pki::generate_cert_from_csr;
 
 /// Keysas `HybridKeyPair`

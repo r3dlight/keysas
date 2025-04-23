@@ -46,8 +46,8 @@ use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 
-use crate::pki::ML_DSA87_OID;
 use crate::pki::ED25519_OID;
+use crate::pki::ML_DSA87_OID;
 
 /// Structure containing informations to build the certificate
 #[derive(Debug, Clone, Serialize)]
