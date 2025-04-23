@@ -20,6 +20,9 @@
 - Authentication
   - Users can be authenticated using personal Yubikeys 5
 
+# Security
+  - This code has undergone a security audit conducted by an external company specialized in cybersecurity. 
+
 # Keysas-core
 
 ## Architecture
@@ -60,6 +63,10 @@ make help
 make build
 make install
 ```
+
+On Debian Trixie:
+
+Install libyara10 and libwebkit2gtk-4.1-dev instead
 
 ## User documentation
 
