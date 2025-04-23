@@ -61,7 +61,7 @@ git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
 rustup default nightly
 make help
 make build
-make install
+sudo make install
 ```
 
 On Debian Trixie:
