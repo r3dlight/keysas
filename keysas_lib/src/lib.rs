@@ -18,14 +18,10 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-
 #[cfg(target_os = "linux")]
 use std::io::IoSlice;
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
-
-#[macro_use]
-extern crate serde_derive;
 
 pub mod certificate_field;
 pub mod file_report;

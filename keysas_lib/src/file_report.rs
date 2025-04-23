@@ -48,6 +48,7 @@ use std::fs::File;
 use std::path::Path;
 use time::OffsetDateTime;
 use x509_cert::Certificate;
+use serde_derive::{Serialize, Deserialize};
 
 /// Metadata object in the report.
 /// The structure can be serialized to JSON.
