@@ -172,8 +172,8 @@ fn hmac_challenge() -> Option<String> {
 
             // Challenge can not be greater than 64 bytes
             let mut challenge: [u128; 4] = [0; 4];
-            for i in 0..4 {
-                challenge[i] = random();
+            for item in &mut challenge {
+                *item = random();
             }
             let casted_challenge = cast_slice(&challenge);
             // In HMAC Mode, the result will always be the SAME for the SAME provided challenge
