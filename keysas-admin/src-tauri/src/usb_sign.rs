@@ -281,9 +281,11 @@ pub fn revoke_device(device: &str) -> Result<()> {
         .open(device)
         .context("Cannot open device for revoking.")?;
 
-    //Let's write behind the magic number now
+    // Let's write behind the magic number
+    // Size must not be > 7684 bytes LBA-MBR (8196-512)
+    // TODO: Erase with random data
     let offset = 512;
-    let blank = "0".repeat(500);
+    let blank = "0".repeat(7683);
     let size_u32 = blank.len() as u32;
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
