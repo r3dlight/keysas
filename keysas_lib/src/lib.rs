@@ -16,12 +16,12 @@ use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::io::IoSlice;
+use std::io::{BufReader, Read};
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 
 pub mod certificate_field;
 pub mod file_report;
