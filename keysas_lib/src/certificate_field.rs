@@ -45,6 +45,7 @@ use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
+use serde_derive::Serialize;
 
 use crate::pki::ED25519_OID;
 use crate::pki::ML_DSA87_OID;
