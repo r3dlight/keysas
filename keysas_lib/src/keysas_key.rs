@@ -134,9 +134,7 @@ impl PublicKeys<KeysasHybridPubKeys> for KeysasHybridPubKeys {
         ) {
             Some(pk) => pk,
             None => {
-                return Err(anyhow!(
-                    "Cannot parse ML-DSA public key from certificate"
-                ));
+                return Err(anyhow!("Cannot parse ML-DSA public key from certificate"));
             }
         };
 
@@ -441,9 +439,7 @@ impl KeysasKey<KeysasPQKey> for KeysasPQKey {
         let scheme = match Sig::new(Algorithm::MlDsa87) {
             Ok(scheme) => scheme,
             Err(e) => {
-                return Err(anyhow!(
-                    "OQS error: cannot initialize ML-DSA87 scheme: {e}"
-                ));
+                return Err(anyhow!("OQS error: cannot initialize ML-DSA87 scheme: {e}"));
             }
         };
         let tmp_pq_sk = match Sig::secret_key_from_bytes(&scheme, decoded_pk.private_key) {
