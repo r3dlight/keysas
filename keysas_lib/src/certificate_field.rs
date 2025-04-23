@@ -33,6 +33,7 @@ use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
 use pkcs8::der::asn1::OctetString;
 use pkcs8::der::oid::db::rfc5280;
+use serde_derive::Serialize;
 use std::time::Duration;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
@@ -45,7 +46,6 @@ use x509_cert::spki::AlgorithmIdentifier;
 use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
-use serde_derive::Serialize;
 
 use crate::pki::ED25519_OID;
 use crate::pki::ML_DSA87_OID;

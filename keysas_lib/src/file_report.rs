@@ -43,12 +43,12 @@ use crate::{
 use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
 use oqs::sig::{Algorithm, Sig};
+use serde_derive::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fs::File;
 use std::path::Path;
 use time::OffsetDateTime;
 use x509_cert::Certificate;
-use serde_derive::{Serialize, Deserialize};
 
 /// Metadata object in the report.
 /// The structure can be serialized to JSON.
