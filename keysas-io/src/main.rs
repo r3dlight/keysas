@@ -51,9 +51,8 @@ use kv::*;
 use libc::{c_int, c_short, c_ulong, c_void};
 use oqs::sig::{Algorithm, Sig};
 use proc_mounts::MountIter;
-use std::fmt::Write;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write as wr};
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::ops::Deref;
@@ -68,6 +67,7 @@ use sys_mount::{FilesystemType, Mount, MountFlags, SupportedFilesystems, Unmount
 use yubico_manager::Yubico;
 use yubico_manager::config::Config;
 use yubico_manager::config::{Mode, Slot};
+
 
 mod errors;
 
@@ -433,7 +433,7 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                          );
                          // Create a tmp dir to be able to rename files later
                          let tmp = Path::new(TMP_DIR);
-                         if !tmp.exists() ||  !tmp.is_dir() {
+                         if !tmp.exists() || !tmp.is_dir() {
                              match fs::create_dir(tmp) {
                                  Ok(_)=> info!("Creating tmp directory for writing incoming files !"),
                                  Err(e) => error!("Cannot create tmp directory: {e:?}"),
@@ -451,16 +451,20 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                              error!(
                                                  "Error while copying file {path_to_read}: {e:?}"
                                              );
-                                             let mut report =
+                                             let report =
                                                  format!("{}{}", path_to_write, ".ioerror");
-                                             match File::create(&report) {
-                                                 Ok(_) => warn!("io-error report file created."),
+                                             let mut report = match File::create(&report) {
+                                                 Ok(r) => {
+                                                    info!("io-error report file created.");
+                                                    r
+                                                },
                                                  Err(why) => {
                                                      error!(
                                                          "Failed to create io-error report {report:?}: {why}"
                                                      );
+                                                     return;
                                                  }
-                                             }
+                                             };
                                              match writeln!(
                                                  report,
                                                  "Error while copying file: {e:?}"
