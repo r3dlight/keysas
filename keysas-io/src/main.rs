@@ -52,9 +52,9 @@ use libc::{c_int, c_short, c_ulong, c_void};
 use oqs::sig::{Algorithm, Sig};
 use proc_mounts::MountIter;
 use std::fs::File;
-use std::io::{Read, Write as wr};
 use std::io::Seek;
 use std::io::SeekFrom;
+use std::io::{Read, Write as wr};
 use std::ops::Deref;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -67,7 +67,6 @@ use sys_mount::{FilesystemType, Mount, MountFlags, SupportedFilesystems, Unmount
 use yubico_manager::Yubico;
 use yubico_manager::config::Config;
 use yubico_manager::config::{Mode, Slot};
-
 
 mod errors;
 
@@ -433,7 +432,15 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                          );
                          // Create a tmp dir to be able to rename files later
                          let tmp = Path::new(TMP_DIR);
-                         if !tmp.exists() || !tmp.is_dir() {
+
+                         if tmp.exists() {
+                            if tmp.is_dir() {
+                                debug!("tmp directory already exists.");
+                            } else {
+                                error!("A file with the same name as the directory already exists: {TMP_DIR}");
+                                return;
+                            }
+                        } else {
                              match fs::create_dir(tmp) {
                                  Ok(_)=> info!("Creating tmp directory for writing incoming files !"),
                                  Err(e) => error!("Cannot create tmp directory: {e:?}"),
