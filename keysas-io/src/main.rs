@@ -430,8 +430,10 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                              TMP_DIR,
                              diacritics::remove_diacritics(&entry_cleaned)
                          );
+
                          // Create a tmp dir to be able to rename files later
-                         let tmp = Path::new(TMP_DIR);
+                         let tmp = TMP_DIR.trim_end_matches("/");
+                         let tmp = Path::new(tmp);
 
                          if tmp.exists() {
                             if tmp.is_dir() {
