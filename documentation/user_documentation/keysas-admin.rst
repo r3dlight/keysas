@@ -58,7 +58,7 @@ Before starting, you must add a new **udev** to allow your current user wrting U
 .. code-block:: shell-session
  
  # Add the the new udev rule:
- echo 'SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"' > /etc/udev/rules.d/71-keysas.rules
+ echo 'SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess",ENV{ID_VENDOR_ID}="$attr{vendor}",ENV{ID_MODEL_ID}="$attr{model}"' > /etc/udev/rules.d/71-keysas.rules
  # Then, add your current user to the disk group:
  usermod -aG disk $LOGNAME
 
