@@ -10,7 +10,7 @@ Please report security vulnerabilities to one of the contributors. You will rece
 | Component | Technical facts | Patched facts | Unpatched facts |
 |-----------------|-----------------|-----------------|----------|
 | Keysas-lib   |   10   | 9   | 1 |
-| Keysas-core   |   7   | 9   | 1 |
+| Keysas-core   |   7   | 6   | 1 |
 | Keysas-io   |   8   | 8   | 0 |
 | Keysas-admin   |   7   | 7   | 0 |
 
