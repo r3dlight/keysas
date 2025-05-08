@@ -2,7 +2,7 @@
 /*
  * The "keysas-in".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -11,8 +11,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, RulesetStatus, ABI,
+    ABI, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr, RulesetCreatedAttr,
+    RulesetStatus, path_beneath_rules,
 };
 
 #[cfg(target_os = "linux")]
@@ -74,7 +74,7 @@ pub fn init() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn landlock_sandbox(sas_in: &String) -> Result<()> {
-    use landlock::{make_bitflags, PathBeneath, PathFd};
+    use landlock::{PathBeneath, PathFd, make_bitflags};
     // Still using ABI v2 for now
     let abi = ABI::V2;
     let allow = make_bitflags!(AccessFs::{RemoveFile | RemoveDir | ReadFile | ReadDir});

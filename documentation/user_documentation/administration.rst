@@ -23,7 +23,7 @@ Each test and verification is added to metadata and sent to **Keysas-out**.
 **Keysas-out** receives the raw file descriptors and metadata through a dedicated abstract socket.
 It immediately verifies the sha256 digest. If a file is considered unhealthy (reading metadata), the file descriptor is definitly closed. 
 If not the file descriptor is copied into the outgoing SAS with a report containing the metadata associated.
-If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Dilithium5 on each file and linked report containing the file metadata and the station analysis.
+If enrolled using **Keysas-admin**, it also performs an hybrid post-quantum signature using Ed25519/Ml-Dsa-87 on each file and linked report containing the file metadata and the station analysis.
 
 System configuration
 ====================
@@ -37,7 +37,7 @@ Here are some recommendations and best practices to use **Keysas** in good condi
 
  The GNU/Linux system used should be hardened according to the best practices such as *ANSSI*, *CIS*, *STIG* etc.
 
- You can take a look at the following: https://www.ssi.gouv.fr/en/guide/configuration-recommendations-of-a-gnulinux-system/ 
+ You can take a look at the following: https://cyber.gouv.fr/en/publications/configuration-recommendations-gnulinux-system 
 
 .. admonition:: Network Cards (Only for network gateway)
  :class: tip

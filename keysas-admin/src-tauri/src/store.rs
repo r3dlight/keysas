@@ -51,10 +51,11 @@ pub fn init_store(path: &str) -> Result<(), anyhow::Error> {
                             // Initialize the store and return the connection
                             match c.execute(CREATE_QUERY) {
                                 Ok(_) => {
+                                    log::debug!("Store initialized");
                                     *hdl = Some(c);
                                 }
                                 Err(e) => {
-                                    return Err(anyhow!("Failed to initialize database: {e}"))
+                                    return Err(anyhow!("Failed to initialize database: {e}"));
                                 }
                             }
                         }
@@ -99,10 +100,10 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
                     true
                 })?;
                 if (public.chars().count() > 0) && (private.chars().count() > 0) {
-                    log::debug!("Found: {}, {}", public, private);
+                    log::debug!("Found: {public}, {private}");
                     Ok((public, private))
                 } else {
-                    Err(anyhow!("Failed to find station in database"))
+                    Err(anyhow!("get_ssh: Failed to find station in database"))
                 }
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -112,7 +113,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
 
 /// Save the paths to the public and private SSH keys
 /// The function first checks that the path are valid files
-pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
+pub fn set_ssh(public: &str, private: &str) -> Result<(), anyhow::Error> {
     if !Path::new(public.trim()).is_file() || !Path::new(private.trim()).is_file() {
         return Err(anyhow!("Invalid paths"));
     }
@@ -121,9 +122,13 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("REPLACE INTO ssh_table (name, path) VALUES ('public', '{}'), ('private', '{}');",
-                        public, private);
-                connection.execute(query)?;
+                let mut query = connection.prepare(
+                    "REPLACE INTO ssh_table (name, path) VALUES ('public', ?), ('private', ?);",
+                )?;
+
+                query.bind((1, public))?;
+                query.bind((2, private))?;
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -133,17 +138,17 @@ pub fn set_ssh(public: &String, private: &String) -> Result<(), anyhow::Error> {
 
 /// Save the paths to the public and private SSH keys
 /// The function first checks that the path are valid files
-pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
+pub fn set_station(name: &str, ip: &str) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO station_table (name, ip) VALUES ('{}', '{}');",
-                    name, ip
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query =
+                    connection.prepare("REPLACE INTO station_table (name, ip) VALUES (?, ?);")?;
+                query.bind((1, name))?;
+                query.bind((2, ip))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -152,14 +157,15 @@ pub fn set_station(name: &String, ip: &String) -> Result<(), anyhow::Error> {
 }
 
 /// Delete a Keysas station
-pub fn delete_station(name: &String) -> Result<(), anyhow::Error> {
+pub fn delete_station(name: &str) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("DELETE FROM station_table WHERE name = '{}';", name);
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = connection.prepare("DELETE FROM station_table WHERE name = ?;")?;
+                query.bind((1, name))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -174,7 +180,7 @@ pub async fn drop_pki() -> Result<(), anyhow::Error> {
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "DROP TABLE ca_table; CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);".to_string();
-                log::debug!("Query: {}", query);
+                log::debug!("Query: {query}");
                 connection.execute(query)?;
                 Ok(())
             }
@@ -186,26 +192,19 @@ pub async fn drop_pki() -> Result<(), anyhow::Error> {
 /// Get the station IP address by name
 /// Returns an error if the station does not exist or in case of trouble accessing
 /// the database
-pub fn get_station_ip_by_name(name: &String) -> Result<String, anyhow::Error> {
+pub fn get_station_ip_by_name(name: &str) -> Result<String, anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!("SELECT * FROM station_table WHERE name = '{}';", name);
+                let query = connection.prepare("SELECT * FROM station_table WHERE name = ?;")?;
                 let mut result = String::new();
-                log::debug!("Query: {}", query);
-                connection.iterate(query, |pairs| {
-                    for &(key, value) in pairs.iter() {
-                        if key == "ip" {
-                            if let Some(ip) = value {
-                                result.push_str(ip)
-                            }
-                        }
-                    }
-                    true
-                })?;
+                for row in query.into_iter().bind((1, name))? {
+                    let row = row?;
+                    result = row.read::<&str, _>("ip").to_string();
+                }
                 if result.chars().count() > 0 {
-                    log::debug!("Found: {}", result);
+                    log::debug!("Found: {result}");
                     Ok(result)
                 } else {
                     Err(anyhow!("Failed to find station in database"))
@@ -248,7 +247,7 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
                     result.push(st);
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -258,23 +257,21 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
 
 /// Save the PKI configuration infos
 /// Returns Ok or an Error
-pub fn set_pki_config(pki_dir: &String, infos: &CertificateFields) -> Result<(), anyhow::Error> {
+pub fn set_pki_config(pki_dir: &str, infos: &CertificateFields) -> Result<(), anyhow::Error> {
     match STORE_HANDLE.lock() {
         Err(e) => Err(anyhow!("Failed to get database lock: {e}")),
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
-                let query = format!(
-                    "REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
-                                        VALUES ('{}','{}', '{}','{}','{}','{}');",
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),             
-                    pki_dir,
-                    infos.org_name.as_ref().unwrap_or(&String::from("")).clone(),
-                    infos.org_unit.as_ref().unwrap_or(&String::from("")),
-                    infos.country.as_ref().unwrap_or(&String::from("")),
-                    &infos.validity.unwrap_or(0)
-                );
-                log::debug!("Query: {}", query);
-                connection.execute(query)?;
+                let mut query = connection.prepare("REPLACE INTO ca_table (name, directory, org_name, org_unit, country, validity) \
+                                        VALUES (?,?,?,?,?,?);")?;
+                query.bind((1, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((2, pki_dir))?;
+                query.bind((3, infos.org_name.as_deref().unwrap_or("")))?;
+                query.bind((4, infos.org_unit.as_deref().unwrap_or("")))?;
+                query.bind((5, infos.country.as_deref().unwrap_or("")))?;
+                query.bind((6, infos.validity.unwrap_or(0) as i64))?;
+                //log::debug!("Query: {}", query);
+                query.next()?;
                 Ok(())
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -291,7 +288,7 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
                 let mut result = String::new();
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        println!("{:?}:{:?}", key, value);
+                        println!("{key:?}:{value:?}");
                         if key == "directory" {
                             if let Some(dir) = value {
                                 result.push_str(dir)
@@ -300,7 +297,7 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
                     }
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -344,7 +341,7 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                     }
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),

@@ -2,7 +2,7 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
@@ -11,11 +11,11 @@ use std::{net::TcpListener, path::Path, thread::spawn};
 
 use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError,
-    RulesetStatus, ABI,
+    ABI, Access, AccessFs, Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetError, RulesetStatus,
+    path_beneath_rules,
 };
-use nom::bytes::complete::take_until;
 use nom::IResult;
+use nom::bytes::complete::take_until;
 use regex::Regex;
 use std::fs;
 use std::net::Ipv4Addr;
@@ -24,9 +24,8 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use tungstenite::{
-    accept_hdr,
+    Message, accept_hdr,
     handshake::server::{Request, Response},
-    Message,
 };
 
 extern crate serde;
@@ -152,11 +151,11 @@ fn parse_ip(s: &str) -> IResult<&str, &str> {
 fn get_ip() -> Result<Vec<String>> {
     let mut ips = Vec::new();
     let addrs = nix::ifaddrs::getifaddrs()?;
+    let re = Regex::new(r"eth|enp")?;
     for ifaddr in addrs {
         if let Some(address) = ifaddr.address {
             let addr = address.to_string();
             let (_, ip) = parse_ip(&addr).unwrap();
-            let re = Regex::new(r"eth|enp")?;
             if re.is_match(&ifaddr.interface_name) && ip.parse::<Ipv4Addr>().is_ok() {
                 ips.push(ip.to_string());
             }
@@ -173,7 +172,7 @@ fn main() -> Result<()> {
         let stream = match stream {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to accept client connection: {}", e);
+                eprintln!("Failed to accept client connection: {e}");
                 continue;
             }
         };
@@ -233,7 +232,7 @@ fn main() -> Result<()> {
                 };
 
                 let serialized = serde_json::to_string(&orders)?;
-                websocket.send(Message::Text(serialized))?;
+                websocket.send(Message::Text(serialized.into()))?;
                 thread::sleep(Duration::from_millis(300));
             }
         });

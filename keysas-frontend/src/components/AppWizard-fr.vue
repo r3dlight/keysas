@@ -17,7 +17,7 @@ Ce tutoriel va vous montrer comment procéder. Vous pourrez le ré-afficher à t
 <h2>Keysas-admin</h2>
 <section id="creation-pki">
 <h3>1 - Création de la PKI de signature</h3>
-Cette procédure vous permettra de générer une PKI hybride Ed25519-Dilithium5 (IKPQPKI) pour la signatures des clés de sortie et la signature des documents passés dans une station blanche <b>Keysas</b>.
+Cette procédure vous permettra de générer une PKI hybride Ed25519-Ml-Dsa-87 (IKPQPKI) pour la signatures des clés de sortie et la signature des documents passés dans une station blanche <b>Keysas</b>.
 <div class="callout callout-info">
   Si vous n'avez jamais créé de PKI avec <b>Keysas-admin</b>, il suffit lancer l'application puis d'aller sur <b>Admin configuration</b> et de cliquer sur <b>IKPQPKI configuration</b>. <br>
   Cliquez ensuite sur <b>Create a new IKPQPKI</b> puis entrez les paramètres souhaités pour personnaliser votre PKI. 

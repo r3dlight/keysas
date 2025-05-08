@@ -1,9 +1,7 @@
-import { Store } from 'tauri-plugin-store-api';
+import { load } from '@tauri-apps/plugin-store';
 import { invoke } from "@tauri-apps/api";
 
-const Path = '.keysas.dat';
-const store = new Store(Path);
-
+const Path = 'keysas.dat';
 
 export async function setData(data) {
     let { key, val } = data;
@@ -52,7 +50,7 @@ export async function getKeys(){
 export async function loadStore(){
     console.log("Loading store");
     try {
-        let res = await store.load(Path);
+        let res = await load(Path, { autoSave: false });
         return res;
      } catch(e) {
         return Promise.reject(e);

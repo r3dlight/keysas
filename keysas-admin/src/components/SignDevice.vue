@@ -22,7 +22,7 @@
               <li class="tip-text"><b>On GNU/Linux:</b></li>
               <ul>
                 <li class="tip-text">Create a new file <b>/etc/udev/rules.d/71-keysas.rules</b></li>
-                <li class="tip-text">Copy and paste this in the new file: <br><b class="text-secondary">SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"</b></li>
+                <li class="tip-text">Copy and paste this in the new file: <br><b class="text-secondary">SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess",ENV{ID_VENDOR_ID}="$attr{vendor}",ENV{ID_MODEL_ID}="$attr{model}"</b></li>
                 <li class="tip-text">Open a terminal and execute this: <br> <b class="text-secondary">udevadm trigger && udevadm control --reload</b></li>
               </ul>
           </div>
@@ -45,7 +45,7 @@
 <script>
 "use strict";
 
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import 'animate.css';
 
 export default {

@@ -1,70 +1,38 @@
 {
+  "$schema": "https://schema.tauri.app/config/2.0.0-rc",
+  "productName": "keysas-admin",
+  "version": "2.5.0",
+  "identifier": "fr.keysas.dev",
   "build": {
-    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist/",
+    "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist"
+    "beforeBuildCommand": "npm run build"
   },
-  "package": {
-    "productName": "keysas-admin",
-    "version": "2.4.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": true
-    },
-    "bundle": {
-      "active": true,
-      "category": "DeveloperTool",
-      "copyright": "",
-      "deb": {
-        "depends": []
-      },
-      "externalBin": [],
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "fr.admin.keysas",
-      "longDescription": "",
-      "macOS": {
-        "entitlements": null,
-        "exceptionDomain": "",
-        "frameworks": [],
-        "providerShortName": null,
-        "signingIdentity": null
-      },
-      "resources": [],
-      "shortDescription": "",
-      "targets": "all",
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
-      }
-    },
-    "security": {
-      "csp": null
-    },
-    "updater": {
-      "active": true,
-      "endpoints": [
-          "https://keysas.fr/download/keysas-admin/update.json"
-      ],
-      "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFMjg4NzZFOTJBRDdGOEUKUldTT2Y2MlNib2NvanN5MXN0WHgvV08wNGg1T2N2ZGZEZmJ1N2ZneXhwL3Y3RXdPYTdKOHp2VWMK"
-    },
+  "app": {
+
     "windows": [
       {
-        "fullscreen": false,
+        "title": "keysas-admin",
+        "width": 800,
         "height": 600,
         "resizable": true,
-        "title": "keysas-admin",
-        "width": 800
+        "fullscreen": false
       }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
     ]
   }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /*
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various utility functions
  */
@@ -16,16 +16,12 @@ use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
-
 #[cfg(target_os = "linux")]
 use std::io::IoSlice;
+use std::io::{BufReader, Read};
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
-
-#[macro_use]
-extern crate serde_derive;
+use std::path::PathBuf;
 
 pub mod certificate_field;
 pub mod file_report;

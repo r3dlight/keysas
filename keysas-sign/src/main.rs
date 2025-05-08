@@ -10,12 +10,12 @@
 //! Keysas-sign is a utility on the station that manage its private keys
 //! It can be called on the command line and it offers the two functions
 //!  - generate_signing_keypair
-//!     This command is used to generate a new signing keypair on the station that
-//!     will be used to signed outgoing files and reports
+//!    This command is used to generate a new signing keypair on the station that
+//!    will be used to signed outgoing files and reports
 //!  - save_certificate
-//!     This command is used to load certificate on the station, it can be either:
-//!         - file: the certificate corresponds to the private signing key of the station
-//!         - usb: the certificate corresponds to the USB signing authority
+//!    This command is used to load certificate on the station, it can be either:
+//!      - file: the certificate corresponds to the private signing key of the station
+//!      - usb: the certificate corresponds to the USB signing authority
 #![warn(unused_extern_crates)]
 #![forbid(non_shorthand_field_patterns)]
 #![warn(dead_code)]
@@ -32,11 +32,11 @@
 #![warn(unused_imports)]
 #![feature(str_split_remainder)]
 
-pub use anyhow::{anyhow, Context, Result};
-use clap::{crate_version, Arg, ArgAction, Command};
+pub use anyhow::{Context, Result, anyhow};
+use clap::{Arg, ArgAction, Command, crate_version};
 use ed25519_dalek::SigningKey;
-use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use pkcs8::der::EncodePem;
@@ -165,7 +165,7 @@ fn generate_signing_keypair(
     hybrid_csr.push_str(&ec_csr.to_pem(pkcs8::LineEnding::LF)?);
     // Add a delimiter between the two CSR
     hybrid_csr.push('|');
-    // Add the Dilithium5 CSR
+    // Add the ML-DSA87 CSR
     hybrid_csr.push_str(&pq_csr.to_pem(pkcs8::LineEnding::LF)?);
 
     Ok(hybrid_csr)
@@ -199,7 +199,7 @@ fn main() -> Result<()> {
         match generate_signing_keypair(&config, FILE_PRIV_CL_PATH, FILE_PRIV_PQ_PATH, KEY_PASSWD) {
             Ok(r) => {
                 // Return the CSR
-                println!("{}", r);
+                println!("{r}");
             }
             Err(e) => {
                 return Err(anyhow!("Failed to generate private key {e}"));

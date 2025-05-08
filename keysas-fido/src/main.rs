@@ -2,7 +2,7 @@
 /*
  * The "keysas-fido".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains the main function.
  */
@@ -23,14 +23,14 @@
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
 
-use clap::{arg, crate_version, ArgAction, Command as Clap_Command};
+use clap::{ArgAction, Command as Clap_Command, arg, crate_version};
 use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
+use yubico_manager::Yubico;
 use yubico_manager::config::{Command, Config};
 use yubico_manager::config::{Mode, Slot};
 use yubico_manager::configure::DeviceModeConfig;
 use yubico_manager::hmacmode::HmacKey;
-use yubico_manager::Yubico;
 mod errors;
 use crate::errors::*;
 use kv::Config as kvConfig;

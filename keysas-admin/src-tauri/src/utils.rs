@@ -1,18 +1,19 @@
 use crate::ssh_wrapper::session_exec;
 use crate::store::{drop_pki, init_store, set_pki_config};
 use anyhow::anyhow;
-use keysas_lib::certificate_field::{validate_signing_certificate, CertificateFields};
+use keysas_lib::certificate_field::{CertificateFields, validate_signing_certificate};
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
-use pkcs8::der::EncodePem;
 use pkcs8::LineEnding;
+use pkcs8::der::EncodePem;
+use shlex::try_quote;
 use ssh::LocalSession;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpStream;
 use std::path::Path;
+use x509_cert::Certificate;
 use x509_cert::der::DecodePem;
 use x509_cert::request::CertReq;
-use x509_cert::Certificate;
 
 // Key names won't change
 const ST_CA_KEY_NAME: &str = "st-ca";
@@ -25,14 +26,16 @@ pub fn cmd_generate_key_and_get_csr(
     session: &mut LocalSession<TcpStream>,
     name: &str,
 ) -> Result<(CertReq, CertReq), anyhow::Error> {
+    let name_escaped = try_quote(name)?;
     let command = format!(
         "{}{}{}",
-        "sudo /usr/bin/keysas-sign --generate", " --name ", name
+        "sudo /usr/bin/keysas-sign --generate", " --name ", name_escaped
     );
+    log::error!("Command: {command:?}");
     let cmd_res = match session_exec(session, &command) {
         Ok(res) => res,
         Err(why) => {
-            log::error!("Error on send_command: {:?}", why);
+            log::error!("Error on send_command: {why:?}");
             return Err(anyhow!("Connection failed"));
         }
     };
@@ -77,9 +80,9 @@ pub fn cmd_generate_key_and_get_csr(
 /// Utility function to load a certificate on the station
 /// Kind:
 ///     - file-cl: certificate for ED25519 station files signing
-///     - file-pq: certificate for Dilithium5 station files signing
+///     - file-pq: certificate for ML-DSA87 station files signing
 ///     - usb-cl: certificate for ED25519 USB signing
-///     - usb-pq: certificate for Dilithium5 USB signing
+///     - usb-pq: certificate for ML-DSA87 USB signing
 pub fn send_cert_to_station(
     session: &mut LocalSession<TcpStream>,
     cert: &Certificate,
@@ -120,7 +123,7 @@ pub fn send_cert_to_station(
 pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::Error> {
     let output = String::from_utf8(cert.to_pem(LineEnding::LF)?.into())?;
     let mut file = File::create(path)?;
-    write!(file, "{}", output)?;
+    write!(file, "{output}")?;
     Ok(())
 }
 
@@ -155,13 +158,13 @@ pub async fn check_restore_pki(
 
             if subdirectory_path.exists() && subdirectory_path.is_dir() {
                 if file_path.exists() && file_path.is_file() {
-                    log::debug!("Found file {} in directory {}.", file, directory);
+                    log::debug!("Found file {file} in directory {directory}.");
                 } else {
-                    log::error!("File {} not found in directory {}.", file, directory);
+                    log::error!("File {file} not found in directory {directory}.");
                     return Err(anyhow!("Invalid algorithm OID"));
                 }
             } else {
-                log::error!("Directory {:?} doesn't exist.", subdirectory_path);
+                log::error!("Directory {subdirectory_path:?} doesn't exist.");
                 return Err(anyhow!("Directory do not exist"));
             }
         }
@@ -184,33 +187,19 @@ pub async fn check_restore_pki(
         }
     };
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.classic_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.classic_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root 25519 certificate: {:?}",
-                why,
-            ))
-        }
-    };
+    )
+    .map_err(|why| anyhow!("Error validating root ed25519 certificate: {:?}", why))?;
     log::debug!("Root Ed25519 certificate validated.");
 
-    match validate_signing_certificate(
+    validate_signing_certificate(
         &root_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
-    ) {
-        Ok(rpp) => rpp,
-        Err(why) => {
-            return Err(anyhow!(
-                "Error validating root Dilithium5 certificate: {:?}",
-                why
-            ))
-        }
-    };
-    log::debug!("Root Dilithium5 certificate validated.");
+    )
+    .map_err(|why| anyhow!("Error validating root PQC certificate: {:?}", why))?;
+    log::debug!("Root PQC certificate validated.");
 
     let st_keys = match HybridKeyPair::load(
         ST_CA_KEY_NAME,
@@ -235,7 +224,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating station Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -244,15 +233,15 @@ pub async fn check_restore_pki(
         &st_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
     ) {
-        Ok(_) => log::debug!("Dilithium5 station certificate signature is valid."),
+        Ok(_) => log::debug!("ML-DSA87 station certificate signature is valid."),
         Err(why) => {
             return Err(anyhow!(
-                "Error validating station Dilithium5 certificate signature: {:?}",
+                "Error validating station ML-DSA87 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
-    log::debug!("Station Dilithium5 certificate validated.");
+    log::debug!("Station ML-DSA87 certificate validated.");
 
     let usb_keys = match HybridKeyPair::load(
         USB_CA_KEY_NAME,
@@ -277,7 +266,7 @@ pub async fn check_restore_pki(
             return Err(anyhow!(
                 "Error validating USB Ed25519 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
     log::debug!("Station Ed25519 certificate validated.");
@@ -286,15 +275,15 @@ pub async fn check_restore_pki(
         &usb_keys.pq_cert.to_pem(LineEnding::LF)?,
         Some(&root_keys.pq_cert),
     ) {
-        Ok(_) => log::debug!("Dilithium5 USB certificate signature is valid."),
+        Ok(_) => log::debug!("ML-DSA87 USB certificate signature is valid."),
         Err(why) => {
             return Err(anyhow!(
-                "Error validating USB Dilithium5 certificate signature: {:?}",
+                "Error validating USB ML-DSA87 certificate signature: {:?}",
                 why
-            ))
+            ));
         }
     }
-    log::debug!("USB Dilithium5 certificate validated.");
+    log::debug!("USB ML-DSA87 certificate validated.");
     log::info!("PKI provided is valid.");
     log::info!("Writing loaded configuration to database...");
     drop_pki().await?;
@@ -344,9 +333,9 @@ pub async fn check_restore_pki(
             return Err(anyhow!("RdnSequence not valid: length is not 2"));
         }
     }
-    log::debug!("Found Country: {} ", country);
-    log::debug!("Found organization: {} ", organization);
-    log::debug!("Found organizational_unit: {} ", organizational_unit);
+    log::debug!("Found Country: {country} ");
+    log::debug!("Found organization: {organization} ");
+    log::debug!("Found organizational_unit: {organizational_unit} ");
     if !country.is_empty() && !organization.is_empty() && !organizational_unit.is_empty() {
         let cert_infos = CertificateFields {
             org_name: Some(organization.to_string()),

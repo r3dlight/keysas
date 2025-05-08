@@ -1,24 +1,24 @@
 use ed25519_dalek::Signer;
 use ed25519_dalek::SigningKey;
 use hex_literal::hex;
-use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::certificate_field::CertificateFields;
+use keysas_lib::certificate_field::validate_signing_certificate;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use oqs::sig::Algorithm;
 use oqs::sig::Sig;
-use pkcs8::der::asn1::BitString;
-use pkcs8::der::Any;
-use pkcs8::der::Encode;
-use pkcs8::pkcs5::pbes2;
-use pkcs8::spki::AlgorithmIdentifier;
 use pkcs8::EncryptedPrivateKeyInfo;
 use pkcs8::LineEnding;
 use pkcs8::PrivateKeyInfo;
+use pkcs8::der::Any;
+use pkcs8::der::Encode;
+use pkcs8::der::asn1::BitString;
+use pkcs8::pkcs5::pbes2;
+use pkcs8::spki::AlgorithmIdentifier;
 use rand_dl::rngs::OsRng;
 use std::fs::read;
-use tempfile::{tempdir, NamedTempFile};
+use tempfile::{NamedTempFile, tempdir};
 use x509_cert::name::RdnSequence;
 use x509_cert::spki::ObjectIdentifier;
 
@@ -231,10 +231,10 @@ fn test_generate_csr_ed25519() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn test_generate_csr_dilithium5() {
-    // Create the root CA Dilithium key pair
+fn test_generate_csr_mldsa() {
+    // Create the root CA ML-DSA87 key pair
     oqs::init();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+    let pq_scheme = Sig::new(Algorithm::MlDsa87).unwrap();
     let (pk, sk) = pq_scheme.keypair().unwrap();
     let keypair = KeysasPQKey {
         private_key: sk,
@@ -258,9 +258,9 @@ fn test_generate_csr_dilithium5() {
     }
 
     // Test CSR signing algorithm
-    let dilithium5_oid = ObjectIdentifier::new("1.3.6.1.4.1.2.267.7.8.7").unwrap();
+    let mldsa_oid = ObjectIdentifier::new("2.16.840.1.101.3.4.3.19").unwrap();
     let ref_algo: AlgorithmIdentifier<Any> = AlgorithmIdentifier {
-        oid: dilithium5_oid,
+        oid: mldsa_oid,
         parameters: None,
     };
     assert_eq!(csr.algorithm, ref_algo);
@@ -309,10 +309,10 @@ fn test_save_and_load_ed25519() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn test_save_and_load_dilithium5() {
-    // Create the root CA Dilithium key pair
+fn test_save_and_load_mldsa() {
+    // Create the root CA ML_DSA87 key pair
     oqs::init();
-    let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+    let pq_scheme = Sig::new(Algorithm::MlDsa87).unwrap();
     let (pk, sk) = pq_scheme.keypair().unwrap();
     let keypair = KeysasPQKey {
         private_key: sk,

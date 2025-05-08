@@ -2,7 +2,7 @@
   <NavBar />
   <div class="container">
     <div class="row">
-      <h1>Administration configuration__</h1>
+      <h1>Administration configuration</h1>
       <br>
     </div>
   <div class="box">
@@ -95,3 +95,11 @@ export default {
 
 }
 </script>
+
+<style>
+
+button {
+  font-size: 12px;
+}
+
+</style>

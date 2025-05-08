@@ -45,6 +45,9 @@ Enroll you Keysas stations
 You can now start adding new **Keysas** stations in the **"Add a new Keysas"** menu providing a name and an IP address
 When done, export the **public SSH** key by clicking the **"Export SSH pubkey"** button for each station added.
 
+.. warning:: 
+ Exporting the SSH public key requires that directory **/home/keysas/.ssh/** is already existing on the remote host. 
+
 In the menu, go to **"Manage your registered stations"**, click on more, provide your **IKPQPKI** **password** then click on **"Enroll"**
 Be patient, this may take some time !
 
@@ -55,7 +58,7 @@ Before starting, you must add a new **udev** to allow your current user wrting U
 .. code-block:: shell-session
  
  # Add the the new udev rule:
- echo 'SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"' > /etc/udev/rules.d/71-keysas.rules
+ echo 'SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess",ENV{ID_VENDOR_ID}="$attr{vendor}",ENV{ID_MODEL_ID}="$attr{model}"' > /etc/udev/rules.d/71-keysas.rules
  # Then, add your current user to the disk group:
  usermod -aG disk $LOGNAME
 

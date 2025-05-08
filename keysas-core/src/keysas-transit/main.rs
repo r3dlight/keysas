@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-out binary.
@@ -23,13 +23,12 @@
 #![forbid(trivial_bounds)]
 #![warn(overflowing_literals)]
 #![warn(deprecated)]
-#![allow(forgetting_references)]
 
 use anyhow::Result;
 use bincode::Options;
 use clamav_tcp::scan;
 use clamav_tcp::version;
-use clap::{crate_version, Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, crate_version};
 use infer::get;
 use keysas_lib::init_logger;
 use keysas_lib::sha256_digest;
@@ -38,7 +37,6 @@ use nix::unistd;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::io::{IoSlice, IoSliceMut};
-use std::mem;
 use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::os::fd::FromRawFd;
@@ -229,7 +227,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match m {
                 Ok(ad) => Some(ad),
                 Err(e) => {
-                    log::warn!("failed to get ancillary data: {:?}", e);
+                    log::warn!("failed to get ancillary data: {e:?}");
                     None
                 }
             }
@@ -305,9 +303,15 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
     for f in files {
         match unistd::dup2(f.fd, 500) {
             Ok(nfd) => {
+                // Safety: We are using a file descriptor that we know is valid
                 let mut file = unsafe { File::from_raw_fd(nfd) };
                 // Synchronize the file before calculating the SHA256 hash
-                file.sync_all().unwrap();
+                match file.sync_all() {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Failed to synchronize file: {e}");
+                    }
+                }
                 // Position the cursor at the beginning of the file
                 match unistd::lseek(nfd, 0, unistd::Whence::SeekSet) {
                     Ok(_) => (),
@@ -410,7 +414,7 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                 }
                 // Check the magic number
                 // Read only 1Mo of the file to be faster and do not read large files
-                let reader = BufReader::new(file);
+                let reader = BufReader::new(&file);
                 let limited_reader = &mut reader.take(1024 * 1024);
                 let mut buffer = Vec::new();
                 match limited_reader.read_to_end(&mut buffer) {
@@ -424,9 +428,11 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
                         }
                     }
                     Err(e) => {
-                        error!("Cannot read limited buffer: {e:?}, file will be marked as not allowed !");
+                        error!(
+                            "Cannot read limited buffer: {e:?}, file will be marked as not allowed !"
+                        );
                         f.md.is_type_allowed = false;
-                        f.md.file_type = "Unknow".into();
+                        f.md.file_type = "Unknown".into();
                     }
                 }
             }
@@ -444,8 +450,6 @@ fn check_files(files: &mut Vec<FileData>, conf: &Configuration, clam_addr: Strin
             f.md.av_pass,
             f.md.is_toobig
         );
-        #[allow(forgetting_references)]
-        mem::forget(f);
     }
 }
 
@@ -511,7 +515,9 @@ fn main() -> Result<()> {
                 }
             },
             None => {
-                error!("Cannot parse any valid SocketAddr for connecting to clamav server, killing my self.");
+                error!(
+                    "Cannot parse any valid SocketAddr for connecting to clamav server, killing my self."
+                );
                 process::exit(1);
             }
         },

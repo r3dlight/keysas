@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /*
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions for building and validating file report
  */
@@ -27,7 +27,7 @@
 //!         "file_digest",         // String: base64 encoded SHA256 digest of the file
 //!         "metadata_digest",     // String: base64 encoded SHA256 digest of the metadata
 //!         "station_certificate", // String: concatenation of the station signing certificates PEM
-//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and Dilithium5 signatures
+//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and ML-DSA87 signatures
 //!     }
 //! }
 //! ```
@@ -41,8 +41,9 @@ use crate::{
     certificate_field::validate_signing_certificate, keysas_hybrid_keypair::HybridKeyPair,
 };
 use anyhow::anyhow;
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use oqs::sig::{Algorithm, Sig};
+use serde_derive::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fs::File;
 use std::path::Path;
@@ -73,9 +74,9 @@ pub struct Bd {
     pub file_digest: String,
     /// SHA256 digest of the [MetaData] associated to the file
     pub metadata_digest: String,
-    /// Station certificates: concatenation of its ED25519 and Dilithium5 signing certificates with a '|' delimiter
+    /// Station certificates: concatenation of its ED25519 and ML-DSA87 signing certificates with a '|' delimiter
     pub station_certificate: String,
-    /// Report signature: concatenation of the ED25519 and Dilithium5 signatures in base64
+    /// Report signature: concatenation of the ED25519 and ML-DSA87 signatures in base64
     pub report_signature: String,
 }
 
@@ -177,7 +178,7 @@ pub fn generate_report_metadata(f: &FileMetadata) -> MetaData {
     }
 }
 
-/// Bind the report to the file by signing with ED25519 and Dilithium5 the concatenation
+/// Bind the report to the file by signing with ED25519 and ML-DSA87 the concatenation
 /// of the file digest and the report metadata digest.
 /// The two signatures are concatenated (ED25519 first).
 /// All the fields of the binding are encoded in base64
@@ -216,7 +217,7 @@ pub fn bind_and_sign(
     if let Some(keys) = sign_keys {
         // Sign with ED25519
         signature.append(&mut keys.classic.message_sign(concat.as_bytes())?);
-        // Sign with Dilithium5
+        // Sign with ML-DSA87
         signature.append(&mut keys.pq.message_sign(concat.as_bytes())?);
     }
 
@@ -241,7 +242,7 @@ pub fn bind_and_sign(
 /// * `report_path` - Path to the file containing the report
 /// * `file_path`   - Path to the file linked to the report
 /// * `ca_cert_cl`  - ED25519 certificate of the authority, used to validate the certificate in the report
-/// * `ca_cert_pq`  - Dilithium certificate of the authority
+/// * `ca_cert_pq`  - ML-DSA87 certificate of the authority
 pub fn parse_report(
     report_path: &Path,
     file_path: Option<&Path>,
@@ -260,12 +261,15 @@ pub fn parse_report(
     let report: Report = serde_json::from_str(report_content.as_str())?;
 
     // If the report is linked to a file, test that there is a path to it supplied
-    if report.metadata.name.ne("") && file_path.is_none() {
+    if !report.metadata.name.is_empty() && file_path.is_none() {
         return Err(anyhow!("No file supplied with the report"));
     }
 
     // Extracts the certificate within the report and validate them
     let mut certs = report.binding.station_certificate.split('|');
+    if certs.clone().count() != 2 {
+        return Err(anyhow!("Invalid number of certificates"));
+    }
     let cert_cl = validate_signing_certificate(
         certs.next().ok_or(anyhow!("No ED25519 certificate"))?,
         ca_cert_cl,
@@ -273,7 +277,7 @@ pub fn parse_report(
     let cert_pq = validate_signing_certificate(
         certs
             .remainder()
-            .ok_or(anyhow!("No Dilithium certificate"))?,
+            .ok_or(anyhow!("No ML-DSA87 certificate"))?,
         ca_cert_pq,
     )?;
 
@@ -311,6 +315,9 @@ pub fn parse_report(
     // Signature validation
     let signature = general_purpose::STANDARD.decode(&report.binding.report_signature)?;
 
+    if signature.len() <= ed25519_dalek::SIGNATURE_LENGTH {
+        return Err(anyhow!("Signature is too short"));
+    }
     // Validate the signature with ED25519
     let cert_cl_bytes = cert_cl
         .tbs_certificate
@@ -324,7 +331,7 @@ pub fn parse_report(
         return Err(anyhow!("Cannot copy from slice cert_cl_bytes"));
     }
     let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&cert_cl_bytes_casted)?;
-
+    // SAFETY: Should not panic as len is checked previously as > 64
     let sign_cl_bytes = &signature[0..ed25519_dalek::SIGNATURE_LENGTH];
     let mut sign_cl_bytes_casted: [u8; 64] = [0u8; 64];
     if sign_cl_bytes.len() == 64 {
@@ -337,11 +344,11 @@ pub fn parse_report(
     pub_cl.verify_strict(message.as_bytes(), &sig_cl)?;
     // If the signature is invalid, an error is thrown
 
-    // Validate the signature with Dilithium
+    // Validate the signature with ML-DSA87
     oqs::init();
-    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+    let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
         Ok(pq_s) => pq_s,
-        Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+        Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
     };
     let pub_pq = pq_scheme
         .public_key_from_bytes(
@@ -351,13 +358,15 @@ pub fn parse_report(
                 .subject_public_key
                 .raw_bytes(),
         )
-        .ok_or_else(|| anyhow!("Failed to extract Dilithium public key"))?;
+        .ok_or_else(|| anyhow!("Failed to extract ML-DSA87 public key"))?;
+
+    // SAFETY: should not panic as len has been verified as > 64
     let sig_pq = pq_scheme
         .signature_from_bytes(&signature[ed25519_dalek::SIGNATURE_LENGTH..])
         .ok_or_else(|| anyhow!("Failed to parse signature field"))?;
     match pq_scheme.verify(message.as_bytes(), sig_pq, pub_pq) {
-        Ok(_) => log::info!("Dilithium scheme is now verified"),
-        Err(e) => return Err(anyhow!("Dilithium scheme is not verified: {e}")),
+        Ok(_) => log::info!("ML-DSA87 scheme is now verified"),
+        Err(e) => return Err(anyhow!("ML-DSA87 scheme is not verified: {e}")),
     }
     // If the signature is invalid an error is thrown
     Ok(report)
@@ -366,12 +375,12 @@ pub fn parse_report(
 #[cfg(test)]
 mod tests_out {
     use crate::{certificate_field::CertificateFields, keysas_hybrid_keypair::HybridKeyPair};
-    use base64::{engine::general_purpose, Engine};
+    use base64::{Engine, engine::general_purpose};
     use oqs::sig::{Algorithm, Sig};
     use pkcs8::der::{DecodePem, EncodePem};
     use x509_cert::Certificate;
 
-    use crate::file_report::{bind_and_sign, generate_report_metadata, FileMetadata};
+    use crate::file_report::{FileMetadata, bind_and_sign, generate_report_metadata};
 
     #[test]
     fn test_metadata_valid_file() {
@@ -460,7 +469,7 @@ mod tests_out {
         }
         let pub_cl = ed25519_dalek::VerifyingKey::from_bytes(&pub_cl_casted).unwrap();
         oqs::init();
-        let pq_scheme = Sig::new(Algorithm::Dilithium5).unwrap();
+        let pq_scheme = Sig::new(Algorithm::MlDsa87).unwrap();
         let pub_pq = pq_scheme
             .public_key_from_bytes(
                 cert_pq

@@ -2,31 +2,32 @@
 /*
  * The "keysas-io".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file is the main file for udev management.
  */
 
 #![feature(atomic_from_mut)]
 #![feature(str_split_remainder)]
+#![feature(random)]
 
 extern crate libc;
 extern crate regex;
 extern crate udev;
 
 use anyhow::anyhow;
-use base64::{engine::general_purpose, Engine as _};
-use clap::{crate_version, Arg, Command as Clap_Command};
+use base64::{Engine as _, engine::general_purpose};
+use clap::{Arg, Command as Clap_Command, crate_version};
 use log::{debug, error, info, warn};
 use regex::Regex;
 use std::fs::{self, create_dir_all};
 use std::path::PathBuf;
+use std::random::random;
 use std::thread as sthread;
 use std::{ffi::OsStr, net::TcpListener, thread::spawn};
 use tungstenite::{
-    accept_hdr,
+    Message, accept_hdr,
     handshake::server::{Request, Response},
-    Message,
 };
 use udev::Event;
 use walkdir::WalkDir;
@@ -40,7 +41,7 @@ extern crate sys_mount;
 extern crate serde_derive;
 
 use crate::errors::*;
-use crossbeam_utils::thread;
+use bytemuck::cast_slice;
 use ed25519_dalek::Signature as SignatureDalek;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_key::PublicKeys;
@@ -50,11 +51,10 @@ use kv::*;
 use libc::{c_int, c_short, c_ulong, c_void};
 use oqs::sig::{Algorithm, Sig};
 use proc_mounts::MountIter;
-use std::fmt::Write;
 use std::fs::File;
-use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
+use std::io::{Read, Write as wr};
 use std::ops::Deref;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -64,12 +64,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use sys_mount::unmount;
 use sys_mount::{FilesystemType, Mount, MountFlags, SupportedFilesystems, Unmount, UnmountFlags};
+use yubico_manager::Yubico;
 use yubico_manager::config::Config;
 use yubico_manager::config::{Mode, Slot};
-use yubico_manager::Yubico;
 
 mod errors;
-//use std::process::exit;
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -90,7 +89,7 @@ type nfds_t = c_ulong;
 
 const POLLIN: c_short = 0x0001;
 
-extern "C" {
+unsafe extern "C" {
     fn ppoll(
         fds: *mut pollfd,
         nfds: nfds_t,
@@ -125,7 +124,7 @@ impl StrExt for str {
     }
 }
 
-// Const because we do not want them to be modifyied
+// Const as we do not want them to be user modifyied
 const TMP_DIR: &str = "/var/local/tmp/";
 const SAS_IN: &str = "/var/local/in/";
 const SAS_OUT: &str = "/var/local/out/";
@@ -140,16 +139,15 @@ fn list_yubikey() -> Vec<String> {
     let mut yubikey_vector = Vec::new();
 
     if let Ok(device) = yubi.find_yubikey() {
-        //info!(
-        //    "Vendor ID: {:?} Product ID {:?}",
-        //    device.vendor_id, device.product_id
-        //);
+        debug!(
+            "Vendor ID: {:?}, Product ID {:?}.",
+            device.vendor_id, device.product_id
+        );
         let concat = format!("{:?}/{:?}", device.vendor_id, device.product_id);
         yubikey_vector.push(concat);
     } else {
         debug!("Fido2: Yubikey not present.");
     }
-
     yubikey_vector
 }
 
@@ -172,9 +170,13 @@ fn hmac_challenge() -> Option<String> {
                 .set_slot(Slot::Slot2);
 
             // Challenge can not be greater than 64 bytes
-            let challenge = String::from("Keysas-Challenge");
+            let mut challenge: [u128; 4] = [0; 4];
+            for item in &mut challenge {
+                *item = random();
+            }
+            let casted_challenge = cast_slice(&challenge);
             // In HMAC Mode, the result will always be the SAME for the SAME provided challenge
-            match yubi.challenge_response_hmac(challenge.as_bytes(), config) {
+            match yubi.challenge_response_hmac(casted_challenge, config) {
                 Ok(hmac_result) => {
                     let v: &[u8] = hmac_result.deref();
                     let hex_string = hex::encode(v);
@@ -184,7 +186,13 @@ fn hmac_challenge() -> Option<String> {
                     // Open the key/value store
                     match Store::new(cfg) {
                         Ok(store) => match store.bucket::<String, String>(Some("Keysas")) {
-                            Ok(enrolled_yubikeys) => enrolled_yubikeys.get(&hex_string).unwrap(),
+                            Ok(enrolled_yubikeys) => match enrolled_yubikeys.get(&hex_string) {
+                                Ok(y) => y,
+                                Err(why) => {
+                                    error!("Error while getting yubikey value: {why:?}");
+                                    None
+                                }
+                            },
                             Err(why) => {
                                 error!("Error while accessing the Bucket: {why:?}");
                                 None
@@ -234,6 +242,9 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
     let buf_str = String::from_utf8(buffer.to_vec())?;
 
     let mut signatures = buf_str.split('|');
+    if signatures.clone().count() != 2 {
+        return Err(anyhow!("Invalid number of certificates"));
+    }
     let s_cl = match signatures.next() {
         Some(cl) => cl,
         None => return Err(anyhow!("Cannot parse Classic signature from USB device")),
@@ -244,7 +255,7 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
         Err(e) => {
             return Err(anyhow!(
                 "Cannot decode base64 Classic signature from bytes: {e}"
-            ))
+            ));
         }
     };
 
@@ -266,9 +277,9 @@ fn get_signature(device: &str) -> Result<KeysasHybridSignature> {
 
     let sig_dalek = SignatureDalek::from_bytes(&s_cl_decoded_casted);
     oqs::init();
-    let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+    let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
         Ok(pq_s) => pq_s,
-        Err(e) => return Err(anyhow!("Cannot construct new Dilithium5 algorithm: {e}")),
+        Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
     };
 
     let sig_pq = match pq_scheme.signature_from_bytes(&s_pq_decoded) {
@@ -289,21 +300,21 @@ fn is_signed(
     id_model_id: &str,
     id_revision: &str,
     id_serial: &str,
-) -> Result<bool> {
+) -> bool {
     debug!("Checking signature for device: {device}");
     //Getting both pubkeys for certs
     let opt_pubkeys = match KeysasHybridPubKeys::get_pubkeys_from_certs(ca_cert_cl, ca_cert_pq) {
         Ok(o) => o,
         Err(e) => {
-            error!("Cannot get pubkeys from certs: {e}");
-            return Ok(false);
+            warn!("Cannot get pubkeys from certs: {e}");
+            return false;
         }
     };
     let pubkeys = match opt_pubkeys {
         Some(p) => p,
         None => {
             error!("No pubkeys found in certificates, cannot build KeysasHybridPubKeys");
-            return Ok(false);
+            return false;
         }
     };
 
@@ -315,7 +326,7 @@ fn is_signed(
         }
         Err(e) => {
             error!("Cannot parse signature on the device: {e}");
-            return Ok(false);
+            return false;
         }
     };
     let data = format!(
@@ -325,11 +336,11 @@ fn is_signed(
     match KeysasHybridPubKeys::verify_key_signatures(data.as_bytes(), signatures, pubkeys) {
         Ok(_) => {
             info!("USB device is signed");
-            Ok(true)
+            true
         }
         Err(e) => {
             info!("Signatures are not matching on USB device: {e}");
-            Ok(false)
+            false
         }
     }
 }
@@ -391,12 +402,22 @@ fn move_device_out(device: &Path) -> Result<PathBuf> {
 
 fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
     File::create(LOCK)?;
-    thread::scope(|s| {
-             for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
-                 if e.metadata().expect("Cannot get metadata for file.").is_file() {
-             s.spawn(move |_| {
+    std::thread::scope(|s| {
+        for e in WalkDir::new(mount_point).into_iter().filter_map(|e| e.ok()) {
+            if e.metadata()
+                .expect("Cannot get metadata for file.")
+                .is_file()
+            {
+                // SAFETY: Thread should not panic as we test everything using match{}
+                s.spawn(move || {
                          debug!("New entry path found: {}.", e.path().display());
-                         let path_to_read = e.path().to_str().unwrap();
+                         let path_to_read = match e.path().to_str() {
+                             Some(p) => p,
+                             None => {
+                                 error!("Cannot convert path to string.");
+                                 return;
+                             }
+                         };
                          let entry = e.file_name().to_string_lossy();
                          let entry_cleaned = str::replace(&entry, "?", "-");
                          let path_to_write = format!(
@@ -409,9 +430,19 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                              TMP_DIR,
                              diacritics::remove_diacritics(&entry_cleaned)
                          );
+
                          // Create a tmp dir to be able to rename files later
-                         let tmp = Path::new(TMP_DIR);
-                         if !tmp.exists() &&  !tmp.is_dir() {
+                         let tmp = TMP_DIR.trim_end_matches("/");
+                         let tmp = Path::new(tmp);
+
+                         if tmp.exists() {
+                            if tmp.is_dir() {
+                                debug!("tmp directory already exists.");
+                            } else {
+                                error!("A file with the same name as the directory already exists: {TMP_DIR}");
+                                return;
+                            }
+                        } else {
                              match fs::create_dir(tmp) {
                                  Ok(_)=> info!("Creating tmp directory for writing incoming files !"),
                                  Err(e) => error!("Cannot create tmp directory: {e:?}"),
@@ -429,16 +460,20 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                                              error!(
                                                  "Error while copying file {path_to_read}: {e:?}"
                                              );
-                                             let mut report =
+                                             let report =
                                                  format!("{}{}", path_to_write, ".ioerror");
-                                             match File::create(&report) {
-                                                 Ok(_) => warn!("io-error report file created."),
+                                             let mut report = match File::create(&report) {
+                                                 Ok(r) => {
+                                                    info!("io-error report file created.");
+                                                    r
+                                                },
                                                  Err(why) => {
                                                      error!(
                                                          "Failed to create io-error report {report:?}: {why}"
                                                      );
+                                                     return;
                                                  }
-                                             }
+                                             };
                                              match writeln!(
                                                  report,
                                                  "Error while copying file: {e:?}"
@@ -471,10 +506,9 @@ fn copy_files_in(mount_point: &PathBuf) -> Result<()> {
                              ),
                          };
              });
-         }
-         }
-     })
-     .expect("Cannot scope threads !");
+            }
+        }
+    });
     info!("Incoming files copied sucessfully, unlocking.");
     if Path::new(LOCK).exists() {
         fs::remove_file(LOCK)?;
@@ -678,7 +712,7 @@ fn main() -> Result<()> {
                 yubikeys: yubi,
             };
             let serialized = serde_json::to_string(&keys)?;
-            websocket.send(Message::Text(serialized))?;
+            websocket.send(Message::Text(serialized.into()))?;
 
             loop {
                 let result = unsafe {
@@ -702,13 +736,27 @@ fn main() -> Result<()> {
                     }
                 };
 
-                debug!("Event type is: {:?}", event.event_type());
+                info!("New USB event type detected: {:?}", event.event_type());
+                info!("action: {:?}", event.action());
+                info!(
+                    "property_value: {:?}",
+                    event.property_value(
+                        OsStr::new("DEVTYPE")
+                            .to_str()
+                            .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?
+                    )
+                );
                 if event.action() == Some(OsStr::new("add"))
-                    && event.property_value(
+                    && ((event.property_value(
                         OsStr::new("DEVTYPE")
                             .to_str()
                             .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?,
-                    ) == Some(OsStr::new("partition"))
+                    ) == Some(OsStr::new("partition")))
+                        || (event.property_value(
+                            OsStr::new("DEVTYPE")
+                                .to_str()
+                                .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?,
+                        ) == Some(OsStr::new("disk"))))
                 {
                     let yubi: Yubistruct = Yubistruct {
                         active: yubikey,
@@ -721,7 +769,7 @@ fn main() -> Result<()> {
                         yubikeys: yubi,
                     };
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.send(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized.into()))?;
 
                     let id_vendor_id = event
                         .property_value(
@@ -758,7 +806,14 @@ fn main() -> Result<()> {
                                 .ok_or_else(|| anyhow!("Cannot convert ID_SERIAL to str."))?,
                         )
                         .ok_or_else(|| anyhow!("Cannot get ID_SERIAL from event."))?;
-                    //println!("device: {:?}", event.device().parent().unwrap().property_value(OsStr::new("system_name")));
+                    error!(
+                        "device: {:?}",
+                        event
+                            .device()
+                            .parent()
+                            .unwrap()
+                            .property_value(OsStr::new("system_name"))
+                    );
                     //for property in event.device().parent() {
                     //    for attr in property.attributes() {
                     //        println!("{:?}:{:?}", attr.name(),attr.value());
@@ -798,136 +853,99 @@ fn main() -> Result<()> {
                         id_revision,
                         id_serial,
                     );
-                    match signed {
-                        Ok(value) => {
-                            //Invalid Signature
-                            if !value {
-                                info!("Device signature is not valid !");
-                                let keys_in_iter: Vec<String> =
-                                    keys_in.clone().into_iter().collect();
-                                if !keys_in_iter.contains(&product) {
-                                    busy_in()?;
-                                    keys_in.push(product);
-                                    let yubi: Yubistruct = Yubistruct {
-                                        active: yubikey,
-                                        yubikeys: list_yubikey(),
-                                    };
-                                    let keys: Usbkeys = Usbkeys {
-                                        usb_in: keys_in.clone(),
-                                        usb_out: keys_out.clone(),
-                                        usb_undef: keys_undef.clone(),
-                                        yubikeys: yubi,
-                                    };
-                                    let serialized = serde_json::to_string(&keys)?;
-                                    websocket.send(Message::Text(serialized))?;
-                                    if yubikey {
-                                        match hmac_challenge() {
-                                            Some(name) => {
-                                                info!(
-                                                    "HMAC challenge successfull for user: {name} !"
-                                                );
-                                                copy_device_in(Path::new(&device))?;
-                                                info!("Unsigned USB device done.");
-                                                ready_in()?;
-                                            }
-                                            None => {
-                                                warn!("No user found during HMAC challenge !");
-                                                ready_in()?;
-                                            }
-                                        };
-                                    } else {
+                    if !signed {
+                        info!("Device signature is not valid !");
+                        let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
+                        warn!("keys_in_iter: {keys_in_iter:?}");
+                        if !keys_in_iter.contains(&product) {
+                            busy_in()?;
+                            keys_in.push(product);
+                            let yubi: Yubistruct = Yubistruct {
+                                active: yubikey,
+                                yubikeys: list_yubikey(),
+                            };
+                            let keys: Usbkeys = Usbkeys {
+                                usb_in: keys_in.clone(),
+                                usb_out: keys_out.clone(),
+                                usb_undef: keys_undef.clone(),
+                                yubikeys: yubi,
+                            };
+                            info!("DEVICE NOT VALID1: {}", &device);
+                            let serialized = serde_json::to_string(&keys)?;
+                            websocket.send(Message::Text(serialized.into()))?;
+                            if yubikey {
+                                match hmac_challenge() {
+                                    Some(name) => {
+                                        info!("HMAC challenge successfull for user: {name} !");
                                         copy_device_in(Path::new(&device))?;
                                         info!("Unsigned USB device done.");
                                         ready_in()?;
                                     }
-                                }
-                            //Signature ok so this is a out device
-                            } else if value {
-                                info!("USB device is signed.");
-                                let keys_out_iter: Vec<String> =
-                                    keys_out.clone().into_iter().collect();
-                                if !keys_out_iter.contains(&product) {
-                                    busy_out()?;
-                                    keys_out.push(product);
-                                    let yubi: Yubistruct = Yubistruct {
-                                        active: yubikey,
-                                        yubikeys: list_yubikey(),
-                                    };
-                                    let keys: Usbkeys = Usbkeys {
-                                        usb_in: keys_in.clone(),
-                                        usb_out: keys_out.clone(),
-                                        usb_undef: keys_undef.clone(),
-                                        yubikeys: yubi,
-                                    };
-                                    let serialized = serde_json::to_string(&keys)?;
-                                    match websocket.send(Message::Text(serialized)) {
-                                        Ok(_) => log::debug!("Data wrote into the websocket"),
-                                        Err(e) => {
-                                            log::error!("Cannot write data into the websocket: {e}")
-                                        }
+                                    None => {
+                                        warn!("No user found during HMAC challenge !");
+                                        ready_in()?;
                                     }
-                                    move_device_out(Path::new(&device))?;
-                                    info!("Signed USB device done.");
-                                    ready_out()?;
-                                }
+                                };
                             } else {
-                                let keys_undef_iter: Vec<String> =
-                                    keys_undef.clone().into_iter().collect();
-                                if !keys_undef_iter.contains(&product) {
-                                    keys_undef.push(product);
-                                    warn!("Undefined USB device.");
-                                    let yubi: Yubistruct = Yubistruct {
-                                        active: yubikey,
-                                        yubikeys: list_yubikey(),
-                                    };
-                                    let keys: Usbkeys = Usbkeys {
-                                        usb_in: keys_in.clone(),
-                                        usb_out: keys_out.clone(),
-                                        usb_undef: keys_undef.clone(),
-                                        yubikeys: yubi,
-                                    };
-                                    let serialized = serde_json::to_string(&keys)?;
-                                    websocket.send(Message::Text(serialized))?;
+                                info!("DEVICE NOT VALID2: {}", &device);
+                                copy_device_in(Path::new(&device))?;
+                                info!("Unsigned USB device done.");
+                                ready_in()?;
+                            }
+                        } else if event.property_value(
+                            OsStr::new("DEVTYPE")
+                                .to_str()
+                                .ok_or_else(|| anyhow!("Cannot convert DEVTYPE to str."))?,
+                        ) == Some(OsStr::new("partition"))
+                        {
+                            busy_in()?;
+                            //keys_in.push(product);
+                            let yubi: Yubistruct = Yubistruct {
+                                active: yubikey,
+                                yubikeys: list_yubikey(),
+                            };
+                            let keys: Usbkeys = Usbkeys {
+                                usb_in: keys_in.clone(),
+                                usb_out: keys_out.clone(),
+                                usb_undef: keys_undef.clone(),
+                                yubikeys: yubi,
+                            };
+                            info!("DEVICE NOT VALID3: {}", &device);
+                            let serialized = serde_json::to_string(&keys)?;
+                            websocket.send(Message::Text(serialized.into()))?;
+                            copy_device_in(Path::new(&device))?;
+                            ready_in()?;
+                            info!("Unsigned USB device done.");
+                        }
+                    //Signature ok so this is a out device
+                    } else {
+                        info!("USB device is signed.");
+                        let keys_out_iter: Vec<String> = keys_out.clone().into_iter().collect();
+                        if !keys_out_iter.contains(&product) {
+                            busy_out()?;
+                            keys_out.push(product);
+                            let yubi: Yubistruct = Yubistruct {
+                                active: yubikey,
+                                yubikeys: list_yubikey(),
+                            };
+                            let keys: Usbkeys = Usbkeys {
+                                usb_in: keys_in.clone(),
+                                usb_out: keys_out.clone(),
+                                usb_undef: keys_undef.clone(),
+                                yubikeys: yubi,
+                            };
+                            let serialized = serde_json::to_string(&keys)?;
+                            match websocket.send(Message::Text(serialized.into())) {
+                                Ok(_) => log::debug!("Data wrote into the websocket"),
+                                Err(e) => {
+                                    log::error!("Cannot write data into the websocket: {e}")
                                 }
                             }
+                            move_device_out(Path::new(&device))?;
+                            info!("Signed USB device done.");
+                            ready_out()?;
                         }
-                        Err(e) => {
-                            info!("USB device never signed: {e:?}");
-                            let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
-                            if !keys_in_iter.contains(&product) {
-                                // busy_in ?
-                                busy_in()?;
-                                keys_in.push(product);
-                                let yubi: Yubistruct = Yubistruct {
-                                    active: yubikey,
-                                    yubikeys: list_yubikey(),
-                                };
-                                let keys: Usbkeys = Usbkeys {
-                                    usb_in: keys_in.clone(),
-                                    usb_out: keys_out.clone(),
-                                    usb_undef: keys_undef.clone(),
-                                    yubikeys: yubi,
-                                };
-                                let serialized = serde_json::to_string(&keys)?;
-                                websocket.send(Message::Text(serialized))?;
-                                if yubikey {
-                                    match hmac_challenge() {
-                                        Some(name) => {
-                                            info!("HMAC challenge successfull for user: {name} !");
-                                            copy_device_in(Path::new(&device))?;
-                                            info!("Unsigned USB device done.");
-                                            ready_in()?;
-                                        }
-                                        None => warn!("No user found during HMAC challenge !"),
-                                    };
-                                } else {
-                                    copy_device_in(Path::new(&device))?;
-                                    info!("Unsigned USB device done.");
-                                    ready_in()?;
-                                }
-                            }
-                        }
-                    };
+                    }
                 } else if event.action() == Some(OsStr::new("remove")) {
                     let product = match get_attr_udev(event) {
                         Ok(product) => product,
@@ -954,7 +972,7 @@ fn main() -> Result<()> {
                     };
 
                     let serialized = serde_json::to_string(&keys)?;
-                    websocket.send(Message::Text(serialized))?;
+                    websocket.send(Message::Text(serialized.into()))?;
                 }
 
                 sthread::sleep(Duration::from_millis(60));

@@ -10,6 +10,8 @@
 
 /usr/bin/keysas-out {
   #include <abstractions/base>
+  /etc/keysas/ r,
+  /etc/keysas/** r,
   owner /var/local/out/ r,
   owner /var/local/out/** rw,
 }

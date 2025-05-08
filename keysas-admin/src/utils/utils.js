@@ -1,7 +1,7 @@
 "use strict";
 
-import { invoke } from "@tauri-apps/api";
-import { open } from "@tauri-apps/api/dialog";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from '@tauri-apps/plugin-dialog';
 
 export async function reboot(ip) {
     try {

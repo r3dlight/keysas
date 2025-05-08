@@ -2,7 +2,7 @@
 /*
  * The "keysas-lib".
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas_lib.
@@ -23,16 +23,17 @@
 #![warn(deprecated)]
 #![warn(unused_imports)]
 
-use anyhow::{anyhow, Context};
-use der::asn1::SetOfVec;
-use der::oid::db::rfc4519;
+use anyhow::{Context, anyhow};
 use der::Any;
 use der::Tag;
+use der::asn1::SetOfVec;
+use der::oid::db::rfc4519;
 use oqs::sig::{Algorithm, Sig};
-use pkcs8::der::asn1::OctetString;
-use pkcs8::der::oid::db::rfc5280;
 use pkcs8::der::DecodePem;
 use pkcs8::der::Encode;
+use pkcs8::der::asn1::OctetString;
+use pkcs8::der::oid::db::rfc5280;
+use serde_derive::Serialize;
 use std::time::Duration;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::certificate::*;
@@ -46,8 +47,8 @@ use x509_cert::spki::ObjectIdentifier;
 use x509_cert::spki::SubjectPublicKeyInfo;
 use x509_cert::time::Validity;
 
-use crate::pki::DILITHIUM5_OID;
 use crate::pki::ED25519_OID;
+use crate::pki::ML_DSA87_OID;
 
 /// Structure containing informations to build the certificate
 #[derive(Debug, Clone, Serialize)]
@@ -68,7 +69,7 @@ pub struct CertificateFields {
 /// # Arguments
 ///
 /// * `pem` - Certificate in PEM format
-/// * `ca_cert` - CA certificate either ED25519 or Dilithium
+/// * `ca_cert` - CA certificate either ED25519 or ML-DSA87
 pub fn validate_signing_certificate(
     pem: &str,
     ca_cert: Option<&Certificate>,
@@ -120,15 +121,15 @@ pub fn validate_signing_certificate(
                 ca_key.verify_strict(&cert.tbs_certificate.to_der()?, &sig)?;
                 // If the signature is invalid an error is thrown
             }
-            DILITHIUM5_OID => {
+            ML_DSA87_OID => {
                 // Initialize liboqs
-                log::info!("Found Dilithium5 OID");
+                log::info!("Found ML-DSA87 OID");
                 oqs::init();
 
                 // Extract the CA public key
-                let pq_scheme = match Sig::new(Algorithm::Dilithium5) {
+                let pq_scheme = match Sig::new(Algorithm::MlDsa87) {
                     Ok(pq_s) => pq_s,
-                    Err(e) => return Err(anyhow!("Cannot construct new Dilithium algorithm: {e}")),
+                    Err(e) => return Err(anyhow!("Cannot construct new ML-DSA87 algorithm: {e}")),
                 };
                 let ca_key = pq_scheme
                     .public_key_from_bytes(
@@ -137,7 +138,7 @@ pub fn validate_signing_certificate(
                             .subject_public_key
                             .raw_bytes(),
                     )
-                    .ok_or_else(|| anyhow!("Invalid Dilithium key"))?;
+                    .ok_or_else(|| anyhow!("Invalid ML-DSA87 key"))?;
 
                 // Verify the certificate signature
                 let sig = pq_scheme
@@ -189,6 +190,15 @@ impl CertificateFields {
 
         // Test if validity can be converted to u32
         let val = validity.map(|value| value.parse::<u32>()).transpose()?;
+        if val.is_some() {
+            // unwrap is safe here as we have checked the validity
+            match val.unwrap().checked_mul(86_400) {
+                Some(_) => (),
+                None => {
+                    return Err(anyhow!("Validity value is too large"));
+                }
+            }
+        }
 
         Ok(CertificateFields {
             org_name: org_name.map(|name| name.to_string()),
@@ -306,7 +316,7 @@ impl CertificateFields {
         //  - Issuer and subject are set with distinguished names
         //  - Unique Identifiers are not used
         //  - Extensions are set
-        log::debug!("Serial number generated is {:?}", serial);
+        log::debug!("Serial number generated is {serial:?}");
         let serial_number = SerialNumber::new(&serial[0..19])
             .with_context(|| "Failed to generate serial number")?;
         let tbs = TbsCertificate {

@@ -2,22 +2,22 @@
 /*
  * The "keysas-sign".
  *
- * (C) Copyright 2019-2023 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * The code for keysas-sign binary.
  */
 
 use crate::get_pki_dir;
-use anyhow::{anyhow, Context, Result};
-use base64::{engine::general_purpose, Engine as _};
+use anyhow::{Context, Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use ed25519_dalek::SigningKey;
 use keysas_lib::keysas_key::KeysasKey;
 use keysas_lib::keysas_key::KeysasPQKey;
 use libc::{c_int, c_short, c_ulong, c_void};
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::SeekFrom;
+use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::ptr;
@@ -48,7 +48,7 @@ type nfds_t = c_ulong;
 const POLLIN: c_short = 0x0001;
 
 #[cfg(target_os = "linux")]
-extern "C" {
+unsafe extern "C" {
     fn ppoll(
         fds: *mut pollfd,
         nfds: nfds_t,
@@ -68,9 +68,9 @@ fn rm_last(value: &str) -> &str {
         Some(last) => {
             if last.is_numeric() {
                 tmp.next_back();
-                return tmp.as_str();
+                tmp.as_str()
             } else {
-                return tmp.as_str();
+                tmp.as_str()
             }
         }
         None => value,
@@ -89,19 +89,18 @@ fn sign_device(
     path_pq: &Path,
     password: &str,
 ) -> Result<String> {
-    //use nom::AsBytes;
-    let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
+    let data = format!("{vendor}/{model}/{revision}/{serial}/{direction}");
     // Test the private keys by loading them
     let classic_struct = SigningKey::load_keys(path_cl, password)?;
-    let pq_pub_struct = KeysasPQKey::load_keys(path_pq, password)?;
+    let pq_struct = KeysasPQKey::load_keys(path_pq, password)?;
     let classic_sig = classic_struct.message_sign(data.as_bytes())?;
-    let pq_sig = pq_pub_struct.message_sign(data.as_bytes())?;
+    let pq_sig = pq_struct.message_sign(data.as_bytes())?;
     let hybrid_sig = format!(
         "{}|{}",
         general_purpose::STANDARD.encode(classic_sig.as_slice()),
         general_purpose::STANDARD.encode(pq_sig.as_slice())
     );
-    log::debug!("{}", hybrid_sig);
+    log::debug!("{hybrid_sig}",);
     Ok(hybrid_sig)
 }
 
@@ -150,7 +149,13 @@ pub fn watch_new_usb() -> Result<(String, String, String, String, String)> {
                 ) == Some(OsStr::new("partition"))
             {
                 let dev = event.device();
-                let device = dev.devnode().unwrap();
+                let device = match dev.devnode() {
+                    Some(dev) => dev,
+                    None => {
+                        log::error!("Cannot get device name.");
+                        return Err(anyhow!("Cannot get device name."));
+                    }
+                };
                 let dev = &device.to_string_lossy();
                 let device = rm_last(dev);
 
@@ -260,7 +265,7 @@ pub fn sign_usb(
         vendor, model, revision, serial, direction, path_cl, path_pq, password,
     )?;
     let size_u32 = attrs.len() as u32;
-    log::info!("Signature size is {}", size_u32);
+    log::info!("Signature size is {size_u32}");
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
     f.write_all(attrs.as_bytes())?;
@@ -276,9 +281,11 @@ pub fn revoke_device(device: &str) -> Result<()> {
         .open(device)
         .context("Cannot open device for revoking.")?;
 
-    //Let's write behind the magic number now
+    // Let's write behind the magic number
+    // Size must not be > 7684 bytes LBA-MBR (8196-512)
+    // TODO: Erase with random data
     let offset = 512;
-    let blank: String = String::from("000000000000000000");
+    let blank = "0".repeat(7683);
     let size_u32 = blank.len() as u32;
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;

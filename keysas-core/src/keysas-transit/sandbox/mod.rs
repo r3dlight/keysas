@@ -2,7 +2,7 @@
 /*
  * The "keysas-transit".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -10,8 +10,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, RulesetError, RulesetStatus, ABI,
+    ABI, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr, RulesetCreatedAttr,
+    RulesetError, RulesetStatus, path_beneath_rules,
 };
 use std::path::Path;
 use std::process;
@@ -44,6 +44,7 @@ pub fn init() -> Result<()> {
     #[cfg(target_arch = "aarch64")]
     ctx.allow_syscall(Syscall::dup3)?;
     ctx.allow_syscall(Syscall::newfstatat)?;
+    ctx.allow_syscall(Syscall::fstat)?;
     ctx.allow_syscall(Syscall::madvise)?;
     ctx.allow_syscall(Syscall::accept4)?;
     ctx.allow_syscall(Syscall::bind)?;
@@ -78,6 +79,7 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::landlock_add_rule)?;
     ctx.allow_syscall(Syscall::landlock_restrict_self)?;
     ctx.allow_syscall(Syscall::clock_gettime)?;
+    ctx.allow_syscall(Syscall::exit_group)?;
     ctx.load()?;
     Ok(())
 }

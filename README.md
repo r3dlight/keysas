@@ -14,11 +14,14 @@
 - Signatures (for scanned files and USB keys)
     - Trusted (Outgoing) USB devices must be signed with Keysas-admin application
     - Each verified file signature is stored in the corresponding file report (.krp) 
-    - Signatures are post-quantum proof (hybrid Ed25519/Diltithium5 scheme)
+    - Signatures are post-quantum proof (hybrid Ed25519/Ml-Dsa-87 scheme)
     - Private keys are stored using PKCS#8 format
     - x509 certificates are signed by the internal PKI (using Keysas-admin)
 - Authentication
   - Users can be authenticated using personal Yubikeys 5
+
+# Security
+  - This code has undergone a security audit conducted by [Amossys](https://www.amossys.fr/) an external company specialized in cybersecurity. Since this audit, all security patches have been applied to the current v2.5. See SECURITY.md for more information.
 
 # Keysas-core
 
@@ -50,16 +53,20 @@ Files are passed between daemons as raw file descriptors and using abstract sock
 On Debian stable (Bookwoom only):
 
 ```bash
-apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev acl xinit sudo 
-bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+sudo apt -qy install -y libyara-dev libyara9 wget cmake make lsb-release software-properties-common libseccomp-dev clamav-daemon clamav-freshclam pkg-config git bash libudev-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev acl xinit sudo 
+sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
 source "$HOME/.cargo/env"
 git clone --depth=1 https://github.com/r3dlight/keysas && cd keysas
 rustup default nightly
 make help
 make build
-make install
+sudo make install
 ```
+
+On Debian Trixie:
+
+Install libyara10 and libwebkit2gtk-4.1-dev instead
 
 ## User documentation
 

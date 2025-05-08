@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2024 Stephane Neveu, Luc Bonnafoux
+ * (C) Copyright 2019-2025 Stephane Neveu, Luc Bonnafoux
  *
  * This file contains various funtions
  * for building the keysas-out binary.
@@ -34,7 +34,7 @@
 //!         "file_digest",         // String: base64 encoded SHA256 digest of the file
 //!         "metadata_digest",     // String: base64 encoded SHA256 digest of the metadata
 //!         "station_certificate", // String: concatenation of the station signing certificates PEM
-//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and Dilithium5 signatures
+//!         "report_signature",    // String: base64 encoded concatenation of the ED25519 and ML-DSA87 signatures
 //!     }
 //! }
 //! ```
@@ -61,11 +61,11 @@
 #![feature(str_split_remainder)]
 
 use anyhow::Result;
-use clap::{crate_version, Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, crate_version};
 use keysas_lib::append_ext;
+use keysas_lib::file_report::FileMetadata;
 use keysas_lib::file_report::bind_and_sign;
 use keysas_lib::file_report::generate_report_metadata;
-use keysas_lib::file_report::FileMetadata;
 use keysas_lib::init_logger;
 use keysas_lib::keysas_hybrid_keypair::HybridKeyPair;
 use keysas_lib::sha256_digest;
@@ -97,6 +97,7 @@ pub struct FileData {
 /// Directory containing the station signing keys
 const KEY_FILE_DIR: &str = "/etc/keysas";
 /// Password for the private signing keys PKCS#8 files
+/// TODO: Remove this hardcoded pass and add a config file
 const KEY_PASSWD: &str = "Keysas007";
 /// Directory containing the station configuration
 const CONFIG_DIRECTORY: &str = "/etc/keysas";
@@ -178,7 +179,9 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match bincode::deserialize_from::<&[u8], FileMetadata>(buffer) {
                 Ok(meta) => Some(FileData { fd, md: meta }),
                 Err(e) => {
-                    warn!("Failed to deserialize messge from keysas-transit: {e}, killing myself.");
+                    warn!(
+                        "Failed to deserialize message from keysas-transit: {e}, killing myself."
+                    );
                     process::exit(1);
                 }
             }
@@ -219,7 +222,6 @@ fn output_files(
         path.push(&f.md.filename);
         let path = append_ext("krp", path);
         let mut report = File::options()
-            .read(true)
             .write(true)
             .create(true)
             .truncate(true)
@@ -227,7 +229,7 @@ fn output_files(
         let json_report = serde_json::to_string_pretty(&new_report)?;
 
         info!("{json_report}");
-        writeln!(report, "{}", json_report)?;
+        writeln!(report, "{json_report}")?;
 
         // Test if the check passed, if yes write the file to sas_out
         if f.md.is_digest_ok
@@ -235,8 +237,7 @@ fn output_files(
             && f.md.is_type_allowed
             && f.md.av_pass
             && !f.md.is_corrupted
-            && f.md.yara_pass
-            || (!f.md.yara_pass && !conf.yara_clean)
+            && (f.md.yara_pass || conf.yara_clean)
         {
             // Output file
             let mut reader = BufReader::new(&file);
@@ -270,8 +271,6 @@ fn output_files(
 /// 2. Parse them
 /// 3. Create reports for each file and outputs them with the file to the output directory
 fn main() -> Result<()> {
-    // TODO activate seccomp
-
     // Parse command arguments
     let config = parse_args();
 

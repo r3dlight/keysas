@@ -2,7 +2,7 @@
 /*
  * The "keysas-out".
  *
- * (C) Copyright 2019-2024 Stephane Neveu
+ * (C) Copyright 2019-2025 Stephane Neveu
  *
  * This file contains various funtions
  * to sandbox this binary using seccomp.
@@ -11,8 +11,8 @@
 use crate::CONFIG_DIRECTORY;
 pub use anyhow::Result;
 use landlock::{
-    path_beneath_rules, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr,
-    RulesetCreatedAttr, RulesetError, RulesetStatus, ABI,
+    ABI, Access, AccessFs, CompatLevel, Compatible, Ruleset, RulesetAttr, RulesetCreatedAttr,
+    RulesetError, RulesetStatus, path_beneath_rules,
 };
 
 #[cfg(target_os = "linux")]
@@ -63,6 +63,8 @@ pub fn init() -> Result<()> {
     ctx.allow_syscall(Syscall::execve)?;
     ctx.allow_syscall(Syscall::copy_file_range)?;
     ctx.allow_syscall(Syscall::clock_gettime)?;
+    ctx.allow_syscall(Syscall::futex)?;
+    ctx.allow_syscall(Syscall::exit_group)?;
     ctx.load()?;
     Ok(())
 }
