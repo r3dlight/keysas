@@ -89,7 +89,7 @@ fn sign_device(
     path_pq: &Path,
     password: &str,
 ) -> Result<String> {
-    let data = format!("{}/{}/{}/{}/{}", vendor, model, revision, serial, direction);
+    let data = format!("{vendor}/{model}/{revision}/{serial}/{direction}");
     // Test the private keys by loading them
     let classic_struct = SigningKey::load_keys(path_cl, password)?;
     let pq_struct = KeysasPQKey::load_keys(path_pq, password)?;
@@ -100,7 +100,7 @@ fn sign_device(
         general_purpose::STANDARD.encode(classic_sig.as_slice()),
         general_purpose::STANDARD.encode(pq_sig.as_slice())
     );
-    log::debug!("{}", hybrid_sig);
+    log::debug!("{hybrid_sig}", );
     Ok(hybrid_sig)
 }
 
@@ -265,7 +265,7 @@ pub fn sign_usb(
         vendor, model, revision, serial, direction, path_cl, path_pq, password,
     )?;
     let size_u32 = attrs.len() as u32;
-    log::info!("Signature size is {}", size_u32);
+    log::info!("Signature size is {size_u32}");
     f.seek(SeekFrom::Start(offset))?;
     f.write_all(&size_u32.to_be_bytes())?;
     f.write_all(attrs.as_bytes())?;

@@ -199,7 +199,7 @@ fn main() -> Result<()> {
         match generate_signing_keypair(&config, FILE_PRIV_CL_PATH, FILE_PRIV_PQ_PATH, KEY_PASSWD) {
             Ok(r) => {
                 // Return the CSR
-                println!("{}", r);
+                println!("{r}");
             }
             Err(e) => {
                 return Err(anyhow!("Failed to generate private key {e}"));

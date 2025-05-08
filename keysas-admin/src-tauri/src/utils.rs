@@ -35,7 +35,7 @@ pub fn cmd_generate_key_and_get_csr(
     let cmd_res = match session_exec(session, &command) {
         Ok(res) => res,
         Err(why) => {
-            log::error!("Error on send_command: {:?}", why);
+            log::error!("Error on send_command: {why:?}");
             return Err(anyhow!("Connection failed"));
         }
     };
@@ -123,7 +123,7 @@ pub fn send_cert_to_station(
 pub fn save_certificate(cert: &Certificate, path: &Path) -> Result<(), anyhow::Error> {
     let output = String::from_utf8(cert.to_pem(LineEnding::LF)?.into())?;
     let mut file = File::create(path)?;
-    write!(file, "{}", output)?;
+    write!(file, "{output}")?;
     Ok(())
 }
 
@@ -158,13 +158,13 @@ pub async fn check_restore_pki(
 
             if subdirectory_path.exists() && subdirectory_path.is_dir() {
                 if file_path.exists() && file_path.is_file() {
-                    log::debug!("Found file {} in directory {}.", file, directory);
+                    log::debug!("Found file {file} in directory {directory}.");
                 } else {
-                    log::error!("File {} not found in directory {}.", file, directory);
+                    log::error!("File {file} not found in directory {directory}.");
                     return Err(anyhow!("Invalid algorithm OID"));
                 }
             } else {
-                log::error!("Directory {:?} doesn't exist.", subdirectory_path);
+                log::error!("Directory {subdirectory_path:?} doesn't exist.");
                 return Err(anyhow!("Directory do not exist"));
             }
         }
@@ -333,9 +333,9 @@ pub async fn check_restore_pki(
             return Err(anyhow!("RdnSequence not valid: length is not 2"));
         }
     }
-    log::debug!("Found Country: {} ", country);
-    log::debug!("Found organization: {} ", organization);
-    log::debug!("Found organizational_unit: {} ", organizational_unit);
+    log::debug!("Found Country: {country} ");
+    log::debug!("Found organization: {organization} ");
+    log::debug!("Found organizational_unit: {organizational_unit} ");
     if !country.is_empty() && !organization.is_empty() && !organizational_unit.is_empty() {
         let cert_infos = CertificateFields {
             org_name: Some(organization.to_string()),

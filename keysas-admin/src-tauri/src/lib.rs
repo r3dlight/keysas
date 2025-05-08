@@ -271,7 +271,7 @@ async fn list_stations() -> Result<String, String> {
                     return Err(String::from("Invalid result"));
                 }
             };
-            log::debug!("Station list: {}", result);
+            log::debug!("Station list: {result}");
             Ok(result)
         }
         Err(e) => {
@@ -450,7 +450,7 @@ async fn update(ip: String) -> bool {
     };
 
     let host = format!("{}{}", ip.trim(), ":22");
-    log::error!("Rust will try updating host: {}", host);
+    log::error!("Rust will try updating host: {host}");
 
     // Connect to the host
     let mut session = match connect_key(&ip, &private_key) {
@@ -471,7 +471,7 @@ async fn update(ip: String) -> bool {
             log::info!("Trying to update and rebooting...");
         }
         Err(why) => {
-            log::error!("Error while updating: {:?}", why);
+            log::error!("Error while updating: {why:?}");
             session.close();
             return false;
         }
@@ -492,7 +492,7 @@ async fn reboot(ip: String) -> bool {
     };
     // Connect to the host
     let host = format!("{}{}", ip.trim(), ":22");
-    log::info!("Rust will try rebooting host: {}", host);
+    log::info!("Rust will try rebooting host: {host}");
     let mut session = match connect_key(&ip, &private_key) {
         Ok(s) => s,
         Err(e) => {
@@ -506,7 +506,7 @@ async fn reboot(ip: String) -> bool {
             log::info!("Keysas station is rebooting !");
         }
         Err(why) => {
-            log::error!("Rust error on open_exec: {:?}", why);
+            log::error!("Rust error on open_exec: {why:?}");
             session.close();
             return false;
         }
@@ -539,7 +539,7 @@ async fn shutdown(ip: String) -> bool {
             session.close();
         }
         Err(why) => {
-            log::error!("Rust error on open_exec: {:?}", why);
+            log::error!("Rust error on open_exec: {why:?}");
             session.close();
             return false;
         }
@@ -559,7 +559,7 @@ async fn export_sshpubkey(ip: String) -> bool {
             return false;
         }
     };
-    log::info!("Exporting public SSH key to {:?}", ip);
+    log::info!("Exporting public SSH key to {ip:?}");
     // Connect to the host
     let mut session = match connect_pwd(&ip) {
         Ok(s) => s,
@@ -578,7 +578,7 @@ async fn export_sshpubkey(ip: String) -> bool {
             log::info!("authorized_keys successfully s-copied !");
         }
         Err(e) => {
-            log::error!("Rust error on upload: {:?}", e);
+            log::error!("Rust error on upload: {e:?}");
             session.close();
             return false;
         }
@@ -602,7 +602,7 @@ async fn export_sshpubkey(ip: String) -> bool {
             true
         }
         Err(e) => {
-            log::error!("Rust error on open_exec: {:?}", e);
+            log::error!("Rust error on open_exec: {e:?}");
             session.close();
             false
         }
@@ -647,7 +647,7 @@ async fn is_alive(name: String) -> Result<bool, String> {
             log::info!("Keysas is alive.");
         }
         Err(why) => {
-            log::error!("Cannot execute command status: {:?}", why);
+            log::error!("Cannot execute command status: {why:?}");
             session.close();
             return Err(String::from("Store error"));
         }

@@ -172,7 +172,7 @@ fn main() -> Result<()> {
         let stream = match stream {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("Failed to accept client connection: {}", e);
+                eprintln!("Failed to accept client connection: {e}");
                 continue;
             }
         };

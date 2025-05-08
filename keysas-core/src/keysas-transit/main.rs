@@ -227,7 +227,7 @@ fn parse_messages(messages: Messages, buffer: &[u8]) -> Vec<FileData> {
             match m {
                 Ok(ad) => Some(ad),
                 Err(e) => {
-                    log::warn!("failed to get ancillary data: {:?}", e);
+                    log::warn!("failed to get ancillary data: {e:?}");
                     None
                 }
             }

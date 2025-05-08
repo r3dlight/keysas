@@ -316,7 +316,7 @@ impl CertificateFields {
         //  - Issuer and subject are set with distinguished names
         //  - Unique Identifiers are not used
         //  - Extensions are set
-        log::debug!("Serial number generated is {:?}", serial);
+        log::debug!("Serial number generated is {serial:?}");
         let serial_number = SerialNumber::new(&serial[0..19])
             .with_context(|| "Failed to generate serial number")?;
         let tbs = TbsCertificate {

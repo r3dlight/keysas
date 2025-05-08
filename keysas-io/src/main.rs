@@ -856,7 +856,7 @@ fn main() -> Result<()> {
                     if !signed {
                         info!("Device signature is not valid !");
                         let keys_in_iter: Vec<String> = keys_in.clone().into_iter().collect();
-                        warn!("keys_in_iter: {:?}", keys_in_iter);
+                        warn!("keys_in_iter: {keys_in_iter:?}");
                         if !keys_in_iter.contains(&product) {
                             busy_in()?;
                             keys_in.push(product);

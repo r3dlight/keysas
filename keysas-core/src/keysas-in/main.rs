@@ -129,7 +129,7 @@ fn is_corrupted(file: PathBuf) -> bool {
                         None => PathBuf::new(),
                     };
                     path.push(corrupted_filename);
-                    warn!("Corrupted file should be: {:?}", path);
+                    warn!("Corrupted file should be: {path:?}");
                     path.exists() && path.is_file()
                 } else {
                     let ioerror = append_ext("ioerror", file);
@@ -201,7 +201,7 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
                 if m.is_corrupted {
                     let ioerror_report = append_ext("ioerror", f.clone());
                     match remove_file(&ioerror_report) {
-                        Ok(_) => warn!("Removing ioerror report: {:?}", ioerror_report),
+                        Ok(_) => warn!("Removing ioerror report: {ioerror_report:?}"),
                         Err(e) => error!("Cannot remove ioerror report: {e}"),
                     }
                 }
@@ -230,8 +230,8 @@ fn send_files(files: &[String], stream: &UnixStream, sas_in: &String) -> Result<
         // Files are unlinked once fds are sent
         for (file_path, &fd) in fs.iter().zip(fds.iter()) {
             match unlinkat(Some(fd), file_path, UnlinkatFlags::NoRemoveDir) {
-                Ok(_) => info!("File {:?} has been removed.", file_path),
-                Err(e) => error!("Cannot unlink file {:?}: {:?}", file_path, e),
+                Ok(_) => info!("File {file_path:?} has been removed."),
+                Err(e) => error!("Cannot unlink file {file_path:?}: {e:?}"),
             };
         }
     }
@@ -260,7 +260,7 @@ fn main() -> Result<()> {
         match remove_file(&config.socket_in) {
             Ok(_) => debug!("Removing previously created socket_in"),
             Err(why) => {
-                error!("Cannot remove previously created socket_in: {:?}", why);
+                error!("Cannot remove previously created socket_in: {why:?}");
                 process::exit(1);
             }
         }

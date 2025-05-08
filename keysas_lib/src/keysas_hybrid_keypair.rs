@@ -169,25 +169,25 @@ impl HybridKeyPair {
     ) -> Result<(), anyhow::Error> {
         // Save keys
         let cl_key_path = keys_path.join(name.to_owned() + "-cl.p8");
-        log::debug!("cl_key_path: {:?}", cl_key_path);
+        log::debug!("cl_key_path: {cl_key_path:?}");
         self.classic.save_keys(&cl_key_path, pwd)?;
 
         let pq_key_path = keys_path.join(name.to_owned() + "-pq.p8");
-        log::debug!("pq_key_path: {:?}", pq_key_path);
+        log::debug!("pq_key_path: {pq_key_path:?}");
         self.pq.save_keys(&pq_key_path, pwd)?;
 
         // Save certificates
         let cl_cert_path = certs_path.join(name.to_owned() + "-cl.pem");
         let cl_pem = self.classic_cert.to_pem(LineEnding::LF)?;
-        log::debug!("cl_cert_path: {:?}", cl_cert_path);
+        log::debug!("cl_cert_path: {cl_cert_path:?}");
         let mut cl_cert_file = File::create(cl_cert_path)?;
-        write!(cl_cert_file, "{}", cl_pem)?;
+        write!(cl_cert_file, "{cl_pem}")?;
 
         let pq_cert_path = certs_path.join(name.to_owned() + "-pq.pem");
         let pq_pem = self.pq_cert.to_pem(LineEnding::LF)?;
-        log::debug!("pq_cert_path: {:?}", pq_cert_path);
+        log::debug!("pq_cert_path: {pq_cert_path:?}");
         let mut pq_cert_file = File::create(pq_cert_path)?;
-        write!(pq_cert_file, "{}", pq_pem)?;
+        write!(pq_cert_file, "{pq_pem}")?;
 
         Ok(())
     }

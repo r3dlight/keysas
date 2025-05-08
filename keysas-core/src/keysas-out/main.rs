@@ -229,7 +229,7 @@ fn output_files(
         let json_report = serde_json::to_string_pretty(&new_report)?;
 
         info!("{json_report}");
-        writeln!(report, "{}", json_report)?;
+        writeln!(report, "{json_report}")?;
 
         // Test if the check passed, if yes write the file to sas_out
         if f.md.is_digest_ok

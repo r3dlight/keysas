@@ -100,7 +100,7 @@ pub fn get_ssh() -> Result<(String, String), anyhow::Error> {
                     true
                 })?;
                 if (public.chars().count() > 0) && (private.chars().count() > 0) {
-                    log::debug!("Found: {}, {}", public, private);
+                    log::debug!("Found: {public}, {private}");
                     Ok((public, private))
                 } else {
                     Err(anyhow!("get_ssh: Failed to find station in database"))
@@ -180,7 +180,7 @@ pub async fn drop_pki() -> Result<(), anyhow::Error> {
         Ok(hdl) => match hdl.as_ref() {
             Some(connection) => {
                 let query = "DROP TABLE ca_table; CREATE TABLE IF NOT EXISTS ca_table (name TEXT PRIMARY KEY, directory TEXT, org_name TEXT, org_unit TEXT, country TEXT, validity TEXT);".to_string();
-                log::debug!("Query: {}", query);
+                log::debug!("Query: {query}");
                 connection.execute(query)?;
                 Ok(())
             }
@@ -204,7 +204,7 @@ pub fn get_station_ip_by_name(name: &str) -> Result<String, anyhow::Error> {
                     result = row.read::<&str, _>("ip").to_string();
                 }
                 if result.chars().count() > 0 {
-                    log::debug!("Found: {}", result);
+                    log::debug!("Found: {result}");
                     Ok(result)
                 } else {
                     Err(anyhow!("Failed to find station in database"))
@@ -247,7 +247,7 @@ pub fn get_station_list() -> Result<Vec<Station>, anyhow::Error> {
                     result.push(st);
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -288,7 +288,7 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
                 let mut result = String::new();
                 connection.iterate(query, |pairs| {
                     for &(key, value) in pairs.iter() {
-                        println!("{:?}:{:?}", key, value);
+                        println!("{key:?}:{value:?}");
                         if key == "directory" {
                             if let Some(dir) = value {
                                 result.push_str(dir)
@@ -297,7 +297,7 @@ pub fn get_pki_dir() -> Result<String, anyhow::Error> {
                     }
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),
@@ -341,7 +341,7 @@ pub fn get_pki_info() -> Result<CertificateFields, anyhow::Error> {
                     }
                     true
                 })?;
-                log::debug!("Found: {:?}", result);
+                log::debug!("Found: {result:?}");
                 Ok(result)
             }
             None => Err(anyhow!("Store is not initialized")),
