@@ -100,7 +100,7 @@ fn sign_device(
         general_purpose::STANDARD.encode(classic_sig.as_slice()),
         general_purpose::STANDARD.encode(pq_sig.as_slice())
     );
-    log::debug!("{hybrid_sig}", );
+    log::debug!("{hybrid_sig}",);
     Ok(hybrid_sig)
 }
 
