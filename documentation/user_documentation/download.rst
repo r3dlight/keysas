@@ -5,19 +5,18 @@ Download
 Lastest release
 ===============
 
-Keysas v2.4
+Keysas v2.5
 ~~~~~~~~~~~~
 
 .. admonition:: Files
  :class: tip
 
- * `keysas-v2.4 <https://github.com/r3dlight/keysas/releases>`_
+ * `keysas-v2.5 <https://github.com/r3dlight/keysas/releases>`_
 
 .. admonition:: Release note
  :class: note
 
- * Remove duplicated pragmas
- * Bump dependencies and version to 2.4
- * Private & public key updated for keysas-admin
- * Remove tarpaulin cfgs to avoid warnings
+ * Complete security audit on Keysas-core, keysas-lib, keysas-io and keysas-admin
+ * Bump dependencies and version to 2.5
+ * Bump PQC to Ml-Dsa-87 for signatures
 

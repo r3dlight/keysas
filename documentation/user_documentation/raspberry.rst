@@ -3,9 +3,9 @@ Decontamination station for USB devices
 ***************************************
 
 
-This is a 100% open-source decontamination station version for **Raspberry Pi v4** (ready-to-go), but you can of course build **Keysas** on Debian 12 (Bookworm) for both architecture (x86_64 or aarch64).
+This is a 100% open-source decontamination station you can build on Debian 12 (or Debian 13) for both architecture (x86_64 or aarch64).
 
-The provided image is based on the Keysas software and offers antivirus scanning as well as analysis based on +20000 pre-installed Yara rules. 
+Keysas software offers antivirus scanning as well as analysis based on +20000 pre-installed Yara rules. 
 You can add new Yara rules as desired to increase the detection probability. 
 You can also filter the types and maximum size of files to transfer as output. 
 The code is entirely written in Rust, sandboxed, and follows the principle of least privilege.
@@ -14,36 +14,10 @@ The code is entirely written in Rust, sandboxed, and follows the principle of le
  Despite the care taken in the solution, there may still be some bugs during use. 
  Please don't hesitate to contact us to report any bugs, which will be addressed in future versions.
 
-.. admonition:: What the Keysas station doesn't protect you from
-  :class: warning
-
-  Due to the nature and low cost of the Raspberry Pi platform, the Keysas station will obviously not be protected against USB-Killer. Protection mechanisms are deployed against BadUSB attacks, but the station may still be potentially vulnerable, under certain conditions, during the startup phase. It is strongly recommended in this case to control the output USB device inventory (as we will discuss later in this documentation) and, to some extent, the input device inventory as well.
-
 Download
 =========
 - `Github/releases <https://github.com/r3dlight/keysas/releases>`_
 
-
-The downloaded image will automatically resize according to the size of your MicroSD card.
-To copy the **Keysas** station image to your SD card:
-
-.. code-block:: shell-session
-
- tar -xvzf keysas-sd-xxyy.tar.gz
- sudo dd if=raspberry_keysas_system_image.img of=/dev/sdX bs=1M status=progress
-
-
-However, it is recommended to use the bmaptool software as follows:
-
-.. code-block:: shell-session
-
- tar -xvzf keysas-sd-xxyy.tar.gz
- sudo bmaptool copy --bmap raspberry_keysas_system_image.img.bmap raspberry_keysas_system_image.img /dev/sdX 
-  
-Where sdX is the device detected by your computer for the SD card.
-
-.. note::
- Due to the high read/write activity on the MicroSD card, it is strongly recommended to use high-performance cards.
 
 Before getting started, you need to sign at least one output USB device (which will receive files considered safe). All unsigned USB storage devices will be considered default input devices (potentially containing malicious files).
 
@@ -59,7 +33,6 @@ It allows you to register your Keysas stations and manage them from an administr
 Currently, only GNU/Linux administration workstations are supported. The downloads are available in the download section above.
 
 To provide you with maximum security, the keysas-admin application is developed using the Tauri-app framework and exclusively uses Vue-JS 3 for the frontend and Rust language for the backend. 
-Once installed, the application will automatically notify you of available updates and offer to install them.
 
 The administration of **Keysas** stations works using the SSHv2 protocol. 
 Therefore, you need to generate a dedicated pair of ed25519 asymmetric keys for Keysas station administration. 
@@ -190,20 +163,11 @@ Using the Keysas Station
 All configuration files are located in /etc/keysas/keysas-*.conf. 
 It is possible to control a whitelist of file types (magic numbers) and set the maximum file size for transfer. Please refer to the official Keysas documentation for more information on the available options (https://keysas.fr/administration.html#keysas-transit).
 
-Hardening of the station
-=========================
+Hardening
+=========
 
-The pre-built system image for Raspberry Pi 4 includes the following hardening features:
-
-- Protections against BadUSB (the screen only works with the MIPI/DSI bus).
-- Linux-hardened kernel with ClipOS v5 configuration.
-- NFTables firewall (only the SSH port is exposed).
-- Protection against SSH brute force attacks.
-- Anti-bounce protection for SSH (SSH pivot).
-- Specific configuration of the Linux kernel.
 - Unsigned devices mounted as read-only (RO), NODEV, NOSUID, NOEXEC, NODEV.
-- User sandboxing using Firejail.
-- **Keysas** daemons sandboxed using Seccomp, Landlock, Namespaces, AppArmor.
+- **Keysas** unprivileged daemons sandboxed using Seccomp, Landlock, Namespaces, AppArmor.
 
 For each transferred file, depending on the results of various scans, you may find the following extensions:
 
@@ -213,17 +177,8 @@ For each transferred file, depending on the results of various scans, you may fi
 
 
 
-Updates
-========
-
-The **Keysas** station automatically installs the latest antivirus signatures and security updates when it has internet access. 
-If the station cannot access the internet, updates can be performed using a local repository in the information system. 
-Check the **FreshClam** documentation.
-However, for now the "Keysas" daemons are not automatically updated and require the installation of new images that will be provided. 
-It is important to backup configurations and generated keys.
-
-Required Hardware
-=================
+Required Hardware to build on Raspberry Pi
+===========================================
 
 `Official screen. <https://www.raspberrypi.com/products/raspberry-pi-touch-display/>`_
 

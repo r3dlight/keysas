@@ -12,8 +12,7 @@ Keysas-admin application
 
  **Keysas-admin** only work on GNU/Linux based systems for now !
  To be able to sign USB devices with your current user, 
- create a new udev rule **/etc/udev/rules.d/71-keysas.rules** with the following:
- **SUBSYSTEMS=="usb", MODE="0660", TAG+="uaccess"**
+ create a new udev rule **/etc/udev/rules.d/71-keysas.rules** (see later)
 
 SSH configuration
 =================
