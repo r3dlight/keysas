@@ -37,25 +37,21 @@ To compile Keysas from sources, let's start by installing the required dependenc
 Getting **Keysas**
 -------------------
 
-A pre-compiled **Keysas** binary is at your
+A pre-compiled **Keysas** binary for ``x86_64`` architecture is at your
 disposal. We recommend using the latest version here:
 https://github.com/r3dlight/keysas/releases
 
 
 Download the following files of lastest stable version.
- * keysas-vx.y.z.zip
- * keysas-vx.y.z.zip.sha256
- * keysas-vx.y.z.zip.sig
+ * keysas-vx.y.z.-x86_64.zip
+ * keysas-vx.y.z.-x86_64.zip.sha256
 
-First, verify the sha256sum and compare it to the keysas-vx.y.z.zip.sha256
-file, and import our public gpg key:
+Verify the sha256sum and compare it to the keysas-vx.y.z.zip.sha256
+file:
 
 .. code-block:: shell-session
 
  $ diff <(sha256sum keysas-vx.y.z.zip) keysas-vx.y.z.zip.sha256 
- $ wget https://keysas.fr/download/public.gpg
- $ gpg2 --import public.gpg
- $ gpg2 --verify keysas-vx.y.z.zip.sig keysas-vx.y.z.zip
  $ unzip keysas-vx.y.z.zip -d keysas
 
 
